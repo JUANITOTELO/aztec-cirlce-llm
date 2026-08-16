@@ -29,12 +29,28 @@ class SessionState:
     edit_mode_enabled: bool = True
     attached_images: List[str] = field(default_factory=list)
 
+    def __post_init__(self):
+        import os
+        # If launched from inside an existing project (e.g. dummy13_app or any app folder),
+        # automatically target the current directory instead of looking for ./aztec_output
+        if (
+            os.path.exists("package.json")
+            or (os.path.exists("src") and os.path.isdir("src"))
+            or (os.path.exists("pyproject.toml") and not os.path.exists("aztec_circle"))
+        ):
+            self.output_dir = "."
+
     def record_run(self, cost_usd: float, tokens: int, loops: int, task_id: str):
         """Accumulate usage from a completed debate run."""
         self.total_cost_usd += cost_usd
         self.total_tokens += tokens
         self.loop_count = loops
         self.active_task_id = task_id
+
+    def record_cost(self, cost_usd: float, tokens: int = 0) -> None:
+        """Accumulate usage from edits, fixes, and auxiliary operations."""
+        self.total_cost_usd += cost_usd
+        self.total_tokens += tokens
 
     def prompt_text(self) -> str:
         """Render the dynamic prompt bar with optional vision badge."""

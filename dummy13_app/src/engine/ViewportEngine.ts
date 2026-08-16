@@ -19,9 +19,17 @@ export class ViewportEngine {
   private isDisposed: boolean = false;
   private gridHelper: THREE.GridHelper;
   private shadowPlane: THREE.Mesh;
+  private floorMesh: THREE.Mesh;
   private isWireframe: boolean = false;
   public gizmosVisible: boolean = true;
-  // Callbacks to React UI (throttled/transient)
+  private currentGizmoMode: GizmoMode = 'rotate';
+  public isGravityEnabled: boolean = true;
+  public isFloorSolid: boolean = true;
+  private velocityY: number = 0;
+  private readonly gravityAccel: number = -9.81;
+  private readonly bounceRestitution: number = 0.22;
+
+  // Callbacks to React UI
   public onJointSelected?: (jointId: JointId | null) => void;
   public onJointChanged?: (jointId: JointId, rotation: THREE.Quaternion) => void;
 
@@ -67,21 +75,31 @@ export class ViewportEngine {
     this.rig = new Dummy13Rig(initialTheme);
     this.scene.add(this.rig.rootGroup);
 
-    // Studio Lighting
-    this.setupLighting();
+    // Studio Environment: Solid Ground Stage, Grid & Shadows
+    const floorGeo = new THREE.CylinderGeometry(5.5, 5.7, 0.1, 48);
+    const floorMat = new THREE.MeshStandardMaterial({
+      color: 0x181a20,
+      roughness: 0.8,
+      metalness: 0.2
+    });
+    this.floorMesh = new THREE.Mesh(floorGeo, floorMat);
+    this.floorMesh.position.y = -0.05;
+    this.floorMesh.receiveShadow = true;
+    this.scene.add(this.floorMesh);
 
-    // Studio Environment Grid & Floor
-    this.gridHelper = new THREE.GridHelper(10, 20, 0x3b82f6, 0x27272a);
-    this.gridHelper.position.y = 0;
+    this.gridHelper = new THREE.GridHelper(10, 20, 0x3b82f6, 0x334155);
+    this.gridHelper.position.y = 0.001;
     this.scene.add(this.gridHelper);
 
-    const shadowGeo = new THREE.PlaneGeometry(10, 10);
-    const shadowMat = new THREE.ShadowMaterial({ opacity: 0.45 });
+    const shadowGeo = new THREE.PlaneGeometry(12, 12);
+    const shadowMat = new THREE.ShadowMaterial({ opacity: 0.55 });
     this.shadowPlane = new THREE.Mesh(shadowGeo, shadowMat);
     this.shadowPlane.rotation.x = -Math.PI / 2;
+    this.shadowPlane.position.y = 0.002;
     this.shadowPlane.receiveShadow = true;
     this.scene.add(this.shadowPlane);
 
+    this.setupLighting();
     this.bindEvents();
     this.startLoop();
   }
@@ -102,7 +120,7 @@ export class ViewportEngine {
     fillLight.position.set(-3, 2, -2);
     this.scene.add(fillLight);
 
-    const rimLight = new THREE.DirectionalLight(0xec4899, 0.5);
+    const rimLight = new THREE.DirectionalLight(0xf43f5e, 0.5);
     rimLight.position.set(0, 3, -4);
     this.scene.add(rimLight);
   }
@@ -115,15 +133,22 @@ export class ViewportEngine {
     });
 
     this.transformControls.addEventListener('change', () => {
+      this.velocityY = 0;
       const attachedObj = this.transformControls.object;
       if (attachedObj && attachedObj.name.startsWith('joint_')) {
         const jointId = attachedObj.name.replace('joint_', '') as JointId;
         const def = JOINT_DEFINITIONS[jointId];
         if (def) {
-          // Re-clamp directly in transient frame loop
-          this.rig.setJointRotation(jointId, attachedObj.quaternion);
-          if (this.onJointChanged) {
-            this.onJointChanged(jointId, attachedObj.quaternion);
+          if (jointId !== 'pelvis' && jointId !== 'root') {
+            this.rig.setJointRotation(jointId, attachedObj.quaternion);
+            if (this.isFloorSolid) {
+              this.rig.clampToFloor();
+            }
+            if (this.onJointChanged) {
+              this.onJointChanged(jointId, attachedObj.quaternion);
+            }
+          } else if (this.isFloorSolid) {
+            this.rig.clampToFloor();
           }
         }
       }
@@ -133,7 +158,6 @@ export class ViewportEngine {
     dom.addEventListener('pointermove', this.onPointerMove);
     window.addEventListener('resize', this.onWindowResize);
 
-    // WebGL Context Loss Handlers
     dom.addEventListener('webglcontextlost', (e) => {
       e.preventDefault();
       if (this.animFrameId) cancelAnimationFrame(this.animFrameId);
@@ -145,9 +169,8 @@ export class ViewportEngine {
 
   private onPointerDown = (event: MouseEvent): void => {
     if (!this.gizmosVisible) return;
-    // Raycast only if not already interacting with TransformControls
     if (this.transformControls.dragging) return;
-    if (event.button !== 0) return; // Left-click only
+    if (event.button !== 0) return;
 
     const rect = this.renderer.domElement.getBoundingClientRect();
     this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -201,6 +224,11 @@ export class ViewportEngine {
       const node = this.rig.jointNodes.get(jointId);
       if (node) {
         this.transformControls.attach(node);
+        if (this.currentGizmoMode === 'translate' && jointId !== 'pelvis' && jointId !== 'root') {
+          this.transformControls.setMode('rotate');
+        } else if (this.currentGizmoMode !== 'none') {
+          this.transformControls.setMode(this.currentGizmoMode);
+        }
       }
     } else {
       this.transformControls.detach();
@@ -212,11 +240,19 @@ export class ViewportEngine {
   }
 
   public setGizmoMode(mode: GizmoMode): void {
+    this.currentGizmoMode = mode;
     if (mode === 'none') {
       this.transformControls.detach();
+    } else if (mode === 'translate') {
+      const attachedObj = this.transformControls.object;
+      const jointId = attachedObj?.name.replace('joint_', '') as JointId | undefined;
+      if (!jointId || (jointId !== 'pelvis' && jointId !== 'root')) {
+        this.selectJoint('pelvis');
+      }
+      this.transformControls.setMode('translate');
     } else {
       this.transformControls.setMode(mode);
-      if (this.rig.jointNodes.has('pelvis') && !this.transformControls.object) {
+      if (!this.transformControls.object && this.rig.jointNodes.has('pelvis')) {
         this.selectJoint('pelvis');
       }
     }
@@ -246,10 +282,10 @@ export class ViewportEngine {
       if (child instanceof THREE.Mesh && !handleSet.has(child)) {
         if (Array.isArray(child.material)) {
           child.material.forEach((m) => {
-            if ('wireframe' in m) (m as THREE.MeshStandardMaterial).wireframe = this.isWireframe;
+            m.wireframe = this.isWireframe;
           });
-        } else if (child.material && 'wireframe' in child.material) {
-          (child.material as THREE.MeshStandardMaterial).wireframe = this.isWireframe;
+        } else if (child.material) {
+          child.material.wireframe = this.isWireframe;
         }
       }
     });
@@ -259,20 +295,65 @@ export class ViewportEngine {
   public toggleGizmoVisibility(): boolean {
     this.gizmosVisible = !this.gizmosVisible;
     this.rig.setHandlesVisible(this.gizmosVisible);
-    this.transformControls.visible = this.gizmosVisible;
-    this.transformControls.enabled = this.gizmosVisible;
     return this.gizmosVisible;
   }
 
-  public captureScreenshot(): string {
-    this.renderer.render(this.scene, this.camera);
-    return this.renderer.domElement.toDataURL('image/png');
+  public toggleGravity(): boolean {
+    this.isGravityEnabled = !this.isGravityEnabled;
+    this.velocityY = 0;
+    return this.isGravityEnabled;
+  }
+
+  public dropToFloor(): void {
+    this.velocityY = 0;
+    this.rig.dropToFloor();
   }
 
   private startLoop = (): void => {
+    let lastTime = performance.now();
+
     const render = () => {
       if (this.isDisposed) return;
       this.animFrameId = requestAnimationFrame(render);
+      const now = performance.now();
+      const dt = Math.min((now - lastTime) / 1000, 0.05);
+      lastTime = now;
+
+      const isTransforming = this.transformControls.dragging;
+      const pelvis = this.rig.jointNodes.get('pelvis');
+
+      if (!isTransforming && pelvis) {
+        this.rig.rootGroup.updateMatrixWorld(true);
+        const lowest = this.rig.getLowestY();
+
+        if (this.isGravityEnabled) {
+          this.velocityY += this.gravityAccel * dt;
+          this.velocityY = Math.max(this.velocityY, -25.0);
+
+          pelvis.position.y += this.velocityY * dt;
+          this.rig.rootGroup.updateMatrixWorld(true);
+
+          const currentLowest = this.rig.getLowestY();
+          if (this.isFloorSolid && currentLowest <= 0) {
+            pelvis.position.y -= currentLowest;
+            this.rig.rootGroup.updateMatrixWorld(true);
+
+            if (this.velocityY < 0) {
+              this.velocityY = -this.velocityY * this.bounceRestitution;
+              if (Math.abs(this.velocityY) < 0.15) {
+                this.velocityY = 0;
+              }
+            }
+          }
+        } else if (this.isFloorSolid) {
+          if (lowest < 0) {
+            pelvis.position.y -= lowest;
+            this.rig.rootGroup.updateMatrixWorld(true);
+          }
+          this.velocityY = 0;
+        }
+      }
+
       this.orbitControls.update();
       this.renderer.render(this.scene, this.camera);
     };
@@ -294,6 +375,8 @@ export class ViewportEngine {
     (this.gridHelper.material as THREE.Material).dispose();
     this.shadowPlane.geometry.dispose();
     (this.shadowPlane.material as THREE.Material).dispose();
+    this.floorMesh.geometry.dispose();
+    (this.floorMesh.material as THREE.Material).dispose();
 
     this.renderer.dispose();
     if (this.renderer.domElement.parentElement) {

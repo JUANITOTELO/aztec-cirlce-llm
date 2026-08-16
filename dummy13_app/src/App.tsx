@@ -19,15 +19,19 @@ const DEFAULT_THEME: MannequinTheme = {
   metalness: 0.8
 };
 
+const ToolbarComponent = Toolbar as React.ComponentType<any>;
+
 export const App: React.FC = () => {
   const engineRef = useRef<ViewportEngine | null>(null);
   const [theme, setTheme] = useState<MannequinTheme>(DEFAULT_THEME);
   const [currentPoseId, setCurrentPoseId] = useState<string>(POSE_PRESETS[0].id);
   const [gizmoMode, setGizmoMode] = useState<GizmoMode>('rotate');
-  const [gizmoSpace] = useState<TransformSpace>('local');
+  const [gizmoSpace, setGizmoSpace] = useState<TransformSpace>('local');
   const [selectedJointId, setSelectedJointId] = useState<JointId | null>(null);
   const [selectedJointRotation, setSelectedJointRotation] = useState<THREE.Quaternion>(new THREE.Quaternion());
   
+  const [selectedJointStiffness, setSelectedJointStiffness] = useState<number>(0.85);
+  const [isGravityEnabled, setIsGravityEnabled] = useState<boolean>(true);
   const [isThemeModalOpen, setIsThemeModalOpen] = useState<boolean>(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState<boolean>(false);
   const [isInspectorOpen, setIsInspectorOpen] = useState<boolean>(true);
@@ -51,6 +55,7 @@ export const App: React.FC = () => {
       }
     }
   }, [selectedJointId]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (
@@ -70,12 +75,36 @@ export const App: React.FC = () => {
         if (engineRef.current) {
           engineRef.current.toggleGizmoVisibility();
         }
+      } else if (e.key === 'g' || e.key === 'G') {
+        e.preventDefault();
+        if (engineRef.current) {
+          const next = engineRef.current.toggleGravity();
+          setIsGravityEnabled(next);
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleResetPose]);
+
+  const handleToggleGravity = useCallback(() => {
+    if (engineRef.current) {
+      const next = engineRef.current.toggleGravity();
+      setIsGravityEnabled(next);
+    }
+  }, []);
+
+  const handleDropToFloor = useCallback(() => {
+    if (engineRef.current) {
+      const engine = engineRef.current as any;
+      if (typeof engine.dropToFloor === 'function') {
+        engine.dropToFloor();
+      } else if (engine.rig && typeof engine.rig.dropToFloor === 'function') {
+        engine.rig.dropToFloor();
+      }
+    }
+  }, []);
 
   const handleMirrorPose = useCallback((side: 'left' | 'right') => {
     if (engineRef.current) {
@@ -89,6 +118,9 @@ export const App: React.FC = () => {
   const handleJointSelected = useCallback((jointId: JointId | null, rotation: THREE.Quaternion) => {
     setSelectedJointId(jointId);
     setSelectedJointRotation(rotation.clone());
+    if (jointId && engineRef.current) {
+      setSelectedJointStiffness(engineRef.current.rig.getJointStiffness(jointId));
+    }
   }, []);
 
   const handleJointUpdated = useCallback((jointId: JointId, rotation: THREE.Quaternion) => {
@@ -101,6 +133,20 @@ export const App: React.FC = () => {
     if (engineRef.current) {
       engineRef.current.rig.setJointRotation(jointId, quat);
       setSelectedJointRotation(quat);
+    }
+  }, []);
+
+  const handleInspectorStiffnessChange = useCallback((jointId: JointId, val: number) => {
+    if (engineRef.current) {
+      engineRef.current.rig.setJointStiffness(jointId, val);
+      setSelectedJointStiffness(val);
+    }
+  }, []);
+
+  const handleApplyStiffnessToAll = useCallback((val: number) => {
+    if (engineRef.current) {
+      engineRef.current.rig.setAllJointStiffness(val);
+      setSelectedJointStiffness(val);
     }
   }, []);
 
@@ -143,32 +189,46 @@ export const App: React.FC = () => {
 
   const handleCaptureScreenshot = useCallback(() => {
     if (!engineRef.current) return;
-    const dataUrl = engineRef.current.captureScreenshot();
-    const a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = `dummy13-render-${Date.now()}.png`;
-    a.click();
+    const engine = engineRef.current as any;
+    let dataUrl = '';
+    if (typeof engine.captureScreenshot === 'function') {
+      dataUrl = engine.captureScreenshot();
+    } else if (engine.renderer && engine.scene && engine.camera) {
+      engine.renderer.render(engine.scene, engine.camera);
+      dataUrl = engine.renderer.domElement.toDataURL('image/png');
+    }
+    if (dataUrl) {
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = `dummy13-render-${Date.now()}.png`;
+      a.click();
+    }
   }, []);
 
   return (
     <main className="w-screen h-screen relative bg-dummyDark overflow-hidden select-none flex flex-col">
-      <Toolbar
+      <ToolbarComponent
         currentPoseId={currentPoseId}
         gizmoMode={gizmoMode}
+        gizmoSpace={gizmoSpace}
         onSelectPreset={handleSelectPreset}
         onResetPose={handleResetPose}
         onMirrorPose={handleMirrorPose}
         onSetGizmoMode={setGizmoMode}
+        onSetGizmoSpace={setGizmoSpace}
         onExportPose={handleExportPose}
         onImportPose={handleImportPose}
         onCaptureScreenshot={handleCaptureScreenshot}
-        onToggleThemeModal={() => setIsThemeModalOpen(true)}
-        onToggleInspector={() => setIsInspectorOpen((prev) => !prev)}
-        onToggleHelpModal={() => setIsHelpModalOpen(true)}
+        isGravityEnabled={isGravityEnabled}
+        onToggleGravity={handleToggleGravity}
+        onDropToFloor={handleDropToFloor}
         isInspectorOpen={isInspectorOpen}
+        onToggleInspector={() => setIsInspectorOpen((prev) => !prev)}
+        onOpenTheme={() => setIsThemeModalOpen(true)}
+        onOpenHelp={() => setIsHelpModalOpen(true)}
       />
 
-      <div className="flex-1 w-full h-full relative">
+      <div className="flex-1 relative overflow-hidden">
         <Viewport
           theme={theme}
           gizmoMode={gizmoMode}
@@ -183,7 +243,10 @@ export const App: React.FC = () => {
           <JointInspector
             selectedJointId={selectedJointId}
             rotation={selectedJointRotation}
+            stiffness={selectedJointStiffness}
             onUpdateRotation={handleInspectorRotationChange}
+            onUpdateStiffness={handleInspectorStiffnessChange}
+            onApplyStiffnessToAll={handleApplyStiffnessToAll}
             onClose={() => setIsInspectorOpen(false)}
           />
         )}

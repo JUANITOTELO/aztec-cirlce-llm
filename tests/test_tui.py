@@ -183,3 +183,73 @@ def test_print_welcome_banner():
     print_welcome_banner(console, state)
     out = console.export_text()
     assert "AZTEC" in out or "Multi-Generational" in out
+
+
+def test_session_state_record_cost():
+    state = SessionState()
+    assert "$0.00" in state.prompt_text()
+    state.record_cost(0.19, 3400)
+    assert state.total_cost_usd == 0.19
+    assert state.total_tokens == 3400
+    assert "$0.19" in state.prompt_text()
+
+
+@pytest.mark.asyncio
+async def test_cmd_edit_records_cost_in_session_state(tmp_path):
+    from aztec_circle.tui.commands import cmd_edit
+    from aztec_circle.engine.patch_agent import PatchResult
+    from aztec_circle.engine.project_runner import CommandResult
+
+    console = Console()
+    state = SessionState(output_dir=str(tmp_path))
+    assert state.total_cost_usd == 0.0
+
+    mock_patch_result = PatchResult(
+        success=True,
+        edit_summary="Added feature",
+        round1_tokens=500,
+        round2_tokens=2500,
+        total_cost_usd=0.05,
+    )
+
+    with patch("aztec_circle.engine.patch_agent.PatchAgent.run", new_callable=AsyncMock) as mock_run, \
+         patch("aztec_circle.engine.project_runner.ProjectRunner.typecheck_project", new_callable=AsyncMock) as mock_tc:
+        mock_run.return_value = mock_patch_result
+        mock_tc.return_value = CommandResult(success=True, stdout="", stderr="", exit_code=0, duration_seconds=0.1)
+
+        await cmd_edit("Add a feature", state, console)
+
+    assert state.total_cost_usd == 0.05
+    assert state.total_tokens == 3000
+    assert "$0.05" in state.prompt_text()
+
+
+@pytest.mark.asyncio
+async def test_cmd_fix_records_cost_in_session_state(tmp_path):
+    from aztec_circle.tui.commands import cmd_fix
+    from aztec_circle.engine.build_fixer import FixResult
+    from aztec_circle.engine.project_runner import CommandResult
+
+    console = Console()
+    state = SessionState(output_dir=str(tmp_path))
+    assert state.total_cost_usd == 0.0
+
+    mock_cmd_res = CommandResult(success=True, stdout="", stderr="", exit_code=0, duration_seconds=0.2)
+    mock_fix_result = FixResult(
+        success=True,
+        iterations=1,
+        final_build_result=mock_cmd_res,
+        patches_applied=["src/App.tsx"],
+        total_cost_usd=0.072,
+    )
+
+    with patch("aztec_circle.engine.project_runner.ProjectRunner.build_project", new_callable=AsyncMock) as mock_build, \
+         patch("aztec_circle.engine.build_fixer.BuildFixAgent.fix", new_callable=AsyncMock) as mock_fix:
+        mock_build.return_value = CommandResult(success=False, stdout="", stderr="Error", exit_code=1, duration_seconds=0.2)
+        mock_fix.return_value = mock_fix_result
+
+        await cmd_fix("", state, console)
+
+    assert state.total_cost_usd == 0.072
+    assert "$0.07" in state.prompt_text()
+

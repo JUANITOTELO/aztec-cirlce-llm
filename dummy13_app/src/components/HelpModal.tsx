@@ -55,7 +55,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
             </div>
             <div>
               <h4 className="font-semibold text-white mb-0.5">Keyboard Shortcuts</h4>
-              <p><strong className="text-white">R:</strong> Reset pose to default (T-Pose)<br /><strong className="text-white">W:</strong> Toggle wireframe mode</p>
+              <p><strong className="text-white">R:</strong> Reset pose to default (T-Pose)<br /><strong className="text-white">W:</strong> Toggle gizmo wireframe balls</p>
             </div>
           </div>
         </div>

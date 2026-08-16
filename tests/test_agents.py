@@ -23,6 +23,38 @@ def test_extract_json_payload_variations():
     chatter = "Sure! {\"status\": \"ok\"} Hope this helps!"
     assert extract_json_payload(chatter) == {"status": "ok"}
 
+    # Raw unescaped newlines in code strings
+    raw_code = """```json
+{
+  "edit_summary": "Add feature",
+  "patches": [
+    {
+      "file": "src/App.tsx",
+      "action": "replace",
+      "replacement": "export default function App() {
+  const [val, setVal] = useState(0);
+  return <div>{val}</div>;
+}"
+    }
+  ]
+}
+```"""
+    res = extract_json_payload(raw_code)
+    assert res.get("edit_summary") == "Add feature"
+    assert len(res.get("patches", [])) == 1
+    assert "useState(0)" in res["patches"][0]["replacement"]
+
+    # Truncated JSON without closing brackets
+    truncated = '{"edit_summary": "Incomplete edit", "patches": [{"file": "index.ts", "action": "replace"'
+    res_trunc = extract_json_payload(truncated)
+    assert res_trunc.get("edit_summary") == "Incomplete edit"
+    assert len(res_trunc.get("patches", [])) == 1
+
+    # Trailing commas and single quotes
+    dirty = "{'edit_summary': 'Clean', 'patches': [{'file': 'main.py',},],}"
+    res_dirty = extract_json_payload(dirty)
+    assert res_dirty.get("edit_summary") == "Clean"
+
 
 @pytest.mark.asyncio
 async def test_youth_agent_run(mock_provider):

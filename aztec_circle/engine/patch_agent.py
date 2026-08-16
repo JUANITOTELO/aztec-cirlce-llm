@@ -323,6 +323,42 @@ Please generate the minimal, atomic JSON patches to fulfill the instruction."""
                     )
 
             if not patches:
+                # Secondary: Check if r2_data itself is a list or contains items key
+                items = r2_data.get("items", []) if isinstance(r2_data, dict) else (r2_data if isinstance(r2_data, list) else [])
+                for p in items:
+                    if isinstance(p, dict) and "file" in p:
+                        patches.append(
+                            FilePatch(
+                                file=p["file"],
+                                action=p.get("action", "replace"),
+                                start_line=p.get("start_line"),
+                                end_line=p.get("end_line"),
+                                replacement=p.get("replacement"),
+                                concern=p.get("concern", "Code edit"),
+                            )
+                        )
+
+            if not patches:
+                # Tertiary Regex Fallback: Scan text for individual patch objects
+                patch_matches = re.finditer(r"\{[^{}]*\"file\"[^{}]*\}", r2_resp.content, re.DOTALL)
+                for pm in patch_matches:
+                    try:
+                        p_obj = json_repair.loads(pm.group(0))
+                        if isinstance(p_obj, dict) and "file" in p_obj:
+                            patches.append(
+                                FilePatch(
+                                    file=p_obj["file"],
+                                    action=p_obj.get("action", "replace"),
+                                    start_line=p_obj.get("start_line"),
+                                    end_line=p_obj.get("end_line"),
+                                    replacement=p_obj.get("replacement"),
+                                    concern=p_obj.get("concern", "Code edit"),
+                                )
+                            )
+                    except Exception:
+                        pass
+
+            if not patches:
                 return PatchResult(
                     success=False,
                     edit_summary="No valid patches returned by generator.",

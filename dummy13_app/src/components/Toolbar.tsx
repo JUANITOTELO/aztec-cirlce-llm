@@ -9,7 +9,9 @@ import {
   Rotate3d,
   HelpCircle,
   Palette,
-  SlidersHorizontal
+  SlidersHorizontal,
+  ArrowDownToLine,
+  Magnet
 } from 'lucide-react';
 import { POSE_PRESETS } from '../engine/PresetLibrary';
 import { GizmoMode, PoseData } from '../types/dummy13';
@@ -27,6 +29,9 @@ interface ToolbarProps {
   onToggleThemeModal: () => void;
   onToggleInspector: () => void;
   onToggleHelpModal: () => void;
+  isGravityEnabled: boolean;
+  onToggleGravity: () => void;
+  onDropToFloor: () => void;
   isInspectorOpen: boolean;
 }
 
@@ -43,7 +48,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onToggleThemeModal,
   onToggleInspector,
   onToggleHelpModal,
-  isInspectorOpen
+  isInspectorOpen,
+  isGravityEnabled,
+  onToggleGravity,
+  onDropToFloor
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -133,6 +141,28 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         >
           <RotateCcw className="w-4 h-4" />
         </button>
+
+        <button
+          onClick={onToggleGravity}
+          title={isGravityEnabled ? 'Gravity Simulation Active (G)' : 'Gravity Simulation Disabled (G)'}
+          className={`p-2 rounded-lg border border-dummyBorder transition flex items-center gap-1 text-xs font-medium ${
+            isGravityEnabled
+              ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 shadow-sm'
+              : 'bg-dummyDark hover:bg-slate-800 text-slate-400 hover:text-white'
+          }`}
+        >
+          <Magnet className="w-4 h-4" />
+          <span className="hidden lg:inline">{isGravityEnabled ? 'Gravity ON' : 'Gravity OFF'}</span>
+        </button>
+
+        <button
+          onClick={onDropToFloor}
+          title="Rest Mannequin on Solid Floor (Y=0)"
+          className="p-2 rounded-lg bg-dummyDark hover:bg-slate-800 text-slate-300 hover:text-white border border-dummyBorder transition"
+        >
+          <ArrowDownToLine className="w-4 h-4" />
+        </button>
+
         <button
           onClick={() => onMirrorPose('left')}
           title="Mirror Left Arm/Leg to Right Side"

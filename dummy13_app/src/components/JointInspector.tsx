@@ -2,20 +2,26 @@ import React from 'react';
 import * as THREE from 'three';
 import { JointId } from '../types/dummy13';
 import { JOINT_DEFINITIONS } from '../engine/Dummy13Rig';
-import { X, ShieldAlert } from 'lucide-react';
+import { X, ShieldAlert, Sliders, Lock } from 'lucide-react';
 
 interface JointInspectorProps {
   selectedJointId: JointId | null;
   rotation: THREE.Quaternion;
+  stiffness: number;
   onUpdateRotation: (jointId: JointId, quat: THREE.Quaternion) => void;
+  onUpdateStiffness: (jointId: JointId, stiffness: number) => void;
+  onApplyStiffnessToAll?: (stiffness: number) => void;
   onClose: () => void;
 }
 
 export const JointInspector: React.FC<JointInspectorProps> = ({
   selectedJointId,
   rotation,
+  stiffness,
   onUpdateRotation,
-  onClose
+  onUpdateStiffness,
+  onApplyStiffnessToAll,
+  onClose,
 }) => {
   if (!selectedJointId) {
     return (
@@ -66,7 +72,7 @@ export const JointInspector: React.FC<JointInspectorProps> = ({
         {/* Pitch (X) */}
         <div>
           <div className="flex justify-between text-xs font-mono mb-1">
-            <span className="text-red-400 font-semibold">Pitch (X-Axis)</span>
+            <span className="text-rose-400 font-semibold">Pitch (X-Axis)</span>
             <span>{degX.toFixed(1)}°</span>
           </div>
           <input
@@ -77,7 +83,7 @@ export const JointInspector: React.FC<JointInspectorProps> = ({
             value={Math.round(degX)}
             onChange={(e) => handleEulerChange('x', parseFloat(e.target.value))}
             disabled={def.constraints.type === 'hinge_y' || def.constraints.type === 'hinge_z'}
-            className="w-full accent-red-500 bg-dummyDark h-1.5 rounded-lg cursor-pointer disabled:opacity-30"
+            className="w-full accent-rose-500 bg-dummyDark h-1.5 rounded-lg cursor-pointer disabled:opacity-30"
           />
           <div className="flex justify-between text-[10px] text-slate-500 font-mono">
             <span>{minDegX.toFixed(0)}°</span>
@@ -128,6 +134,72 @@ export const JointInspector: React.FC<JointInspectorProps> = ({
             <span>{maxDegZ.toFixed(0)}°</span>
           </div>
         </div>
+      </div>
+
+      {/* Joint Stiffness / Friction Section */}
+      <div className="mt-4 pt-3 border-t border-dummyBorder/80 space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-sky-300">
+            <Sliders className="w-3.5 h-3.5" />
+            <span>Joint Stiffness / Friction</span>
+          </div>
+          <span className="text-xs font-mono text-white">{Math.round(stiffness * 100)}%</span>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={5}
+          value={Math.round(stiffness * 100)}
+          onChange={(e) => onUpdateStiffness(selectedJointId, parseFloat(e.target.value) / 100)}
+          className="w-full accent-sky-400 bg-dummyDark h-1.5 rounded-lg cursor-pointer"
+        />
+        <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+          <span>Flaccid (0%)</span>
+          <span>Firm (85%)</span>
+          <span>Locked (100%)</span>
+        </div>
+
+        <div className="flex items-center gap-1.5 pt-1">
+          <button
+            type="button"
+            onClick={() => onUpdateStiffness(selectedJointId, 0.0)}
+            className={`flex-1 py-1 text-[11px] font-medium rounded transition ${
+              stiffness === 0 ? 'bg-amber-500/20 border border-amber-500 text-amber-300' : 'bg-dummyDark/60 hover:bg-dummyDark text-slate-400 border border-transparent'
+            }`}
+          >
+            Loose
+          </button>
+          <button
+            type="button"
+            onClick={() => onUpdateStiffness(selectedJointId, 0.85)}
+            className={`flex-1 py-1 text-[11px] font-medium rounded transition ${
+              stiffness >= 0.8 && stiffness < 1.0 ? 'bg-sky-500/20 border border-sky-500 text-sky-300' : 'bg-dummyDark/60 hover:bg-dummyDark text-slate-400 border border-transparent'
+            }`}
+          >
+            Firm
+          </button>
+          <button
+            type="button"
+            onClick={() => onUpdateStiffness(selectedJointId, 1.0)}
+            className={`flex-1 py-1 text-[11px] font-medium rounded transition ${
+              stiffness === 1.0 ? 'bg-emerald-500/20 border border-emerald-500 text-emerald-300' : 'bg-dummyDark/60 hover:bg-dummyDark text-slate-400 border border-transparent'
+            }`}
+          >
+            Rigid
+          </button>
+        </div>
+
+        {onApplyStiffnessToAll && (
+          <button
+            type="button"
+            onClick={() => onApplyStiffnessToAll(stiffness)}
+            className="w-full mt-1.5 py-1 px-2 flex items-center justify-center gap-1.5 text-[11px] font-medium text-slate-300 bg-dummyDark/80 hover:bg-dummyBorder/80 border border-dummyBorder rounded transition"
+          >
+            <Lock className="w-3 h-3 text-sky-400" />
+            Apply {Math.round(stiffness * 100)}% Stiffness to All Limbs
+          </button>
+        )}
       </div>
     </aside>
   );

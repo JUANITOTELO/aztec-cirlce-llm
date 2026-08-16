@@ -85,4 +85,6 @@ export interface JointDefinition {
   defaultOffset: [number, number, number];
   constraints: JointConstraint;
   side?: 'left' | 'right' | 'center';
+  weight?: number; // Limb mass in kg
+  stiffness?: number; // Joint tightness from 0.0 (flaccid) to 1.0 (rigid lock)
 }

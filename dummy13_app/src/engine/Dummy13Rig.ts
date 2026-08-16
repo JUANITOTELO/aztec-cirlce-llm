@@ -9,7 +9,8 @@ export const JOINT_DEFINITIONS: Record<JointId, JointDefinition> = {
     parentId: null,
     defaultOffset: [0, 0, 0],
     constraints: { type: 'root', minX: -Math.PI, maxX: Math.PI, minY: -Math.PI, maxY: Math.PI, minZ: -Math.PI, maxZ: Math.PI },
-    side: 'center'
+    side: 'center',
+    weight: 0
   },
   pelvis: {
     id: 'pelvis',
@@ -17,7 +18,8 @@ export const JOINT_DEFINITIONS: Record<JointId, JointDefinition> = {
     parentId: 'root',
     defaultOffset: [0, 1.1, 0],
     constraints: { type: 'ball', minX: -0.4, maxX: 0.4, minY: -0.4, maxY: 0.4, minZ: -0.4, maxZ: 0.4, maxSwing: 0.5, maxTwist: 0.5 },
-    side: 'center'
+    side: 'center',
+    weight: 3.5
   },
   spine_lower: {
     id: 'spine_lower',
@@ -25,7 +27,8 @@ export const JOINT_DEFINITIONS: Record<JointId, JointDefinition> = {
     parentId: 'pelvis',
     defaultOffset: [0, 0.22, 0],
     constraints: { type: 'ball', minX: -0.5, maxX: 0.5, minY: -0.4, maxY: 0.4, minZ: -0.3, maxZ: 0.3, maxSwing: 0.6, maxTwist: 0.4 },
-    side: 'center'
+    side: 'center',
+    weight: 2.2
   },
   spine_upper: {
     id: 'spine_upper',
@@ -33,7 +36,8 @@ export const JOINT_DEFINITIONS: Record<JointId, JointDefinition> = {
     parentId: 'spine_lower',
     defaultOffset: [0, 0.26, 0],
     constraints: { type: 'ball', minX: -0.4, maxX: 0.4, minY: -0.4, maxY: 0.4, minZ: -0.3, maxZ: 0.3, maxSwing: 0.5, maxTwist: 0.4 },
-    side: 'center'
+    side: 'center',
+    weight: 2.8
   },
   neck: {
     id: 'neck',
@@ -41,7 +45,8 @@ export const JOINT_DEFINITIONS: Record<JointId, JointDefinition> = {
     parentId: 'spine_upper',
     defaultOffset: [0, 0.28, 0],
     constraints: { type: 'ball', minX: -0.5, maxX: 0.5, minY: -0.7, maxY: 0.7, minZ: -0.4, maxZ: 0.4, maxSwing: 0.6, maxTwist: 0.8 },
-    side: 'center'
+    side: 'center',
+    weight: 0.6
   },
   head: {
     id: 'head',
@@ -49,7 +54,8 @@ export const JOINT_DEFINITIONS: Record<JointId, JointDefinition> = {
     parentId: 'neck',
     defaultOffset: [0, 0.16, 0],
     constraints: { type: 'ball', minX: -0.6, maxX: 0.6, minY: -1.0, maxY: 1.0, minZ: -0.4, maxZ: 0.4, maxSwing: 0.7, maxTwist: 1.0 },
-    side: 'center'
+    side: 'center',
+    weight: 1.5
   },
   // Left Arm
   clavicle_l: {
@@ -58,7 +64,8 @@ export const JOINT_DEFINITIONS: Record<JointId, JointDefinition> = {
     parentId: 'spine_upper',
     defaultOffset: [0.18, 0.18, 0],
     constraints: { type: 'universal', minX: -0.3, maxX: 0.3, minY: -0.3, maxY: 0.4, minZ: -0.4, maxZ: 0.4 },
-    side: 'left'
+    side: 'left',
+    weight: 0.8
   },
   shoulder_l: {
     id: 'shoulder_l',
@@ -66,7 +73,8 @@ export const JOINT_DEFINITIONS: Record<JointId, JointDefinition> = {
     parentId: 'clavicle_l',
     defaultOffset: [0.18, 0, 0],
     constraints: { type: 'ball', minX: -Math.PI * 0.9, maxX: Math.PI * 0.9, minY: -Math.PI * 0.9, maxY: Math.PI * 0.9, minZ: -Math.PI * 0.9, maxZ: Math.PI * 0.9, maxSwing: Math.PI * 0.85, maxTwist: Math.PI * 0.8 },
-    side: 'left'
+    side: 'left',
+    weight: 1.4
   },
   elbow_l: {
     id: 'elbow_l',
@@ -74,7 +82,8 @@ export const JOINT_DEFINITIONS: Record<JointId, JointDefinition> = {
     parentId: 'shoulder_l',
     defaultOffset: [0, -0.35, 0],
     constraints: { type: 'hinge_x', minX: -0.05, maxX: 2.6, minY: 0, maxY: 0, minZ: 0, maxZ: 0 },
-    side: 'left'
+    side: 'left',
+    weight: 1.0
   },
   wrist_l: {
     id: 'wrist_l',
@@ -82,7 +91,8 @@ export const JOINT_DEFINITIONS: Record<JointId, JointDefinition> = {
     parentId: 'elbow_l',
     defaultOffset: [0, -0.32, 0],
     constraints: { type: 'ball', minX: -0.8, maxX: 0.8, minY: -0.5, maxY: 0.5, minZ: -0.8, maxZ: 0.8, maxSwing: 0.9, maxTwist: 1.2 },
-    side: 'left'
+    side: 'left',
+    weight: 0.5
   },
   hand_l: {
     id: 'hand_l',
@@ -90,7 +100,8 @@ export const JOINT_DEFINITIONS: Record<JointId, JointDefinition> = {
     parentId: 'wrist_l',
     defaultOffset: [0, -0.1, 0],
     constraints: { type: 'universal', minX: -0.5, maxX: 0.5, minY: -0.3, maxY: 0.3, minZ: -0.3, maxZ: 0.3 },
-    side: 'left'
+    side: 'left',
+    weight: 0.3
   },
   // Right Arm
   clavicle_r: {
@@ -99,7 +110,8 @@ export const JOINT_DEFINITIONS: Record<JointId, JointDefinition> = {
     parentId: 'spine_upper',
     defaultOffset: [-0.18, 0.18, 0],
     constraints: { type: 'universal', minX: -0.3, maxX: 0.3, minY: -0.4, maxY: 0.3, minZ: -0.4, maxZ: 0.4 },
-    side: 'right'
+    side: 'right',
+    weight: 0.8
   },
   shoulder_r: {
     id: 'shoulder_r',
@@ -107,7 +119,8 @@ export const JOINT_DEFINITIONS: Record<JointId, JointDefinition> = {
     parentId: 'clavicle_r',
     defaultOffset: [-0.18, 0, 0],
     constraints: { type: 'ball', minX: -Math.PI * 0.9, maxX: Math.PI * 0.9, minY: -Math.PI * 0.9, maxY: Math.PI * 0.9, minZ: -Math.PI * 0.9, maxZ: Math.PI * 0.9, maxSwing: Math.PI * 0.85, maxTwist: Math.PI * 0.8 },
-    side: 'right'
+    side: 'right',
+    weight: 1.4
   },
   elbow_r: {
     id: 'elbow_r',
@@ -115,7 +128,8 @@ export const JOINT_DEFINITIONS: Record<JointId, JointDefinition> = {
     parentId: 'shoulder_r',
     defaultOffset: [0, -0.35, 0],
     constraints: { type: 'hinge_x', minX: -0.05, maxX: 2.6, minY: 0, maxY: 0, minZ: 0, maxZ: 0 },
-    side: 'right'
+    side: 'right',
+    weight: 1.0
   },
   wrist_r: {
     id: 'wrist_r',
@@ -123,7 +137,8 @@ export const JOINT_DEFINITIONS: Record<JointId, JointDefinition> = {
     parentId: 'elbow_r',
     defaultOffset: [0, -0.32, 0],
     constraints: { type: 'ball', minX: -0.8, maxX: 0.8, minY: -0.5, maxY: 0.5, minZ: -0.8, maxZ: 0.8, maxSwing: 0.9, maxTwist: 1.2 },
-    side: 'right'
+    side: 'right',
+    weight: 0.5
   },
   hand_r: {
     id: 'hand_r',
@@ -131,7 +146,8 @@ export const JOINT_DEFINITIONS: Record<JointId, JointDefinition> = {
     parentId: 'wrist_r',
     defaultOffset: [0, -0.1, 0],
     constraints: { type: 'universal', minX: -0.5, maxX: 0.5, minY: -0.3, maxY: 0.3, minZ: -0.3, maxZ: 0.3 },
-    side: 'right'
+    side: 'right',
+    weight: 0.3
   },
   // Left Leg
   hip_l: {
@@ -140,7 +156,8 @@ export const JOINT_DEFINITIONS: Record<JointId, JointDefinition> = {
     parentId: 'pelvis',
     defaultOffset: [0.18, -0.12, 0],
     constraints: { type: 'ball', minX: -1.6, maxX: 1.4, minY: -0.6, maxY: 0.6, minZ: -0.8, maxZ: 1.2, maxSwing: 1.6, maxTwist: 0.9 },
-    side: 'left'
+    side: 'left',
+    weight: 3.0
   },
   knee_l: {
     id: 'knee_l',
@@ -148,7 +165,8 @@ export const JOINT_DEFINITIONS: Record<JointId, JointDefinition> = {
     parentId: 'hip_l',
     defaultOffset: [0, -0.45, 0],
     constraints: { type: 'hinge_x', minX: -2.6, maxX: 0.05, minY: 0, maxY: 0, minZ: 0, maxZ: 0 },
-    side: 'left'
+    side: 'left',
+    weight: 2.0
   },
   ankle_l: {
     id: 'ankle_l',
@@ -156,7 +174,8 @@ export const JOINT_DEFINITIONS: Record<JointId, JointDefinition> = {
     parentId: 'knee_l',
     defaultOffset: [0, -0.45, 0],
     constraints: { type: 'ball', minX: -0.8, maxX: 0.8, minY: -0.4, maxY: 0.4, minZ: -0.5, maxZ: 0.5, maxSwing: 0.8, maxTwist: 0.5 },
-    side: 'left'
+    side: 'left',
+    weight: 0.8
   },
   foot_l: {
     id: 'foot_l',
@@ -164,7 +183,8 @@ export const JOINT_DEFINITIONS: Record<JointId, JointDefinition> = {
     parentId: 'ankle_l',
     defaultOffset: [0, -0.08, 0.08],
     constraints: { type: 'hinge_x', minX: -0.3, maxX: 0.3, minY: 0, maxY: 0, minZ: 0, maxZ: 0 },
-    side: 'left'
+    side: 'left',
+    weight: 0.5
   },
   // Right Leg
   hip_r: {
@@ -173,7 +193,8 @@ export const JOINT_DEFINITIONS: Record<JointId, JointDefinition> = {
     parentId: 'pelvis',
     defaultOffset: [-0.18, -0.12, 0],
     constraints: { type: 'ball', minX: -1.6, maxX: 1.4, minY: -0.6, maxY: 0.6, minZ: -1.2, maxZ: 0.8, maxSwing: 1.6, maxTwist: 0.9 },
-    side: 'right'
+    side: 'right',
+    weight: 3.0
   },
   knee_r: {
     id: 'knee_r',
@@ -181,7 +202,8 @@ export const JOINT_DEFINITIONS: Record<JointId, JointDefinition> = {
     parentId: 'hip_r',
     defaultOffset: [0, -0.45, 0],
     constraints: { type: 'hinge_x', minX: -2.6, maxX: 0.05, minY: 0, maxY: 0, minZ: 0, maxZ: 0 },
-    side: 'right'
+    side: 'right',
+    weight: 2.0
   },
   ankle_r: {
     id: 'ankle_r',
@@ -189,7 +211,8 @@ export const JOINT_DEFINITIONS: Record<JointId, JointDefinition> = {
     parentId: 'knee_r',
     defaultOffset: [0, -0.45, 0],
     constraints: { type: 'ball', minX: -0.8, maxX: 0.8, minY: -0.4, maxY: 0.4, minZ: -0.5, maxZ: 0.5, maxSwing: 0.8, maxTwist: 0.5 },
-    side: 'right'
+    side: 'right',
+    weight: 0.8
   },
   foot_r: {
     id: 'foot_r',
@@ -197,7 +220,8 @@ export const JOINT_DEFINITIONS: Record<JointId, JointDefinition> = {
     parentId: 'ankle_r',
     defaultOffset: [0, -0.08, 0.08],
     constraints: { type: 'hinge_x', minX: -0.3, maxX: 0.3, minY: 0, maxY: 0, minZ: 0, maxZ: 0 },
-    side: 'right'
+    side: 'right',
+    weight: 0.5
   }
 };
 
@@ -210,6 +234,7 @@ export class Dummy13Rig {
   public jointSpheres: Map<JointId, THREE.Mesh> = new Map();
   public hitHandles: Map<JointId, THREE.Mesh> = new Map();
   
+  public jointStiffness: Map<JointId, number> = new Map();
   private armorMaterial: THREE.MeshStandardMaterial;
   private frameMaterial: THREE.MeshStandardMaterial;
   private jointMaterial: THREE.MeshStandardMaterial;
@@ -283,6 +308,11 @@ export class Dummy13Rig {
       depthTest: false,
       depthWrite: false
     });
+
+    Object.values(JOINT_DEFINITIONS).forEach((def) => {
+      this.jointStiffness.set(def.id, 0.85);
+    });
+
     this.buildSkeletonHierarchy();
     this.generateDummy13Geometry();
   }
@@ -312,7 +342,7 @@ export class Dummy13Rig {
 
   private generateDummy13Geometry(): void {
     // 1. Pelvis (Waist core frame + armor)
-    const pelvisNode = this.jointNodes.get('pelvis')!;
+    const pelvisNode = this.jointNodes.get('pelvis')!
     const pelvisFrame = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.12, 0.16, 8), this.frameMaterial);
     pelvisFrame.castShadow = true;
     pelvisNode.add(pelvisFrame);
@@ -500,7 +530,27 @@ export class Dummy13Rig {
     return node ? node.quaternion.clone() : new THREE.Quaternion();
   }
 
+  public setJointStiffness(jointId: JointId, stiffness: number): void {
+    this.jointStiffness.set(jointId, Math.max(0, Math.min(1, stiffness)));
+  }
+
+  public getJointStiffness(jointId: JointId): number {
+    return this.jointStiffness.get(jointId) ?? 0.85;
+  }
+
+  public setAllJointStiffness(stiffness: number): void {
+    const clamped = Math.max(0, Math.min(1, stiffness));
+    Object.keys(JOINT_DEFINITIONS).forEach((id) => {
+      this.jointStiffness.set(id as JointId, clamped);
+    });
+  }
+
   public setJointPosition(jointId: JointId, position: THREE.Vector3): void {
+    // Only the root pelvis core can be translated in world space;
+    // all child joints remain fixed in their parent socket positions.
+    if (jointId !== 'pelvis' && jointId !== 'root') {
+      return;
+    }
     const node = this.jointNodes.get(jointId);
     if (node) {
       node.position.copy(position);
@@ -582,6 +632,114 @@ export class Dummy13Rig {
         dstNode.quaternion.set(q.x, -q.y, -q.z, q.w);
       }
     });
+  }
+
+  public getLowestY(): number {
+    let lowest = Infinity;
+    const tempBox = new THREE.Box3();
+    const handleSet = new Set(this.hitHandles.values());
+
+    this.rootGroup.traverse((child) => {
+      if (child instanceof THREE.Mesh && !handleSet.has(child) && child.geometry) {
+        tempBox.setFromObject(child);
+        if (tempBox.min.y < lowest) {
+          lowest = tempBox.min.y;
+        }
+      }
+    });
+    return lowest;
+  }
+
+  public applyGravitySag(dt: number, excludedJoint?: JointId | null): void {
+    const gravityDir = new THREE.Vector3(0, -1, 0);
+    const parentWorldQuat = new THREE.Quaternion();
+    const invParentWorldQuat = new THREE.Quaternion();
+    const childPos = new THREE.Vector3();
+    const jointPos = new THREE.Vector3();
+    const armVec = new THREE.Vector3();
+    const torqueAxis = new THREE.Vector3();
+    const deltaQuat = new THREE.Quaternion();
+    const worldQuat = new THREE.Quaternion();
+    const jointFriction = 3.2;
+
+    Object.values(JOINT_DEFINITIONS).forEach((def) => {
+      if (def.id === 'root' || def.id === 'pelvis' || def.id === excludedJoint) return;
+      const node = this.jointNodes.get(def.id);
+      if (!node) return;
+
+      const stiffness = this.getJointStiffness(def.id);
+      const compliance = 1 - stiffness;
+      if (compliance <= 0.001) return;
+
+      const weight = def.weight ?? 1.0;
+      if (weight <= 0) return;
+
+      node.getWorldPosition(jointPos);
+      const centerOfMassLocal = new THREE.Vector3(0, -0.2, 0);
+
+      if (node.children.length > 0) {
+        const childJoint = node.children.find((c) => c.name.startsWith('joint_')) as THREE.Group | undefined;
+        if (childJoint) {
+          centerOfMassLocal.copy(childJoint.position).multiplyScalar(0.5);
+        } else if (def.id.startsWith('foot')) {
+          centerOfMassLocal.set(0, -0.04, 0.08);
+        } else if (def.id.startsWith('hand')) {
+          centerOfMassLocal.set(0, -0.1, 0);
+        } else if (def.id === 'head') {
+          centerOfMassLocal.set(0, 0.14, 0);
+        }
+      }
+
+      node.localToWorld(childPos.copy(centerOfMassLocal));
+      armVec.subVectors(childPos, jointPos);
+      const armLength = armVec.length();
+      if (armLength < 0.001) return;
+
+      armVec.normalize();
+      torqueAxis.crossVectors(armVec, gravityDir);
+      const torqueMag = torqueAxis.length();
+
+      if (torqueMag > 0.001) {
+        torqueAxis.normalize();
+        const sagAngle = Math.min(torqueMag * weight * dt * jointFriction * compliance, 0.08);
+        deltaQuat.setFromAxisAngle(torqueAxis, sagAngle);
+
+        if (node.parent) {
+          node.parent.getWorldQuaternion(parentWorldQuat);
+          invParentWorldQuat.copy(parentWorldQuat).invert();
+        } else {
+          invParentWorldQuat.identity();
+        }
+
+        node.getWorldQuaternion(worldQuat);
+        worldQuat.premultiply(deltaQuat);
+        const newLocalQuat = invParentWorldQuat.multiply(worldQuat);
+        const clamped = clampJointRotation(newLocalQuat, def.constraints);
+        node.quaternion.slerp(clamped, 0.85);
+      }
+    });
+  }
+
+  public clampToFloor(): void {
+    this.rootGroup.updateMatrixWorld(true);
+    const lowest = this.getLowestY();
+    if (lowest < 0) {
+      const pelvis = this.jointNodes.get('pelvis');
+      if (pelvis) {
+        pelvis.position.y -= lowest;
+        this.rootGroup.updateMatrixWorld(true);
+      }
+    }
+  }
+
+  public dropToFloor(): void {
+    this.rootGroup.updateMatrixWorld(true);
+    const lowest = this.getLowestY();
+    const pelvis = this.jointNodes.get('pelvis');
+    if (pelvis && Number.isFinite(lowest)) {
+      pelvis.position.y -= lowest;
+      this.rootGroup.updateMatrixWorld(true);
+    }
   }
 
   public dispose(): void {

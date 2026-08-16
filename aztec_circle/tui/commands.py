@@ -196,6 +196,7 @@ async def cmd_fix(args: str, state: SessionState, console: Console) -> None:
 
     fixer = BuildFixAgent(console=console, max_iterations=3)
     res = await fixer.fix(root, initial_build, runner=runner)
+    state.record_cost(res.total_cost_usd)
     if res.success:
         console.print(f"[bold green]✓ Successfully repaired {len(res.patches_applied)} file(s) across {res.iterations} iteration(s)![/bold green]\n")
     else:
@@ -269,19 +270,27 @@ async def cmd_edit(args: str, state: SessionState, console: Console) -> None:
         console.print("[yellow]Usage: /edit <instruction e.g. 'Add a screenshot button'>[/yellow]\n")
         return
 
+    import os
     from aztec_circle.engine.patch_agent import PatchAgent
     from aztec_circle.engine.project_runner import ProjectRunner
     from aztec_circle.engine.build_fixer import BuildFixAgent
     from aztec_circle.engine.scaffolder import find_project_root
 
-    root = find_project_root(state.output_dir)
+    target_dir = state.output_dir
+    # Auto-detect if target_dir doesn't exist but current directory is a project
+    if not os.path.exists(target_dir) or target_dir == "./aztec_output":
+        if os.path.exists("package.json") or os.path.exists("src"):
+            target_dir = "."
+
+    root = find_project_root(target_dir)
     agent = PatchAgent(console=console)
-    res = await agent.run(instruction=instruction, project_dir=root)
+    res = await agent.run(instruction=instruction, project_dir=root, images=list(state.attached_images), verbose=True)
 
     if not res.success:
         console.print(f"[bold red]✗ Edit operation failed:[/bold red] {res.error_message or res.edit_summary}\n")
         return
 
+    state.record_cost(res.total_cost_usd, res.round1_tokens + res.round2_tokens)
     console.print(f"\n[bold green]Summary:[/bold green] {res.edit_summary}")
     runner = ProjectRunner(console=console)
     tc_res = await runner.typecheck_project(root)
@@ -289,6 +298,7 @@ async def cmd_edit(args: str, state: SessionState, console: Console) -> None:
         console.print("[yellow]Type check reported errors. Triggering atomic Build Fix Agent...[/yellow]")
         fixer = BuildFixAgent(console=console, max_iterations=2)
         fix_res = await fixer.fix(root, tc_res, runner=runner)
+        state.record_cost(fix_res.total_cost_usd)
         if not fix_res.success:
             console.print("[bold red]Warning: Post-edit build check still has unresolved errors.[/bold red]\n")
     else:

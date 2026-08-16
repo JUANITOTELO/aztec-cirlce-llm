@@ -134,8 +134,13 @@ async def run_edit_session(
     from aztec_circle.engine.build_fixer import BuildFixAgent
     from aztec_circle.engine.scaffolder import find_project_root
 
-    root = find_project_root(state.output_dir)
-    console.print(f"\n[bold cyan]✏ Edit Mode Detected[/bold cyan] [dim](target: {state.output_dir})[/dim]")
+    target_dir = state.output_dir
+    if not os.path.exists(target_dir) or target_dir == "./aztec_output":
+        if os.path.exists("package.json") or os.path.exists("src"):
+            target_dir = "."
+
+    root = find_project_root(target_dir)
+    console.print(f"\n[bold cyan]✏ Edit Mode Detected[/bold cyan] [dim](target: {root})[/dim]")
     console.print("[dim]Applying atomic line-range patch. Type /rebuild to force full regeneration.[/dim]")
 
     agent = PatchAgent(console=console)
@@ -145,8 +150,7 @@ async def run_edit_session(
         console.print(f"[bold red]✗ Edit failed:[/bold red] {res.error_message or res.edit_summary}\n")
         return
 
-    state.total_cost_usd += res.total_cost_usd
-    state.total_tokens += (res.round1_tokens + res.round2_tokens)
+    state.record_cost(res.total_cost_usd, res.round1_tokens + res.round2_tokens)
     console.print(f"[bold green]Summary:[/bold green] {res.edit_summary}")
 
     # Quality Gate check
@@ -156,7 +160,7 @@ async def run_edit_session(
         console.print("[yellow]Type check found errors. Triggering atomic Build Fix Agent...[/yellow]")
         fixer = BuildFixAgent(console=console, max_iterations=2)
         fix_res = await fixer.fix(root, tc_res, runner=runner)
-        state.total_cost_usd += fix_res.total_cost_usd
+        state.record_cost(fix_res.total_cost_usd)
         if not fix_res.success:
             console.print("[bold red]Warning: Unresolved type errors remain.[/bold red]\n")
     else:
