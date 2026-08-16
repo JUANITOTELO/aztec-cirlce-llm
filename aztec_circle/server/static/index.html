@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aztec Decision Circle — Multi-Generational LLM Inspector</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --card-border: #30363d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --success: #238636;
+      --warning: #d29922;
+      --danger: #da3633;
+      --font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      line-height: 1.5;
+      padding: 24px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--card-border);
+      margin-bottom: 24px;
+    }
+
+    .logo-area h1 {
+      font-size: 1.4rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    .logo-area p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .connection-badge {
+      font-size: 0.8rem;
+      padding: 4px 10px;
+      border-radius: 12px;
+      background: rgba(35, 134, 54, 0.2);
+      color: #3fb950;
+      border: 1px solid #238636;
+    }
+
+    .connection-badge.disconnected {
+      background: rgba(218, 54, 51, 0.2);
+      color: #f85149;
+      border-color: #da3633;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 24px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 20px;
+    }
+
+    h2 {
+      font-size: 1.1rem;
+      margin-bottom: 16px;
+      color: var(--text);
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    input, textarea, select, button {
+      width: 100%;
+      padding: 10px 12px;
+      background: #0d1117;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.9rem;
+    }
+
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    button {
+      background: #238636;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: background 0.15s ease;
+    }
+
+    button:hover {
+      background: #2ea043;
+    }
+
+    .metrics-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .metric-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .metric-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .metric-val {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-top: 4px;
+      color: var(--text);
+    }
+
+    .pipeline-tracker {
+      display: flex;
+      justify-content: space-between;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 24px;
+      gap: 8px;
+    }
+
+    .step-pill {
+      flex: 1;
+      text-align: center;
+      padding: 10px 4px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      background: #21262d;
+      color: var(--text-muted);
+      border: 1px solid transparent;
+    }
+
+    .step-pill.active {
+      background: #1f6feb;
+      color: #ffffff;
+      border-color: #58a6ff;
+    }
+
+    .step-pill.completed {
+      background: rgba(35, 134, 54, 0.2);
+      color: #3fb950;
+      border-color: #238636;
+    }
+
+    .step-pill.halted {
+      background: rgba(218, 54, 51, 0.2);
+      color: #f85149;
+      border-color: #da3633;
+    }
+
+    .events-feed {
+      height: 480px;
+      overflow-y: auto;
+      background: #0d1117;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 12px;
+      font-family: monospace;
+      font-size: 0.85rem;
+    }
+
+    .event-entry {
+      padding: 8px 10px;
+      margin-bottom: 8px;
+      border-radius: 4px;
+      background: #161b22;
+      border-left: 3px solid var(--accent);
+    }
+
+    .event-time {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+    }
+
+    .event-type {
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .event-body {
+      margin-top: 4px;
+      color: var(--text);
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo-area">
+      <h1>Aztec Decision Circle</h1>
+      <p>Multi-Generational Adversarial LLM Governance Inspector</p>
+    </div>
+    <div id="wsBadge" class="connection-badge disconnected">WebSocket Disconnected</div>
+  </header>
+
+  <div class="metrics-row">
+    <div class="metric-card">
+      <div class="metric-label">Phase</div>
+      <div id="mPhase" class="metric-val">IDLE</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Debate Loop</div>
+      <div id="mLoop" class="metric-val">0</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Total Tokens</div>
+      <div id="mTokens" class="metric-val">0</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Total Cost ($)</div>
+      <div id="mCost" class="metric-val">$0.0000</div>
+    </div>
+  </div>
+
+  <div class="pipeline-tracker">
+    <div id="step-youth" class="step-pill">1. Youth Brainstorm</div>
+    <div id="step-override" class="step-pill">2. Override Gate</div>
+    <div id="step-peer" class="step-pill">3. Peer Drafting</div>
+    <div id="step-elder" class="step-pill">4. Elder Audit</div>
+    <div id="step-arb" class="step-pill">5. Arbitration</div>
+    <div id="step-res" class="step-pill">6. Resolution</div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Execute Task</h2>
+      <form id="taskForm">
+        <div class="form-group">
+          <label for="taskGoal">Goal / Prompt</label>
+          <textarea id="taskGoal" rows="5" placeholder="e.g. Design a distributed token-bucket rate limiter with Redis..." required></textarea>
+        </div>
+        <div class="form-group">
+          <label for="budgetLimit">Budget Limit ($USD)</label>
+          <input type="number" id="budgetLimit" step="0.10" value="1.00" min="0.10">
+        </div>
+        <div class="form-group">
+          <label for="maxLoops">Max Loops</label>
+          <select id="maxLoops">
+            <option value="1">1</option>
+            <option value="2" selected>2</option>
+            <option value="3">3</option>
+          </select>
+        </div>
+        <button type="submit" id="runBtn">Launch Aztec Circle</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Live Debate Stream & Transcript</h2>
+      <div id="eventsFeed" class="events-feed">
+        <div class="event-entry">
+          <span class="event-time">System</span> &mdash; <span class="event-type">INFO</span>
+          <div class="event-body">Ready for task submission. Connecting to live WebSocket event bus...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const wsBadge = document.getElementById("wsBadge");
+    const eventsFeed = document.getElementById("eventsFeed");
+    const mPhase = document.getElementById("mPhase");
+    const mLoop = document.getElementById("mLoop");
+    const mTokens = document.getElementById("mTokens");
+    const mCost = document.getElementById("mCost");
+
+    let ws;
+    function connectWS() {
+      const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+      ws = new WebSocket(`${proto}//${window.location.host}/ws/events`);
+
+      ws.onopen = () => {
+        wsBadge.textContent = "Live WebSocket Connected";
+        wsBadge.className = "connection-badge";
+      };
+
+      ws.onclose = () => {
+        wsBadge.textContent = "WebSocket Disconnected (reconnecting...)";
+        wsBadge.className = "connection-badge disconnected";
+        setTimeout(connectWS, 3000);
+      };
+
+      ws.onmessage = (e) => {
+        try {
+          const msg = JSON.parse(e.data);
+          handleEvent(msg);
+        } catch (err) {
+          console.error("WS Parse error", err);
+        }
+      };
+    }
+
+    function handleEvent(data) {
+      const entry = document.createElement("div");
+      entry.className = "event-entry";
+      const timeStr = new Date().toLocaleTimeString();
+      const eventName = data.event || "UNKNOWN";
+      entry.innerHTML = `<span class="event-time">${timeStr}</span> &mdash; <span class="event-type">${eventName}</span><div class="event-body">${JSON.stringify(data, null, 2)}</div>`;
+      eventsFeed.prepend(entry);
+
+      if (data.phase) {
+        mPhase.textContent = data.phase;
+        updatePipeline(data.phase);
+      }
+      if (data.loop !== undefined) mLoop.textContent = data.loop;
+      if (data.cost_usd !== undefined) mCost.textContent = `$${parseFloat(data.cost_usd).toFixed(4)}`;
+      if (data.total_tokens_used !== undefined) mTokens.textContent = data.total_tokens_used;
+    }
+
+    function updatePipeline(phase) {
+      document.querySelectorAll(".step-pill").forEach(p => p.className = "step-pill");
+      if (phase === "YOUTH_BRAINSTORM") document.getElementById("step-youth").className = "step-pill active";
+      if (phase === "YOUTH_OVERRIDE_CHECK") document.getElementById("step-override").className = "step-pill active";
+      if (phase === "PEER_DRAFTING") document.getElementById("step-peer").className = "step-pill active";
+      if (phase === "ELDER_AUDIT") document.getElementById("step-elder").className = "step-pill active";
+      if (phase === "ARBITRATION") document.getElementById("step-arb").className = "step-pill active";
+      if (phase === "RESOLVED") document.getElementById("step-res").className = "step-pill completed";
+      if (phase === "EMERGENCY_HALTED") document.getElementById("step-override").className = "step-pill halted";
+    }
+
+    document.getElementById("taskForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const goal = document.getElementById("taskGoal").value;
+      const budget = parseFloat(document.getElementById("budgetLimit").value);
+      const maxLoops = parseInt(document.getElementById("maxLoops").value);
+
+      const btn = document.getElementById("runBtn");
+      btn.disabled = true;
+      btn.textContent = "Circle Running...";
+
+      try {
+        const resp = await fetch("/api/tasks/run", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ goal, budget_limit_usd: budget, max_loops: maxLoops })
+        });
+        const resJson = await resp.json();
+        console.log("Run completed:", resJson);
+      } catch (err) {
+        alert("Error executing task: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Launch Aztec Circle";
+      }
+    });
+
+    connectWS();
+  </script>
+</body>
+</html>

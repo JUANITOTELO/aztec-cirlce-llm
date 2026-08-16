@@ -1,0 +1,119 @@
+"""
+Peer Rank Agent: Code Drafter & System Architect.
+"""
+
+from __future__ import annotations
+
+import json
+from typing import Any, Dict, List, Optional
+import structlog
+
+from aztec_circle.adapters.mcp_client import MCPClient
+from aztec_circle.agents.base import BaseAgent, extract_json_payload
+from aztec_circle.config import settings
+from aztec_circle.domain.models import (
+    AgentRank,
+    PeerDraftOutput,
+    ToolCallResult,
+    YouthBrainstormOutput,
+)
+from aztec_circle.prompts import render
+
+log = structlog.get_logger(__name__)
+
+
+class PeerAgent(BaseAgent):
+    def __init__(
+        self,
+        agent_id: str = "peer_code_drafter",
+        model: Optional[str] = None,
+        provider: Optional[Any] = None,
+        mcp_client: Optional[MCPClient] = None,
+    ):
+        model_name = model or settings.PEER_MODEL
+        super().__init__(
+            agent_id=agent_id,
+            rank=AgentRank.PEER,
+            model=model_name,
+            provider=provider,
+        )
+        self.mcp_client = mcp_client or MCPClient()
+
+    async def run(
+        self,
+        goal: str,
+        youth_risks: List[YouthBrainstormOutput],
+        elder_instructions: Optional[str] = None,
+        loop_index: int = 0,
+    ) -> PeerDraftOutput:
+        """
+        Execute drafting of architecture and code, addressing Youth risks and Elder critiques.
+        """
+        is_revision = loop_index > 0 and bool(elder_instructions)
+        template_name = "peer_drafter_loop" if is_revision else "peer_drafter"
+        system_prompt = render(template_name, loop_index=str(loop_index))
+
+        # Format youth risks
+        formatted_risks = []
+        for yo in youth_risks:
+            for r in yo.identified_risks:
+                formatted_risks.append(f"- [{r.severity.value}] ({r.category}) {r.description} -> Mitigation: {r.suggested_mitigation}")
+
+        risk_context = "\n".join(formatted_risks) if formatted_risks else "None identified."
+
+        user_content_parts = [
+            f"PRIMARY GOAL:\n{goal}\n",
+            f"YOUTH ADVERSARIAL RISK LOG:\n{risk_context}\n",
+        ]
+
+        if is_revision and elder_instructions:
+            user_content_parts.append(
+                f"ELDER AUDIT REJECTION & REWORKING INSTRUCTIONS:\n{elder_instructions}\n"
+            )
+
+        user_content_parts.append(
+            "Synthesize architecture and write complete production implementation code addressing all requirements and risks."
+        )
+        user_message = "\n".join(user_content_parts)
+
+        # Call LLM
+        resp = await self._invoke_llm(
+            system_prompt=system_prompt,
+            user_message=user_message,
+            temperature=0.35,
+        )
+
+        data = extract_json_payload(resp.content)
+        return self._build_output(data, resp, loop_index)
+
+    def _build_output(
+        self,
+        data: Dict[str, Any],
+        resp: Any,
+        loop_index: int,
+    ) -> PeerDraftOutput:
+        overview = data.get("architecture_overview", "Synthesized architecture plan.")
+        code_dict = data.get("implementation_code", {})
+        if not isinstance(code_dict, dict):
+            code_dict = {"main.py": str(code_dict)}
+
+        mitigations = data.get("mitigations_applied", [])
+        if not isinstance(mitigations, list):
+            mitigations = [str(mitigations)]
+
+        assumptions = data.get("assumptions_made", [])
+        if not isinstance(assumptions, list):
+            assumptions = [str(assumptions)]
+
+        return PeerDraftOutput(
+            agent_id=self.agent_id,
+            loop_index=loop_index,
+            architecture_overview=overview,
+            implementation_code=code_dict,
+            mitigations_applied=mitigations,
+            assumptions_made=assumptions,
+            tool_calls=[],
+            input_tokens=resp.prompt_tokens,
+            output_tokens=resp.completion_tokens,
+            tokens_used=resp.total_tokens,
+        )
