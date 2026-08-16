@@ -188,7 +188,7 @@ class PatchAgent:
     ):
         self.provider = provider or LLMProvider()
         self.console = console
-        self.model = model or settings.PEER_MODEL
+        self.model = model or settings.get_effective_model("PATCH")
         self.indexer = indexer or ProjectIndexer()
 
     async def run(

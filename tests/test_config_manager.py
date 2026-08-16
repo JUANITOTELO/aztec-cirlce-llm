@@ -103,7 +103,7 @@ async def test_tui_cmd_keys_and_models(tmp_path):
 
         await cmd_models("", state, console)
         out = console.export_text()
-        assert "Active Aztec Rank Model Assignments" in out
+        assert "Active Aztec Rank" in out
 
         await cmd_models("catalog", state, console)
         out = console.export_text()

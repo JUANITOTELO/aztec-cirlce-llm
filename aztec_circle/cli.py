@@ -180,6 +180,14 @@ def run(
         "-P",
         help="Grab and attach image directly from system clipboard",
     ),
+    peer_model: Optional[str] = typer.Option(None, "--peer-model", "-m", help="Model for Peer Drafter (Primary)"),
+    youth_model: Optional[str] = typer.Option(None, "--youth-model", help="Baseline model for Youth rank"),
+    youth_chaos_model: Optional[str] = typer.Option(None, "--youth-chaos-model", help="Model for Youth Chaos Brainstormer"),
+    youth_advocate_model: Optional[str] = typer.Option(None, "--youth-advocate-model", help="Model for Youth Devil's Advocate"),
+    elder_model: Optional[str] = typer.Option(None, "--elder-model", help="Baseline model for Elder Council"),
+    elder_security_model: Optional[str] = typer.Option(None, "--elder-security-model", help="Model for Elder Security Auditor"),
+    elder_structural_model: Optional[str] = typer.Option(None, "--elder-structural-model", help="Model for Elder Structural Architect"),
+    fallback_model: Optional[str] = typer.Option(None, "--fallback-model", help="Model for Fallback failover"),
 ):
     """
     Launch a full multi-generational Aztec Circle debate loop.
@@ -197,7 +205,17 @@ def run(
     console.print(f"[bold cyan]Initializing Aztec Circle for task:[/bold cyan] {goal}")
     if all_images:
         console.print(f"  [dim]Attached {len(all_images)} reference image(s)[/dim]")
-    asyncio.run(_run_async(goal, budget, max_loops, fallback, auto_build, start_server, port, output_dir, max_fix_loops, all_images))
+    asyncio.run(_run_async(
+        goal, budget, max_loops, fallback, auto_build, start_server, port, output_dir, max_fix_loops, all_images,
+        peer_model=peer_model,
+        youth_model=youth_model,
+        youth_chaos_model=youth_chaos_model,
+        youth_advocate_model=youth_advocate_model,
+        elder_model=elder_model,
+        elder_security_model=elder_security_model,
+        elder_structural_model=elder_structural_model,
+        fallback_model=fallback_model,
+    ))
 
 
 async def _run_async(
@@ -211,8 +229,35 @@ async def _run_async(
     output_dir: Optional[str] = None,
     max_fix_loops: int = 2,
     images: Optional[List[str]] = None,
+    peer_model: Optional[str] = None,
+    youth_model: Optional[str] = None,
+    youth_chaos_model: Optional[str] = None,
+    youth_advocate_model: Optional[str] = None,
+    elder_model: Optional[str] = None,
+    elder_security_model: Optional[str] = None,
+    elder_structural_model: Optional[str] = None,
+    fallback_model: Optional[str] = None,
 ):
     from aztec_circle.adapters.image_utils import parse_images_input
+    from aztec_circle.config import settings
+
+    if peer_model:
+        settings.PEER_MODEL = peer_model
+    if youth_model:
+        settings.YOUTH_MODEL = youth_model
+    if youth_chaos_model:
+        settings.YOUTH_CHAOS_MODEL = youth_chaos_model
+    if youth_advocate_model:
+        settings.YOUTH_ADVOCATE_MODEL = youth_advocate_model
+    if elder_model:
+        settings.ELDER_MODEL = elder_model
+    if elder_security_model:
+        settings.ELDER_SECURITY_MODEL = elder_security_model
+    if elder_structural_model:
+        settings.ELDER_STRUCTURAL_MODEL = elder_structural_model
+    if fallback_model:
+        settings.FALLBACK_MODEL = fallback_model
+
     parsed_images = parse_images_input(images)
     state = CircleRunState(
         goal=goal,

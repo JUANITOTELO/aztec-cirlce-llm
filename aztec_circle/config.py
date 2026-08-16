@@ -47,11 +47,59 @@ class Settings(BaseSettings):
     COHERE_API_KEY: Optional[str] = None
     OLLAMA_BASE_URL: str = "http://localhost:11434"
 
-    # Model configuration
+    # Model configuration (Rank baselines)
     YOUTH_MODEL: str = "gemini/gemini-3.7-flash"
     PEER_MODEL: str = "gemini/gemini-3.7-flash"
     ELDER_MODEL: str = "gemini/gemini-2.5-pro"
     FALLBACK_MODEL: Optional[str] = "gemini/gemini-3.7-flash"
+
+    # Granular Sub-Role Overrides (Optional - inherit from rank if None)
+    YOUTH_CHAOS_MODEL: Optional[str] = None
+    YOUTH_ADVOCATE_MODEL: Optional[str] = None
+    ELDER_SECURITY_MODEL: Optional[str] = None
+    ELDER_STRUCTURAL_MODEL: Optional[str] = None
+    PATCH_MODEL: Optional[str] = None
+    FIXER_MODEL: Optional[str] = None
+
+    def get_effective_model(self, role_or_rank: str) -> str:
+        """
+        Resolve the effective model for a specific rank or sub-role with hierarchical fallback.
+        Hierarchy:
+        - YOUTH_CHAOS -> YOUTH_CHAOS_MODEL or YOUTH_MODEL
+        - YOUTH_ADVOCATE -> YOUTH_ADVOCATE_MODEL or YOUTH_MODEL
+        - PEER -> PEER_MODEL
+        - PATCH -> PATCH_MODEL or PEER_MODEL
+        - FIXER -> FIXER_MODEL or PEER_MODEL
+        - ELDER_SECURITY -> ELDER_SECURITY_MODEL or ELDER_MODEL
+        - ELDER_STRUCTURAL -> ELDER_STRUCTURAL_MODEL or ELDER_MODEL
+        - FALLBACK -> FALLBACK_MODEL or PEER_MODEL
+        """
+        r = role_or_rank.strip().upper()
+        if r in ("YOUTH_CHAOS", "CHAOS_BRAINSTORMER"):
+            return normalize_model_name(self.YOUTH_CHAOS_MODEL or self.YOUTH_MODEL)
+        elif r in ("YOUTH_ADVOCATE", "DEVILS_ADVOCATE"):
+            return normalize_model_name(self.YOUTH_ADVOCATE_MODEL or self.YOUTH_MODEL)
+        elif r in ("ELDER_SECURITY", "SECURITY_GOVERNANCE"):
+            return normalize_model_name(self.ELDER_SECURITY_MODEL or self.ELDER_MODEL)
+        elif r in ("ELDER_STRUCTURAL", "STRUCTURAL_PERF", "STRUCTURAL_ARCHITECT"):
+            return normalize_model_name(self.ELDER_STRUCTURAL_MODEL or self.ELDER_MODEL)
+        elif r in ("PATCH", "PATCH_AGENT"):
+            return normalize_model_name(self.PATCH_MODEL or self.PEER_MODEL)
+        elif r in ("FIXER", "BUILD_FIXER"):
+            return normalize_model_name(self.FIXER_MODEL or self.PEER_MODEL)
+        elif r == "YOUTH":
+            return normalize_model_name(self.YOUTH_MODEL)
+        elif r == "PEER":
+            return normalize_model_name(self.PEER_MODEL)
+        elif r == "ELDER":
+            return normalize_model_name(self.ELDER_MODEL)
+        elif r == "FALLBACK":
+            return normalize_model_name(self.FALLBACK_MODEL or self.PEER_MODEL)
+        else:
+            attr = f"{r}_MODEL"
+            if hasattr(self, attr) and getattr(self, attr):
+                return normalize_model_name(str(getattr(self, attr)))
+            return normalize_model_name(self.PEER_MODEL)
 
     # Debate governance
     MAX_DEBATE_LOOPS: int = 2
@@ -131,3 +179,9 @@ settings.PEER_MODEL = normalize_model_name(settings.PEER_MODEL)
 settings.ELDER_MODEL = normalize_model_name(settings.ELDER_MODEL)
 if settings.FALLBACK_MODEL:
     settings.FALLBACK_MODEL = normalize_model_name(settings.FALLBACK_MODEL)
+
+for sub_role in ("YOUTH_CHAOS_MODEL", "YOUTH_ADVOCATE_MODEL", "ELDER_SECURITY_MODEL", "ELDER_STRUCTURAL_MODEL", "PATCH_MODEL", "FIXER_MODEL"):
+    val = getattr(settings, sub_role, None)
+    if val:
+        setattr(settings, sub_role, normalize_model_name(str(val)))
+

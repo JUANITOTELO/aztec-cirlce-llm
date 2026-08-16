@@ -101,7 +101,7 @@ CRITICAL INSTRUCTIONS:
         self.provider = provider or LLMProvider()
         self.console = console
         self.max_iterations = max_iterations
-        self.model = model or settings.PEER_MODEL
+        self.model = model or settings.get_effective_model("FIXER")
 
     def parse_errors(self, build_output: str) -> List[TSError]:
         """Extract structured errors from compiler diagnostics across TS, PHP, Python, and Lean."""

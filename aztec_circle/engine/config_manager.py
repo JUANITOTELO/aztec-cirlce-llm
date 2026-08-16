@@ -118,15 +118,88 @@ class ConfigManager:
         except Exception:
             pass
 
+    ROLE_KEY_MAP = {
+        "YOUTH": "YOUTH_MODEL",
+        "YOUTH_CHAOS": "YOUTH_CHAOS_MODEL",
+        "CHAOS": "YOUTH_CHAOS_MODEL",
+        "YOUTH_ADVOCATE": "YOUTH_ADVOCATE_MODEL",
+        "ADVOCATE": "YOUTH_ADVOCATE_MODEL",
+        "PEER": "PEER_MODEL",
+        "PATCH": "PATCH_MODEL",
+        "PATCH_AGENT": "PATCH_MODEL",
+        "FIXER": "FIXER_MODEL",
+        "FIX": "FIXER_MODEL",
+        "BUILD_FIXER": "FIXER_MODEL",
+        "ELDER": "ELDER_MODEL",
+        "ELDER_SECURITY": "ELDER_SECURITY_MODEL",
+        "SECURITY": "ELDER_SECURITY_MODEL",
+        "ELDER_STRUCTURAL": "ELDER_STRUCTURAL_MODEL",
+        "STRUCTURAL": "ELDER_STRUCTURAL_MODEL",
+        "FALLBACK": "FALLBACK_MODEL",
+    }
+
     @classmethod
-    def save_model_assignment(cls, rank: str, model_id: str) -> None:
+    def normalize_role_key(cls, role_or_rank: str) -> str:
+        """Map role or rank alias to standard setting key name."""
+        cleaned = role_or_rank.strip().upper().replace("-", "_")
+        return cls.ROLE_KEY_MAP.get(cleaned, f"{cleaned}_MODEL" if not cleaned.endswith("_MODEL") else cleaned)
+
+    @classmethod
+    def save_model_assignment(cls, role_or_rank: str, model_id: str) -> None:
         """Update model assignment in settings and persist to ~/.aztec/config.env."""
-        rank = rank.strip().upper()
-        setting_key = f"{rank}_MODEL"
+        setting_key = cls.normalize_role_key(role_or_rank)
 
         if hasattr(settings, setting_key):
             setattr(settings, setting_key, model_id)
             cls.save_api_key(setting_key, model_id)
+
+    @classmethod
+    def reset_model_assignment(cls, role_or_rank: str) -> None:
+        """Reset a sub-role model assignment to None so it inherits from parent rank."""
+        setting_key = cls.normalize_role_key(role_or_rank)
+        if hasattr(settings, setting_key) and not setting_key.endswith(("_MODEL",)) or setting_key in ("YOUTH_CHAOS_MODEL", "YOUTH_ADVOCATE_MODEL", "ELDER_SECURITY_MODEL", "ELDER_STRUCTURAL_MODEL", "PATCH_MODEL", "FIXER_MODEL"):
+            setattr(settings, setting_key, None)
+            cfg_file = cls.get_config_file_path()
+            if cfg_file.exists():
+                with open(cfg_file, "r", encoding="utf-8") as f:
+                    lines = [line for line in f if not line.strip().startswith(f"{setting_key}=")]
+                with open(cfg_file, "w", encoding="utf-8") as f:
+                    f.writelines(lines)
+            os.environ.pop(setting_key, None)
+
+    @classmethod
+    def get_granular_roles_status(cls) -> List[Dict[str, Any]]:
+        """Return full status and model assignments across all ranks and granular roles."""
+        role_definitions = [
+            ("YOUTH", "Youth (Rank Default)", "YOUTH", settings.YOUTH_MODEL, "Exploratory brainstormers baseline"),
+            ("YOUTH_CHAOS", "Youth (Chaos Brainstormer)", "YOUTH", settings.YOUTH_CHAOS_MODEL, "High-temperature divergent exploration"),
+            ("YOUTH_ADVOCATE", "Youth (Devil's Advocate)", "YOUTH", settings.YOUTH_ADVOCATE_MODEL, "Contrarian stress tester & showstopper risk detection"),
+            ("PEER", "Peer Drafter (Primary)", "PEER", settings.PEER_MODEL, "System architecture & atomic code synthesis"),
+            ("PATCH", "Patch Agent (Precision Edit)", "PEER", settings.PATCH_MODEL, "2-round token-efficient line-range patch generator"),
+            ("FIXER", "Build Fixer (Compiler Repair)", "PEER", settings.FIXER_MODEL, "Diagnostic parser & self-healing file repair"),
+            ("ELDER", "Elder Council (Rank Default)", "ELDER", settings.ELDER_MODEL, "Security & structural auditing baseline"),
+            ("ELDER_SECURITY", "Elder (Security Governance)", "ELDER", settings.ELDER_SECURITY_MODEL, "Security audit, injection defense & credential governance"),
+            ("ELDER_STRUCTURAL", "Elder (Structural Architect)", "ELDER", settings.ELDER_STRUCTURAL_MODEL, "Architecture modularity, SRP & database schema auditing"),
+            ("FALLBACK", "Fallback (Emergency Failover)", "AUXILIARY", settings.FALLBACK_MODEL, "Automatic failover provider upon rate-limits or timeouts"),
+        ]
+
+        roles_status = []
+        for role_key, role_label, rank_group, configured_val, desc in role_definitions:
+            effective = settings.get_effective_model(role_key)
+            is_override = bool(configured_val is not None and not role_key.endswith(("DEFAULT", "PEER", "YOUTH", "ELDER", "FALLBACK")))
+            info = ModelCatalog.get_model_info(effective)
+
+            roles_status.append({
+                "role_key": role_key,
+                "role_label": role_label,
+                "rank_group": rank_group,
+                "configured_val": configured_val,
+                "effective_model": effective,
+                "is_override": is_override,
+                "description": desc,
+                "model_info": info,
+            })
+        return roles_status
 
     @classmethod
     def apply_preset(cls, preset_id: str) -> bool:

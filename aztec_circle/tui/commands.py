@@ -93,31 +93,51 @@ async def cmd_keys(args: str, state: SessionState, console: Console) -> None:
 
 
 async def cmd_models(args: str, state: SessionState, console: Console) -> None:
-    """Display or change model assignments per agent rank: /models or /models <RANK> <MODEL_ID>"""
+    """Display or change model assignments per agent rank/role: /models, /models <ROLE> <MODEL_ID>, /models reset <ROLE>, or /models pick"""
     from aztec_circle.engine.config_manager import ConfigManager
-    from aztec_circle.tui.config_ui import render_ranks_table, render_model_catalog_table
+    from aztec_circle.tui.config_ui import render_ranks_table, render_model_catalog_table, run_interactive_role_picker
 
-    parts = args.strip().split()
-    if len(parts) >= 2:
-        rank = parts[0].upper()
-        model_name = parts[1]
-        if rank in ("YOUTH", "PEER", "ELDER", "FALLBACK"):
-            ConfigManager.save_model_assignment(rank, model_name)
-            if rank == "PEER":
-                state.primary_model = model_name
-            console.print(f"[bold green]✓ Updated and saved {rank} model to:[/bold green] {model_name}\n")
-            return
-        else:
-            console.print("[bold red]Invalid rank. Choose from: YOUTH, PEER, ELDER, FALLBACK[/bold red]\n")
-            return
+    text = args.strip()
+    parts = text.split()
 
-    if args.strip().lower() == "catalog" or args.strip().lower() == "all":
+    if text.lower() in ("pick", "select", "choose", "wizard"):
+        await run_interactive_role_picker(console, state)
+        return
+
+    if text.lower() in ("catalog", "all", "list"):
         render_model_catalog_table(console)
         return
 
+    if len(parts) >= 2:
+        subcmd = parts[0].lower()
+        if subcmd in ("reset", "unset", "clear"):
+            target_role = parts[1]
+            ConfigManager.reset_model_assignment(target_role)
+            console.print(f"[bold green]✓ Reset {target_role.upper()} to inherit from rank default.[/bold green]\n")
+            return
+        elif subcmd in ("set", "assign") and len(parts) >= 3:
+            role = parts[1]
+            model_name = parts[2]
+            ConfigManager.save_model_assignment(role, model_name)
+            if role.upper() in ("PEER", "PEER_MODEL"):
+                state.primary_model = model_name
+            console.print(f"[bold green]✓ Updated and saved {role.upper()} model to:[/bold green] {model_name}\n")
+            return
+        else:
+            role = parts[0]
+            model_name = parts[1]
+            ConfigManager.save_model_assignment(role, model_name)
+            if role.upper() in ("PEER", "PEER_MODEL"):
+                state.primary_model = model_name
+            console.print(f"[bold green]✓ Updated and saved {role.upper()} model to:[/bold green] {model_name}\n")
+            return
+
     render_ranks_table(console)
-    console.print("[dim]Usage to assign: /models <YOUTH|PEER|ELDER|FALLBACK> <model_name>[/dim]")
-    console.print("[dim]Type '/models catalog' to view all available models across providers.[/dim]\n")
+    console.print("[dim]Assign: /models <ROLE_KEY> <model_name>  (e.g., /models ELDER_SECURITY deepseek/deepseek-r1)[/dim]")
+    console.print("[dim]Picker: /models pick                     (interactive numbered model menu)[/dim]")
+    console.print("[dim]Reset:  /models reset <ROLE_KEY>         (revert sub-role to inherit from rank)[/dim]")
+    console.print("[dim]Catalog:/models catalog                  (view capabilities & pricing across providers)[/dim]\n")
+
 
 
 async def cmd_preset(args: str, state: SessionState, console: Console) -> None:

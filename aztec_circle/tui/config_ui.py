@@ -48,47 +48,49 @@ def render_api_keys_table(console: Console) -> None:
 
 
 def render_ranks_table(console: Console) -> None:
-    """Display current model assignments across agent ranks."""
+    """Display current model assignments across all ranks and granular sub-roles."""
     table = Table(
-        title="🎭 Active Aztec Rank Model Assignments",
+        title="🎭 Active Aztec Rank & Role Model Assignments",
         header_style="bold gold1",
         border_style="dim cyan",
         expand=True,
     )
-    table.add_column("Rank", style="bold cyan")
-    table.add_column("Role / Responsibility", style="dim")
-    table.add_column("Configured Model", style="bold green")
-    table.add_column("Capabilities", style="magenta")
-    table.add_column("Key Status", justify="center")
+    table.add_column("Rank / Group", style="bold cyan", width=14)
+    table.add_column("Role & Responsibility", style="white", width=30)
+    table.add_column("Role Key", style="dim yellow", width=18)
+    table.add_column("Effective Model", style="bold green", width=30)
+    table.add_column("Inheritance", justify="center", width=14)
+    table.add_column("Capabilities", style="magenta", width=18)
+    table.add_column("Key Status", justify="center", width=12)
 
-    ranks = [
-        ("Youth", "Chaos Brainstorming & Devil's Advocate", settings.YOUTH_MODEL),
-        ("Peer", "Synthesis, Architecture & Code Drafting", settings.PEER_MODEL),
-        ("Elder", "Security Governance & Structural Audit", settings.ELDER_MODEL),
-        ("Fallback", "Emergency Failover Redirection", str(settings.FALLBACK_MODEL or "None")),
-    ]
+    roles = ConfigManager.get_granular_roles_status()
 
-    for rank_name, role_desc, model_id in ranks:
-        info = ModelCatalog.get_model_info(model_id)
+    for r in roles:
+        info = r["model_info"]
         caps = []
         if info.multimodal:
             caps.append("👁️ Vision")
         if info.reasoning:
-            caps.append("🧠 Reasoning")
+            caps.append("🧠 Reason")
         if not caps:
-            caps.append("⚡ Standard")
+            caps.append("⚡ Speed")
 
         key_status = "[green]✓ Ready[/green]" if info.is_configured else "[red]✗ Needs Key[/red]"
+        inherit_badge = "[cyan]Override[/cyan]" if r["is_override"] else "[dim]Rank Default[/dim]" if r["rank_group"] != "AUXILIARY" else "[dim]Auxiliary[/dim]"
+
         table.add_row(
-            rank_name,
-            role_desc,
-            model_id,
+            r["rank_group"],
+            r["role_label"],
+            r["role_key"],
+            r["effective_model"],
+            inherit_badge,
             " ".join(caps),
             key_status,
         )
 
     console.print(table)
-    console.print()
+    console.print("[dim]Assign via: /models <ROLE_KEY> <MODEL_ID> (e.g. /models ELDER_SECURITY deepseek/deepseek-r1)[/dim]")
+    console.print("[dim]Reset via:  /models reset <ROLE_KEY> (e.g. /models reset ELDER_SECURITY)[/dim]\n")
 
 
 def render_model_catalog_table(console: Console, provider: Optional[str] = None) -> None:
@@ -100,29 +102,34 @@ def render_model_catalog_table(console: Console, provider: Optional[str] = None)
         border_style="dim cyan",
         expand=True,
     )
-    table.add_column("Model ID", style="bold cyan", width=36)
+    table.add_column("Index", justify="right", style="bold cyan", width=6)
+    table.add_column("Model ID", style="bold cyan", width=32)
     table.add_column("Display Name", style="white", width=22)
     table.add_column("Context", justify="right", style="dim", width=10)
-    table.add_column("Capabilities", style="magenta", width=24)
-    table.add_column("Recommended Ranks", style="bold yellow", width=20)
-    table.add_column("Ready?", justify="center", width=10)
+    table.add_column("Capabilities", style="magenta", width=20)
+    table.add_column("Pricing (In / Out)", style="dim green", width=18)
+    table.add_column("Ready?", justify="center", width=8)
 
-    for m in models:
+    for idx, m in enumerate(models, 1):
         caps = []
         if m.multimodal:
-            caps.append("👁️ Vision")
+            caps.append("👁️")
         if m.reasoning:
-            caps.append("🧠 Reason")
+            caps.append("🧠")
         if m.supports_tools:
-            caps.append("🔧 Tools")
+            caps.append("🔧")
 
+        pricing = ModelCatalog.get_model_pricing(m.id)
+        price_str = f"${pricing[0]:.2f} / ${pricing[1]:.2f}"
         ready = "[green]✓[/green]" if m.is_configured else "[red]✗[/red]"
+
         table.add_row(
+            str(idx),
             m.id,
             m.name,
             f"{m.context_k}k",
             " ".join(caps),
-            ", ".join(m.recommended_ranks),
+            price_str,
             ready,
         )
 
@@ -138,42 +145,103 @@ def render_presets_table(console: Console) -> None:
         border_style="dim cyan",
         expand=True,
     )
-    table.add_column("Preset ID", style="bold cyan", width=18)
-    table.add_column("Preset Name", style="bold green", width=32)
+    table.add_column("Preset ID", style="bold cyan", width=24)
+    table.add_column("Preset Name", style="bold green", width=36)
     table.add_column("Description", style="dim")
 
     for pid, pdata in PRESET_CONFIGURATIONS.items():
         table.add_row(pid, pdata["name"], pdata["description"])
 
     console.print(table)
-    console.print("[dim]Usage: /preset <preset_id>  (e.g., /preset max_reasoning)[/dim]\n")
+    console.print("[dim]Usage: /preset <preset_id>  (e.g., /preset anthropic_efficiency)[/dim]\n")
+
+
+async def run_interactive_role_picker(console: Console, state: SessionState) -> None:
+    """Prompt user with numbered menus to assign models to specific roles."""
+    roles = ConfigManager.get_granular_roles_status()
+    
+    console.print(Panel(
+        "[bold cyan]Select Role to Configure:[/bold cyan]\n\n" +
+        "\n".join(f"[bold green]{idx}.[/bold green] [bold]{r['role_label']}[/bold] [dim]({r['role_key']} -> {r['effective_model']})[/dim]" for idx, r in enumerate(roles, 1)) +
+        "\n\n[bold green]0.[/bold green] [bold]Cancel[/bold]",
+        title="🎭 Select Aztec Role",
+        border_style="cyan",
+    ))
+
+    try:
+        choice = prompt("Select role number (0-10): ").strip()
+    except (EOFError, KeyboardInterrupt):
+        return
+
+    if not choice.isdigit() or int(choice) == 0 or int(choice) > len(roles):
+        return
+
+    selected_role = roles[int(choice) - 1]
+    role_key = selected_role["role_key"]
+
+    # Show Curated Models Menu
+    models = ModelCatalog.list_curated_models()
+    console.print(Panel(
+        f"[bold cyan]Assign Model to {selected_role['role_label']}:[/bold cyan]\n\n" +
+        "\n".join(f"[bold green]{idx}.[/bold green] [bold]{m.name}[/bold] [dim]({m.id})[/dim]" for idx, m in enumerate(models, 1)) +
+        "\n\n[dim]Or enter any custom model ID (e.g. anthropic/claude-sonnet-5, ollama/deepseek-r1:8b), 'reset' to inherit, or 0 to cancel.[/dim]",
+        title=f"🤖 Choose Model for {role_key}",
+        border_style="cyan",
+    ))
+
+    try:
+        model_choice = prompt(f"Model for {role_key}: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        return
+
+    if not model_choice or model_choice == "0":
+        return
+
+    if model_choice.lower() in ("reset", "inherit", "default", "none"):
+        ConfigManager.reset_model_assignment(role_key)
+        console.print(f"[bold green]✓ Reset {role_key} to inherit from rank default.[/bold green]\n")
+        return
+
+    if model_choice.isdigit() and 1 <= int(model_choice) <= len(models):
+        target_model = models[int(model_choice) - 1].id
+    else:
+        target_model = model_choice
+
+    ConfigManager.save_model_assignment(role_key, target_model)
+    if role_key == "PEER":
+        state.primary_model = target_model
+
+    console.print(f"[bold green]✓ Assigned {role_key} to {target_model}[/bold green]\n")
 
 
 async def run_test_models(console: Console) -> None:
-    """Probe all active rank models with a 1-token test ping."""
-    console.print("[bold cyan]🧪 Testing Model Connectivity & Latency across Active Ranks...[/bold cyan]\n")
-    ranks = [
-        ("Youth Rank", settings.YOUTH_MODEL),
-        ("Peer Rank", settings.PEER_MODEL),
-        ("Elder Rank", settings.ELDER_MODEL),
-    ]
-    if settings.FALLBACK_MODEL and settings.FALLBACK_MODEL != "None":
-        ranks.append(("Fallback Rank", settings.FALLBACK_MODEL))
+    """Probe all active unique rank and role models with a 1-token test ping."""
+    console.print("[bold cyan]🧪 Testing Model Connectivity & Latency across Active Ranks & Roles...[/bold cyan]\n")
+    
+    roles = ConfigManager.get_granular_roles_status()
+    # Unique effective models
+    seen_models = set()
+    test_targets = []
+    for r in roles:
+        eff = r["effective_model"]
+        if eff and eff not in seen_models and eff != "None":
+            seen_models.add(eff)
+            test_targets.append((r["role_label"], eff))
 
     table = Table(title="Model Ping Test Results", header_style="bold gold1", expand=True)
-    table.add_column("Rank", style="bold cyan", width=16)
+    table.add_column("Role Sample", style="bold cyan", width=28)
     table.add_column("Model ID", style="white", width=36)
     table.add_column("Status", justify="center", width=16)
     table.add_column("Latency", justify="right", width=12)
     table.add_column("Details", style="dim")
 
-    for rank_label, model_id in ranks:
-        with console.status(f"[dim]Pinging {rank_label} ({model_id})...[/dim]"):
+    for role_label, model_id in test_targets:
+        with console.status(f"[dim]Pinging {role_label} ({model_id})...[/dim]"):
             success, msg, latency = await ConfigManager.test_model_connection(model_id)
 
         status_str = "[bold green]✓ Online[/bold green]" if success else "[bold red]✗ Failed[/bold red]"
         lat_str = f"{latency:.2f}s" if latency > 0 else "-"
-        table.add_row(rank_label, model_id, status_str, lat_str, msg)
+        table.add_row(role_label, model_id, status_str, lat_str, msg)
 
     console.print(table)
     console.print()
@@ -185,9 +253,9 @@ async def run_interactive_config_menu(console: Console, state: SessionState) -> 
         console.print(Panel(
             "[bold cyan]Aztec Configuration Center[/bold cyan]\n\n"
             "[bold green]1.[/bold green] 🔑 [bold]Manage API Keys[/bold] (View & securely set API keys)\n"
-            "[bold green]2.[/bold green] 🎭 [bold]Assign Models to Ranks[/bold] (Youth, Peer, Elder, Fallback)\n"
+            "[bold green]2.[/bold green] 🎭 [bold]Assign Models to Roles & Ranks[/bold] (Granular role model picker)\n"
             "[bold green]3.[/bold green] 📚 [bold]Browse Model Catalog[/bold] (View capabilities & context)\n"
-            "[bold green]4.[/bold green] ⚡ [bold]Apply Architecture Preset[/bold] (Speed, Reasoning, Google, OpenAI)\n"
+            "[bold green]4.[/bold green] ⚡ [bold]Apply Architecture Preset[/bold] (Anthropic, Speed, Reasoning, OpenAI)\n"
             "[bold green]5.[/bold green] 🧪 [bold]Test Model Connections[/bold] (Live 1-token latency ping)\n"
             "[bold green]0.[/bold green] 🚪 [bold]Return to Main Session[/bold]",
             title="⚙️ Settings & Models",
@@ -217,18 +285,7 @@ async def run_interactive_config_menu(console: Console, state: SessionState) -> 
 
         elif choice == "2":
             render_ranks_table(console)
-            console.print("[dim]Select rank to update (YOUTH, PEER, ELDER, FALLBACK) or press Enter to cancel:[/dim]")
-            try:
-                rank_choice = prompt("Rank to update: ").strip().upper()
-                if rank_choice in ("YOUTH", "PEER", "ELDER", "FALLBACK"):
-                    new_model = prompt(f"New model for {rank_choice} (e.g. gemini/gemini-3.7-flash): ").strip()
-                    if new_model:
-                        ConfigManager.save_model_assignment(rank_choice, new_model)
-                        if rank_choice == "PEER":
-                            state.primary_model = new_model
-                        console.print(f"[bold green]✓ Assigned {rank_choice} to {new_model}[/bold green]\n")
-            except (EOFError, KeyboardInterrupt):
-                pass
+            await run_interactive_role_picker(console, state)
 
         elif choice == "3":
             render_model_catalog_table(console)
@@ -248,3 +305,4 @@ async def run_interactive_config_menu(console: Console, state: SessionState) -> 
 
         elif choice == "5":
             await run_test_models(console)
+

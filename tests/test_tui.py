@@ -82,7 +82,7 @@ async def test_dispatch_slash_models():
     handled = await dispatch_slash_command("/models", state, console)
     assert handled is True
     out = console.export_text()
-    assert "Active Aztec Rank Model Assignments" in out
+    assert "Active Aztec Rank" in out
     assert "Youth" in out
     assert "Peer" in out
     assert "Elder" in out

@@ -50,13 +50,13 @@ class AztecOrchestrator:
         self.consensus = consensus_engine or ConsensusEngine()
 
         self.youth_agents = youth_agents or [
-            YouthAgent(persona="chaos_brainstormer"),
-            YouthAgent(persona="devils_advocate"),
+            YouthAgent(persona="chaos_brainstormer", model=settings.get_effective_model("YOUTH_CHAOS")),
+            YouthAgent(persona="devils_advocate", model=settings.get_effective_model("YOUTH_ADVOCATE")),
         ]
-        self.peer_agent = peer_agent or PeerAgent()
+        self.peer_agent = peer_agent or PeerAgent(model=settings.get_effective_model("PEER"))
         self.elder_agents = elder_agents or [
-            ElderAgent(persona="security_governance"),
-            ElderAgent(persona="structural_perf"),
+            ElderAgent(persona="security_governance", model=settings.get_effective_model("ELDER_SECURITY")),
+            ElderAgent(persona="structural_perf", model=settings.get_effective_model("ELDER_STRUCTURAL")),
         ]
 
     async def run(self) -> Dict[str, Any]:
