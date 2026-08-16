@@ -5,7 +5,7 @@ Tests for FastAPI Web Inspector server endpoints and WebSocket communication.
 from unittest.mock import AsyncMock, patch
 import pytest
 from httpx import ASGITransport, AsyncClient
-from starlette.testclient import TestClient
+from fastapi.testclient import TestClient
 from aztec_circle.domain.models import CirclePhase, CircleRunState
 from aztec_circle.engine.checkpoint import CheckpointStore
 from aztec_circle.server.app import create_app, manager

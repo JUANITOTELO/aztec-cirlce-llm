@@ -5,6 +5,8 @@ CLI entry point for Aztec Decision Circle.
 from __future__ import annotations
 
 import asyncio
+import re
+from typing import Optional
 import typer
 from rich.console import Console
 from rich.live import Live
@@ -18,9 +20,27 @@ from aztec_circle.engine.state_machine import AztecOrchestrator
 app = typer.Typer(
     name="aztec",
     help="Aztec Decision Circle: Multi-Generational Adversarial LLM Debate Framework",
-    no_args_is_help=True,
+    no_args_is_help=False,
 )
 console = Console()
+
+
+@app.callback(invoke_without_command=True)
+def main_callback(ctx: typer.Context):
+    """If no subcommand is passed, launch the interactive agy-style Aztec TUI."""
+    if ctx.invoked_subcommand is None:
+        from aztec_circle.tui.interactive import start_interactive_session
+        asyncio.run(start_interactive_session())
+
+
+@app.command("interactive")
+def interactive():
+    """
+    Launch the interactive agy-style Aztec TUI session.
+    """
+    from aztec_circle.tui.interactive import start_interactive_session
+    asyncio.run(start_interactive_session())
+
 
 
 def _render_dashboard(state: CircleRunState, last_event: dict) -> Panel:
@@ -45,6 +65,23 @@ def _render_dashboard(state: CircleRunState, last_event: dict) -> Panel:
     return Panel(table, title="[bold gold1]Aztec Decision Circle Dashboard[/bold gold1]", border_style="blue")
 
 
+def slugify_goal(goal: str, max_len: int = 32) -> str:
+    """
+    Generate clean directory slug from goal prompt.
+    """
+    stop_words = {
+        "a", "an", "the", "create", "build", "make", "design",
+        "implement", "write", "develop", "let", "lets", "app",
+        "application", "for", "with", "and", "or", "in", "to", "of", "that",
+    }
+    words = re.sub(r"[^\w\s]", "", goal.lower()).split()
+    meaningful = [w for w in words if w not in stop_words]
+    if not meaningful:
+        meaningful = words[:3]
+    slug = "_".join(meaningful[:4])[:max_len].strip("_")
+    return slug or "aztec_output"
+
+
 @app.command()
 def run(
     goal: str = typer.Argument(..., help="The goal, prompt, or architectural challenge to resolve"),
@@ -56,15 +93,54 @@ def run(
         "-f",
         help="Fallback policy upon loop exhaustion",
     ),
+    auto_build: bool = typer.Option(
+        False,
+        "--auto-build",
+        "-B",
+        help="Automatically scaffold, install dependencies, and build upon resolution",
+    ),
+    start_server: bool = typer.Option(
+        False,
+        "--start",
+        "-S",
+        help="Automatically launch development server after building",
+    ),
+    port: int = typer.Option(
+        5173,
+        "--port",
+        "-p",
+        help="Port for development server",
+    ),
+    output_dir: Optional[str] = typer.Option(
+        None,
+        "--output-dir",
+        "-o",
+        help="Target output directory (defaults to auto-generated slug or ./aztec_output)",
+    ),
+    max_fix_loops: int = typer.Option(
+        2,
+        "--max-fix-loops",
+        help="Max automated LLM repair iterations on build failure",
+    ),
 ):
     """
     Launch a full multi-generational Aztec Circle debate loop.
     """
     console.print(f"[bold cyan]Initializing Aztec Circle for task:[/bold cyan] {goal}")
-    asyncio.run(_run_async(goal, budget, max_loops, fallback))
+    asyncio.run(_run_async(goal, budget, max_loops, fallback, auto_build, start_server, port, output_dir, max_fix_loops))
 
 
-async def _run_async(goal: str, budget: float, max_loops: int, fallback: FallbackPolicy):
+async def _run_async(
+    goal: str,
+    budget: float,
+    max_loops: int,
+    fallback: FallbackPolicy,
+    auto_build: bool = False,
+    start_server: bool = False,
+    port: int = 5173,
+    output_dir: Optional[str] = None,
+    max_fix_loops: int = 2,
+):
     state = CircleRunState(
         goal=goal,
         budget_limit_usd=budget,
@@ -96,10 +172,207 @@ async def _run_async(goal: str, budget: float, max_loops: int, fallback: Fallbac
             live.update(_render_dashboard(state, {"event": "COMPLETED"}))
             console.print("\n[bold green]=== Aztec Circle Execution Final Result ===[/bold green]")
             console.print_json(data=result)
+
+            target_out = output_dir or f"./{slugify_goal(goal)}"
+            from aztec_circle.tui.renderer import TranscriptRenderer
+            renderer = TranscriptRenderer(console)
+            renderer.render_deliverable(result, output_dir=target_out)
+
+            if auto_build or start_server:
+                from aztec_circle.engine.scaffolder import find_project_root
+                from aztec_circle.engine.project_runner import ProjectRunner
+                from aztec_circle.engine.build_fixer import BuildFixAgent
+
+                project_root = find_project_root(target_out)
+                console.print(f"\n[bold cyan]─── Auto-Building Deliverable Project ({project_root}) ───[/bold cyan]")
+                runner = ProjectRunner(console=console)
+                install_res = await runner.install_dependencies(project_root)
+                if install_res.success:
+                    build_res = await runner.build_project(project_root)
+                    if not build_res.success and max_fix_loops > 0:
+                        fixer = BuildFixAgent(console=console, max_iterations=max_fix_loops)
+                        fix_res = await fixer.fix(project_root, build_res, runner=runner)
+                        build_res = fix_res.final_build_result
+
+                    if build_res.success and start_server:
+                        server_proc = await runner.start_dev_server(project_root, port=port)
+                        console.print("[dim]Press Ctrl+C to stop dev server...[/dim]")
+                        try:
+                            await server_proc.process.wait()
+                        except (KeyboardInterrupt, asyncio.CancelledError):
+                            await server_proc.stop()
+                            console.print("[yellow]Dev server stopped.[/yellow]")
+
         except Exception as exc:
             consumer_task.cancel()
             live.update(_render_dashboard(state, {"event": "ERROR", "error": str(exc)}))
             console.print(f"\n[bold red]Circle Execution Terminated:[/bold red] {exc}")
+        finally:
+            # Yield brief interval for underlying SSL sockets / transports to close gracefully
+            await asyncio.sleep(0.05)
+
+
+@app.command()
+def build(
+    path: str = typer.Argument("./aztec_output", help="Project directory to scaffold and build"),
+    max_fix_loops: int = typer.Option(2, "--max-fix-loops", help="Max automated LLM repair attempts if build fails"),
+):
+    """
+    Scaffold missing project configuration, install dependencies, and build project.
+    """
+    asyncio.run(_build_async(path, max_fix_loops))
+
+
+async def _build_async(path: str, max_fix_loops: int = 2):
+    from aztec_circle.engine.scaffolder import scaffold_project
+    from aztec_circle.engine.project_runner import ProjectRunner
+    from aztec_circle.engine.build_fixer import BuildFixAgent
+
+    console.print(f"[bold cyan]Scaffolding and building project at:[/bold cyan] {path}")
+    scaffold_res = scaffold_project(path)
+    if scaffold_res.files_injected:
+        console.print(f"  [green]✓[/green] Injected {len(scaffold_res.files_injected)} boilerplate configuration files: [dim]{', '.join(scaffold_res.files_injected)}[/dim]")
+
+    runner = ProjectRunner(console=console)
+    install_res = await runner.install_dependencies(scaffold_res.project_root)
+    if install_res.success:
+        build_res = await runner.build_project(scaffold_res.project_root)
+        if not build_res.success and max_fix_loops > 0:
+            fixer = BuildFixAgent(console=console, max_iterations=max_fix_loops)
+            await fixer.fix(scaffold_res.project_root, build_res, runner=runner)
+
+
+@app.command()
+def edit(
+    instruction: str = typer.Argument(..., help="Edit instruction (e.g. 'Add a screenshot button to the Toolbar')"),
+    path: str = typer.Option("./aztec_output", "--path", "-p", help="Target project directory to edit"),
+    auto_typecheck: bool = typer.Option(True, "--typecheck/--no-typecheck", help="Run tsc check after editing"),
+    auto_fix: bool = typer.Option(True, "--fix/--no-fix", help="Automatically invoke BuildFixAgent if typecheck fails"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Display token telemetry and detailed patch operations"),
+):
+    """
+    Apply an atomic targeted edit to an existing generated project.
+    Uses a 2-round LLM conversation for maximum token efficiency.
+    """
+    asyncio.run(_edit_async(instruction, path, auto_typecheck, auto_fix, verbose))
+
+
+async def _edit_async(instruction: str, path: str, auto_typecheck: bool, auto_fix: bool, verbose: bool):
+    from aztec_circle.engine.patch_agent import PatchAgent
+    from aztec_circle.engine.project_runner import ProjectRunner
+    from aztec_circle.engine.build_fixer import BuildFixAgent
+    from aztec_circle.engine.scaffolder import find_project_root
+
+    root = find_project_root(path)
+    agent = PatchAgent(console=console)
+    res = await agent.run(instruction=instruction, project_dir=root, verbose=verbose)
+
+    if not res.success:
+        console.print(f"[bold red]✗ Edit operation failed:[/bold red] {res.error_message or res.edit_summary}\n")
+        return
+
+    console.print(f"\n[bold green]Summary:[/bold green] {res.edit_summary}")
+
+    if auto_typecheck:
+        runner = ProjectRunner(console=console)
+        tc_res = await runner.typecheck_project(root)
+        if not tc_res.success:
+            if auto_fix:
+                console.print("[yellow]Type check reported errors. Triggering atomic Build Fix Agent...[/yellow]")
+                fixer = BuildFixAgent(console=console, max_iterations=2)
+                fix_res = await fixer.fix(root, tc_res, runner=runner)
+                if not fix_res.success:
+                    console.print("[bold red]Warning: Post-edit build check still has unresolved errors.[/bold red]\n")
+            else:
+                console.print("[bold red]Type check failed.[/bold red]\n")
+        else:
+            console.print("[bold green]✓ Type check passed with zero errors![/bold green]\n")
+
+
+@app.command()
+def fix(
+    path: str = typer.Argument("./aztec_output", help="Project directory to repair"),
+    max_loops: int = typer.Option(3, "--max-loops", "-n", help="Max automated LLM repair iterations"),
+):
+    """
+    Run the Build Fix Agent on a project: automatically patch compiler errors and rebuild.
+    """
+    asyncio.run(_fix_async(path, max_loops))
+
+
+async def _fix_async(path: str, max_loops: int):
+    from aztec_circle.engine.scaffolder import find_project_root
+    from aztec_circle.engine.project_runner import ProjectRunner
+    from aztec_circle.engine.build_fixer import BuildFixAgent
+
+    root = find_project_root(path)
+    console.print(f"[bold cyan]Running Aztec Build Fixer on project at:[/bold cyan] {root}")
+    runner = ProjectRunner(console=console)
+    initial_build = await runner.build_project(root)
+
+    if initial_build.success:
+        console.print("[bold green]✓ Project is already building cleanly with zero errors![/bold green]")
+        return
+
+    fixer = BuildFixAgent(console=console, max_iterations=max_loops)
+    res = await fixer.fix(root, initial_build, runner=runner)
+    if res.success:
+        console.print(f"[bold green]✓ Successfully repaired {len(res.patches_applied)} file(s) across {res.iterations} iteration(s)![/bold green]")
+    else:
+        console.print(f"[bold red]✗ Could not fully resolve all build errors after {res.iterations} iteration(s).[/bold red]")
+
+
+@app.command()
+def test(
+    path: str = typer.Argument("./aztec_output", help="Project directory to test"),
+):
+    """
+    Execute project test suite (npm test or pytest).
+    """
+    asyncio.run(_test_async(path))
+
+
+async def _test_async(path: str):
+    from aztec_circle.engine.scaffolder import find_project_root
+    from aztec_circle.engine.project_runner import ProjectRunner
+
+    root = find_project_root(path)
+    console.print(f"[bold cyan]Running test suite for project at:[/bold cyan] {root}")
+    runner = ProjectRunner(console=console)
+    await runner.test_project(root)
+
+
+@app.command()
+def start(
+    path: str = typer.Argument("./aztec_output", help="Project directory to run"),
+    port: int = typer.Option(5173, "--port", "-p", help="Port to bind development server"),
+):
+    """
+    Build and launch the live development server for the generated project.
+    """
+    asyncio.run(_start_async(path, port))
+
+
+async def _start_async(path: str, port: int):
+    from aztec_circle.engine.scaffolder import scaffold_project
+    from aztec_circle.engine.project_runner import ProjectRunner
+
+    scaffold_res = scaffold_project(path)
+    runner = ProjectRunner(console=console)
+
+    # Ensure dependencies and build are ready
+    install_res = await runner.install_dependencies(scaffold_res.project_root)
+    if not install_res.success:
+        console.print("[bold red]Dependency installation failed. Aborting dev server start.[/bold red]")
+        return
+
+    server_proc = await runner.start_dev_server(scaffold_res.project_root, port=port)
+    console.print("[dim]Dev server running in foreground. Press Ctrl+C to stop.[/dim]")
+    try:
+        await server_proc.process.wait()
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        await server_proc.stop()
+        console.print("\n[yellow]Dev server stopped cleanly.[/yellow]")
 
 
 @app.command()
@@ -184,3 +457,4 @@ def serve(
 
 if __name__ == "__main__":
     app()
+

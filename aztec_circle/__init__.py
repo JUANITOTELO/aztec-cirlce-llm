@@ -15,4 +15,22 @@ try:
 except Exception:
     pass
 
+# Silence asyncio SSL transport closing race condition on Python 3.10+ shutdown
+try:
+    import asyncio.sslproto
+    _orig_fatal_error = asyncio.sslproto.SSLProtocol._fatal_error
+
+    def _safe_ssl_fatal_error(self, exc, message="Fatal error on transport"):
+        if isinstance(exc, (OSError, RuntimeError)) or getattr(self, "_closed", False):
+            return
+        try:
+            _orig_fatal_error(self, exc, message)
+        except Exception:
+            pass
+
+    asyncio.sslproto.SSLProtocol._fatal_error = _safe_ssl_fatal_error
+except Exception:
+    pass
+
 __version__ = "0.1.0"
+

@@ -19,39 +19,45 @@ log = structlog.get_logger(__name__)
 def extract_json_payload(text: str) -> Dict[str, Any]:
     """
     Robustly extract JSON from model responses, handling markdown code fences,
-    leading/trailing chatter, or partial JSON.
+    leading/trailing chatter, unescaped newlines, trailing commas, or partial JSON.
     """
     text = text.strip()
     if not text:
         return {}
 
-    # Strip markdown code fences if present
-    fence_pattern = r"```(?:json)?\s*([\s\S]*?)\s*```"
+    candidates: List[str] = []
+
+    # 1. Strip markdown code fences if present
+    fence_pattern = r"```(?:json)?\s*([\s\S]*?)(?:```|$)"
     match = re.search(fence_pattern, text)
     if match:
-        candidate = match.group(1).strip()
-        try:
-            return json.loads(candidate)
-        except json.JSONDecodeError:
-            pass
+        candidates.append(match.group(1).strip())
 
-    # Try direct parse
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        pass
-
-    # Try finding outermost braces { ... }
+    # 2. Outermost braces
     first_brace = text.find("{")
     last_brace = text.rfind("}")
     if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
-        candidate = text[first_brace : last_brace + 1]
+        candidates.append(text[first_brace : last_brace + 1].strip())
+
+    candidates.append(text)
+
+    for cand in candidates:
+        if not cand:
+            continue
+        # Direct parse with strict=False
         try:
-            return json.loads(candidate)
+            return json.loads(cand, strict=False)
         except json.JSONDecodeError:
             pass
 
-    log.warning("agent.json_extraction_failed", preview=text[:120])
+        # Cleanup trailing commas: ,} or ,]
+        cleaned = re.sub(r",\s*([\]}])", r"\1", cand)
+        try:
+            return json.loads(cleaned, strict=False)
+        except json.JSONDecodeError:
+            pass
+
+    log.warning("agent.json_extraction_failed", preview=text[:160])
     return {}
 
 

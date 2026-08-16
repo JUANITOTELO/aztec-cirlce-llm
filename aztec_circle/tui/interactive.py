@@ -1,0 +1,254 @@
+"""
+Interactive agy-style REPL session for Aztec Decision Circle.
+"""
+
+from __future__ import annotations
+
+import asyncio
+from pathlib import Path
+from typing import Optional
+
+from prompt_toolkit import PromptSession
+from prompt_toolkit.formatted_text import ANSI
+from prompt_toolkit.history import FileHistory
+from prompt_toolkit.styles import Style
+from rich.console import Console
+from rich.live import Live
+
+from aztec_circle.domain.models import CircleRunState
+from aztec_circle.engine.checkpoint import CheckpointStore
+from aztec_circle.engine.state_machine import AztecOrchestrator
+from aztec_circle.tui.commands import dispatch_slash_command
+from aztec_circle.tui.completer import SlashCompleter
+from aztec_circle.tui.renderer import TranscriptRenderer, print_welcome_banner
+from aztec_circle.tui.session import SessionState
+
+console = Console()
+
+TUI_STYLE = Style.from_dict({
+    "prompt": "ansicyan bold",
+    "completion-menu.completion": "bg:#202020 #ffffff",
+    "completion-menu.completion.current": "bg:#00aaaa #000000 bold",
+    "completion-menu.meta.completion": "bg:#101010 #aaaaaa italic",
+})
+
+
+async def run_debate_session(
+    goal: str,
+    state: SessionState,
+    renderer: TranscriptRenderer,
+) -> Optional[dict]:
+    """Execute a full Aztec Decision Circle debate within the interactive session."""
+    run_state = CircleRunState(
+        goal=goal,
+        budget_limit_usd=state.budget_limit_usd,
+        max_loops=state.max_loops,
+        fallback_policy=state.fallback_policy,
+    )
+    event_queue: asyncio.Queue = asyncio.Queue()
+    orchestrator = AztecOrchestrator(state=run_state, event_queue=event_queue)
+
+    console.print(f"\n[bold cyan]Starting Aztec Debate for:[/bold cyan] {goal}")
+    renderer.render_phase("YOUTH_BRAINSTORM")
+
+    # Background event consumer to render events live
+    async def _event_drainer():
+        while True:
+            try:
+                event = await event_queue.get()
+                renderer.render_event(event)
+                event_queue.task_done()
+            except asyncio.CancelledError:
+                break
+
+    drain_task = asyncio.create_task(_event_drainer())
+
+    try:
+        result = await orchestrator.run()
+        await asyncio.sleep(0.05)  # flush pending events
+        drain_task.cancel()
+
+        # Update session telemetry
+        state.last_goal = goal
+        cost = result.get("total_cost_usd", run_state.total_cost_usd)
+        tokens = result.get("total_tokens_used", run_state.total_tokens_used)
+        loops = result.get("loop_count", run_state.loop_count)
+        task_id = result.get("task_id", run_state.task_id)
+        state.record_run(cost_usd=cost, tokens=tokens, loops=loops, task_id=task_id)
+
+        # Render deliverable
+        renderer.render_deliverable(result, output_dir=state.output_dir)
+        await _show_post_debate_menu(state, console)
+        return result
+
+    except asyncio.CancelledError:
+        drain_task.cancel()
+        console.print("\n[yellow]Debate cancelled by user.[/yellow]\n")
+        return None
+    except Exception as exc:
+        drain_task.cancel()
+        console.print(f"\n[bold red]Debate execution encountered an error:[/bold red] {exc}\n")
+        return None
+
+
+def _is_edit_followup(goal: str, state: SessionState) -> bool:
+    """
+    Determine whether input is an incremental follow-up edit to the active project.
+    Heuristics:
+    - Edit mode is enabled
+    - Project output_dir exists and contains source files in src/
+    - Input does NOT start with major project generation trigger keywords
+    """
+    import os
+    import re
+    if not state.edit_mode_enabled:
+        return False
+
+    src_dir = os.path.join(state.output_dir, "src")
+    if not (os.path.isdir(src_dir) and any(f.endswith((".ts", ".tsx", ".js", ".jsx", ".py")) for f in os.listdir(src_dir))):
+        return False
+
+    words = re.sub(r"[^\w\s]", "", goal.strip().lower()).split()
+    if not words:
+        return False
+
+    trigger_words = {
+        "create", "build", "design", "make", "generate",
+        "develop", "write", "initialize", "start", "let", "lets",
+    }
+    return words[0] not in trigger_words
+
+
+async def run_edit_session(
+    instruction: str,
+    state: SessionState,
+    console: Console,
+) -> None:
+    """Apply an atomic incremental edit within the interactive session."""
+    import os
+    from aztec_circle.engine.patch_agent import PatchAgent
+    from aztec_circle.engine.project_runner import ProjectRunner
+    from aztec_circle.engine.build_fixer import BuildFixAgent
+    from aztec_circle.engine.scaffolder import find_project_root
+
+    root = find_project_root(state.output_dir)
+    console.print(f"\n[bold cyan]✏ Edit Mode Detected[/bold cyan] [dim](target: {state.output_dir})[/dim]")
+    console.print("[dim]Applying atomic line-range patch. Type /rebuild to force full regeneration.[/dim]")
+
+    agent = PatchAgent(console=console)
+    res = await agent.run(instruction=instruction, project_dir=root, verbose=True)
+
+    if not res.success:
+        console.print(f"[bold red]✗ Edit failed:[/bold red] {res.error_message or res.edit_summary}\n")
+        return
+
+    state.total_cost_usd += res.total_cost_usd
+    state.total_tokens += (res.round1_tokens + res.round2_tokens)
+    console.print(f"[bold green]Summary:[/bold green] {res.edit_summary}")
+
+    # Quality Gate check
+    runner = ProjectRunner(console=console)
+    tc_res = await runner.typecheck_project(root)
+    if not tc_res.success:
+        console.print("[yellow]Type check found errors. Triggering atomic Build Fix Agent...[/yellow]")
+        fixer = BuildFixAgent(console=console, max_iterations=2)
+        fix_res = await fixer.fix(root, tc_res, runner=runner)
+        state.total_cost_usd += fix_res.total_cost_usd
+        if not fix_res.success:
+            console.print("[bold red]Warning: Unresolved type errors remain.[/bold red]\n")
+    else:
+        console.print("[bold green]✓ Type check passed cleanly![/bold green]\n")
+
+
+async def _show_post_debate_menu(state: SessionState, console: Console) -> None:
+    """Interactive single-keypress action prompt after deliverable is saved."""
+    from prompt_toolkit.key_binding import KeyBindings
+    from aztec_circle.tui.commands import cmd_build, cmd_start, cmd_test, cmd_fix
+
+    console.print(
+        "[bold]▶ Quick Actions:[/bold]  "
+        "[bold cyan]\\[b][/bold cyan] Build & Bundle  "
+        "[bold cyan]\\[r][/bold cyan] Start Live Server  "
+        "[bold cyan]\\[t][/bold cyan] Run Tests  "
+        "[bold cyan]\\[f][/bold cyan] Auto-Fix  "
+        "[dim]\\[Enter] Next Prompt[/dim]"
+    )
+    kb = KeyBindings()
+    action = {"value": None}
+
+    @kb.add("b")
+    def _b(event):
+        action["value"] = "build"
+        event.app.exit()
+
+    @kb.add("r")
+    def _r(event):
+        action["value"] = "start"
+        event.app.exit()
+
+    @kb.add("t")
+    def _t(event):
+        action["value"] = "test"
+        event.app.exit()
+
+    @kb.add("f")
+    def _f(event):
+        action["value"] = "fix"
+        event.app.exit()
+
+    @kb.add("enter")
+    @kb.add("escape")
+    def _skip(event):
+        event.app.exit()
+
+    menu_session = PromptSession(key_bindings=kb)
+    try:
+        await menu_session.prompt_async("")
+    except Exception:
+        pass
+
+    if action["value"] == "build":
+        await cmd_build("", state, console)
+    elif action["value"] == "start":
+        await cmd_build("", state, console)
+        await cmd_start("", state, console)
+    elif action["value"] == "test":
+        await cmd_test("", state, console)
+    elif action["value"] == "fix":
+        await cmd_fix("", state, console)
+
+
+async def start_interactive_session() -> None:
+    """Launch the interactive Aztec TUI session loop."""
+    history_file = Path("~/.aztec_history").expanduser()
+    session: PromptSession = PromptSession(
+        history=FileHistory(str(history_file)),
+        completer=SlashCompleter(),
+        style=TUI_STYLE,
+    )
+
+    state = SessionState()
+    renderer = TranscriptRenderer(console)
+    print_welcome_banner(console, state)
+
+    while True:
+        try:
+            prompt_str = state.prompt_text()
+            user_input = await session.prompt_async(ANSI(prompt_str))
+        except (EOFError, KeyboardInterrupt):
+            console.print("\n[dim]Exiting Aztec session. Goodbye![/dim]")
+            break
+
+        cleaned = user_input.strip()
+        if not cleaned:
+            continue
+
+        # Check if user input is a slash command
+        is_cmd = await dispatch_slash_command(cleaned, state, console)
+        if not is_cmd:
+            if _is_edit_followup(cleaned, state):
+                # Follow-up edit on existing project -> Run lightweight Edit Engine
+                await run_edit_session(cleaned, state, console)
+            else:
+                # Free-text goal -> Launch full debate
+                await run_debate_session(cleaned, state, renderer)

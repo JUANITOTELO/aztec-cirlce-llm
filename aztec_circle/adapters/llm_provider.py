@@ -20,7 +20,14 @@ if not hasattr(_litellm_utils, "ChatCompletionReasoningSummaryTextBlock"):
     except Exception:
         pass
 
+import logging
 import structlog
+
+# Suppress verbose LiteLLM debug output and deprecation warnings
+litellm.suppress_debug_info = True
+logging.getLogger("LiteLLM").setLevel(logging.ERROR)
+logging.getLogger("litellm").setLevel(logging.ERROR)
+
 from tenacity import (
     before_sleep_log,
     retry,
@@ -83,21 +90,24 @@ class LLMProvider:
         self,
         target_model: str,
         messages: List[Dict[str, str]],
-        temperature: float,
+        temperature: Optional[float],
         thinking_budget: Optional[int],
         **kwargs: Any,
     ) -> Any:
-        extra_kwargs: Dict[str, Any] = {}
+        extra_kwargs: Dict[str, Any] = dict(kwargs)
         if thinking_budget and thinking_budget > 0:
             extra_kwargs["thinking"] = {"type": "enabled", "budget_tokens": thinking_budget}
+
+        # Gemini 3+ models deprecate sampling params (temperature/top_p/top_k) in favor of system prompts
+        is_gemini_3_plus = "gemini-3" in target_model.lower()
+        if not is_gemini_3_plus and temperature is not None:
+            extra_kwargs["temperature"] = temperature
 
         return await asyncio.wait_for(
             litellm.acompletion(
                 model=target_model,
                 messages=messages,
-                temperature=temperature,
                 **extra_kwargs,
-                **kwargs,
             ),
             timeout=self.timeout_seconds,
         )
@@ -143,6 +153,30 @@ class LLMProvider:
                         f"Both primary '{target}' and fallback '{self.fallback_model}' failed: {fallback_exc}"
                     ) from fallback_exc
             raise LLMProviderFailure(f"LLM request to '{target}' failed: {exc}") from exc
+
+    async def invoke(
+        self,
+        system_prompt: str,
+        user_message: str,
+        model: Optional[str] = None,
+        temperature: float = 0.7,
+        thinking_budget: Optional[int] = None,
+        **kwargs: Any,
+    ) -> LLMResponse:
+        """
+        Convenience method for system + user message invocations.
+        """
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message},
+        ]
+        return await self.complete(
+            messages=messages,
+            model=model,
+            temperature=temperature,
+            thinking_budget=thinking_budget,
+            **kwargs,
+        )
 
     def _parse_response(self, raw_resp: Any, model: str) -> LLMResponse:
         content = ""
