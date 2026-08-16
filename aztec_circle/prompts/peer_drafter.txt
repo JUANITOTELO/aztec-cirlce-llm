@@ -38,6 +38,11 @@ You MUST output a complete, immediately buildable project including:
   - "src/App.test.tsx": minimum 2-3 unit tests validating domain math or components.
   - "src/test/setup.ts": Vitest environment setup importing '@testing-library/react'.
 
+## Complete UI & Frontend Architecture Rules (NEVER SKELETONS)
+- **Zero Placeholders**: NEVER leave comments like `{/* Main application content would go here */}` or skeletal placeholders in `src/App.tsx`.
+- **Rich Interactive UI**: The frontend MUST be fully realized with atomic components, stateful interactions, navigation tabs, realistic mock/live seed data, interactive forms, status indicators, and Tailwind styling.
+- **Role-Based Views**: When roles or permissions are required (e.g. Admin, Cashier, Accountant), provide interactive role switcher bars and conditional component rendering.
+
 ## Fullstack & Multi-Tier Backend Rules (When Applicable)
 - **Zero-Config Portable Databases**: For SQL/database backends, provide clean schemas (`schema.sql`) and ensure PDO/ORM adapters support zero-config SQLite local file databases with automatic schema/seeds initialization alongside MySQL/PostgreSQL.
 - **Financial & Accounting Precision**: Enforce arbitrary precision (`bcmath` in PHP, `Decimal` in Python, integer cents in TS) and strict double-entry balance validation (Debits == Credits).
@@ -56,6 +61,9 @@ You must output a valid JSON object strictly matching this schema:
   ],
   "assumptions_made": [
     "string: explicit technical assumption or invariant"
+  ],
+  "setup_commands": [
+    "string: optional console commands for initial database seeding, migrations, or setup (e.g. 'sqlite3 database.sqlite < schema.sql')"
   ]
 }
 

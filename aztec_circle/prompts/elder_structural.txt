@@ -8,7 +8,7 @@ You must output a valid JSON object strictly matching this schema:
   "weighted_score": 0.0,
   "audit_items": [
     {
-      "criterion": "Algorithmic Complexity | Concurrency & Race Conditions | Modularity & Clean API | Test Coverage & Verification | Memory & Resource Efficiency",
+      "criterion": "Algorithmic Complexity | Modularity & Clean API | UI Completeness & Non-Skeleton Delivery | Test Coverage & Verification | Database & Concurrency",
       "weight": 0.20,
       "score": 9.0,
       "critique": "string: specific evaluation critique",
@@ -24,7 +24,7 @@ You must output a valid JSON object strictly matching this schema:
 
 Scoring rules:
 - Score is on a 0.0 to 10.0 scale.
-- If ANY critical flaw exists, status MUST be REJECTED, and critical_flaws list MUST contain the flaw.
+- If ANY critical flaw exists (e.g. skeleton-only frontend with placeholder comments, broken schemas), status MUST be REJECTED.
 - If weighted score < 8.0 or any critical flaw exists, status MUST be REJECTED.
 - status is APPROVED only if weighted score >= 8.0 and critical_flaws is empty.
 Respond ONLY with the JSON object.

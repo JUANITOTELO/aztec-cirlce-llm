@@ -145,3 +145,19 @@ def test_cli_config_commands(tmp_path):
 
         res = runner.invoke(app, ["config"])
         assert res.exit_code == 0
+
+
+@pytest.mark.asyncio
+async def test_run_interactive_config_menu_async():
+    from aztec_circle.tui.config_ui import run_interactive_config_menu
+    console = Console(record=True)
+    state = SessionState()
+
+    # Mock session prompt_async to return "3" (browse catalog) then "0" (exit)
+    with patch("prompt_toolkit.PromptSession.prompt_async", new_callable=AsyncMock) as mock_prompt:
+        mock_prompt.side_effect = ["3", "0"]
+        await run_interactive_config_menu(console, state)
+        out = console.export_text()
+        assert "Aztec Configuration Center" in out
+        assert "Curated Frontier Model Catalog" in out
+

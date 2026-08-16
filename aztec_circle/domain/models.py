@@ -25,6 +25,10 @@ class CirclePhase(str, Enum):
     ELDER_AUDIT = "ELDER_AUDIT"                    # Parallel: Security + Structural
     ARBITRATION = "ARBITRATION"                    # Consensus calculation
     RESOLVED = "RESOLVED"                          # Approved deliverable ready
+    MODULAR_BRAINSTORM = "MODULAR_BRAINSTORM"      # Contextual modular brainstorm
+    MODULAR_DRAFTING = "MODULAR_DRAFTING"          # Modular architecture & patch drafting
+    MODULAR_AUDIT = "MODULAR_AUDIT"                # Modular security & structural audit
+    MODULAR_RESOLVED = "MODULAR_RESOLVED"          # Approved modular deliverable ready
     EMERGENCY_HALTED = "EMERGENCY_HALTED"          # Critical anomaly stop
     ESCALATED = "ESCALATED"                        # Loop limit or budget fallback
 
@@ -75,6 +79,25 @@ class YouthBrainstormOutput(BaseModel):
 
 # --- Peer Rank Models ---
 
+class ConsoleCommand(BaseModel):
+    command: str
+    description: str = "Execute console command"
+    stage: str = "post_patch"  # "pre_patch" | "post_patch"
+    cwd: Optional[str] = None
+
+
+class CommandExecutionResult(BaseModel):
+    command: str
+    description: str = ""
+    success: bool = True
+    stdout: str = ""
+    stderr: str = ""
+    exit_code: int = 0
+    duration_seconds: float = 0.0
+    confirmed: bool = True
+    skipped: bool = False
+
+
 class ToolCallResult(BaseModel):
     tool_name: str
     arguments: Dict[str, Any] = Field(default_factory=dict)
@@ -91,6 +114,29 @@ class PeerDraftOutput(BaseModel):
     mitigations_applied: List[str] = Field(default_factory=list)
     assumptions_made: List[str] = Field(default_factory=list)
     tool_calls: List[ToolCallResult] = Field(default_factory=list)
+    input_tokens: int = 0
+    output_tokens: int = 0
+    tokens_used: int = 0
+
+
+class ModularPatchItem(BaseModel):
+    file: str
+    action: str = "replace"  # replace, insert_before, insert_after, create, delete
+    start_line: Optional[int] = None
+    end_line: Optional[int] = None
+    replacement: Optional[str] = None
+    concern: str = "Modular code edit"
+
+
+class ModularDraftOutput(BaseModel):
+    agent_id: str = "peer_modular_architect"
+    loop_index: int = 0
+    architecture_overview: str
+    new_files: Dict[str, str] = Field(default_factory=dict)
+    patches: List[ModularPatchItem] = Field(default_factory=list)
+    commands: List[ConsoleCommand] = Field(default_factory=list)
+    mitigations_applied: List[str] = Field(default_factory=list)
+    assumptions_made: List[str] = Field(default_factory=list)
     input_tokens: int = 0
     output_tokens: int = 0
     tokens_used: int = 0

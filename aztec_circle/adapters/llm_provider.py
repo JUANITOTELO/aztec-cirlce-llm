@@ -181,27 +181,63 @@ class LLMProvider:
             elif isinstance(chunk, dict) and "usage" in chunk and chunk["usage"]:
                 usage_obj = chunk["usage"]
 
-            # Extract text delta
-            delta_text = ""
+            # Extract text and reasoning/thought deltas across provider chunk formats
+            delta_content = ""
+            delta_thought = ""
+
             if hasattr(chunk, "choices") and chunk.choices:
                 choice = chunk.choices[0]
                 delta = getattr(choice, "delta", None)
                 if delta:
-                    delta_text = getattr(delta, "content", "") or ""
+                    delta_content = getattr(delta, "content", "") or ""
+                    delta_thought = (
+                        getattr(delta, "reasoning_content", "")
+                        or getattr(delta, "thought", "")
+                        or getattr(delta, "reasoning", "")
+                        or getattr(delta, "thinking", "")
+                        or ""
+                    )
                 elif hasattr(choice, "text"):
-                    delta_text = choice.text or ""
+                    delta_content = choice.text or ""
             elif isinstance(chunk, dict) and "choices" in chunk and chunk["choices"]:
                 choice = chunk["choices"][0]
                 delta = choice.get("delta", {})
-                delta_text = delta.get("content", "") if isinstance(delta, dict) else ""
+                if isinstance(delta, dict):
+                    delta_content = delta.get("content", "") or ""
+                    delta_thought = (
+                        delta.get("reasoning_content", "")
+                        or delta.get("thought", "")
+                        or delta.get("reasoning", "")
+                        or delta.get("thinking", "")
+                        or ""
+                    )
+            elif hasattr(chunk, "candidates") and chunk.candidates:
+                cand = chunk.candidates[0]
+                if hasattr(cand, "content") and hasattr(cand.content, "parts") and cand.content.parts:
+                    for part in cand.content.parts:
+                        if hasattr(part, "text") and part.text:
+                            if getattr(part, "thought", False):
+                                delta_thought += part.text
+                            else:
+                                delta_content += part.text
 
-            if delta_text:
-                content_chunks.append(delta_text)
-                if on_chunk:
-                    try:
-                        on_chunk(delta_text)
-                    except Exception as cb_err:
-                        log.warning("llm.stream_callback_failed", error=str(cb_err))
+            if delta_content:
+                content_chunks.append(delta_content)
+
+            if on_chunk:
+                try:
+                    if delta_content:
+                        try:
+                            on_chunk(delta_content, is_thought=False)
+                        except TypeError:
+                            on_chunk(delta_content)
+                    elif delta_thought:
+                        try:
+                            on_chunk(delta_thought, is_thought=True)
+                        except TypeError:
+                            on_chunk(delta_thought)
+                except Exception as cb_err:
+                    log.warning("llm.stream_callback_failed", error=str(cb_err))
 
         full_content = "".join(content_chunks)
         return full_content, usage_obj, last_chunk_obj

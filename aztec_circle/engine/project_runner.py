@@ -187,6 +187,65 @@ class ProjectRunner:
             duration_seconds=duration,
         )
 
+    async def run_shell_command_streamed(
+        self,
+        cmd_str: str,
+        cwd: str,
+        title: str = "Console Command",
+    ) -> CommandResult:
+        """Execute shell command string asynchronously with streaming Rich output and shell feature support (pipes, redirects, env vars)."""
+        if self.console:
+            self.console.print(f"[bold cyan]▶ {title}:[/bold cyan] [bold yellow]{cmd_str}[/bold yellow] [dim](cwd: {cwd})[/dim]")
+
+        start_time = time.time()
+        proc = await asyncio.create_subprocess_shell(
+            cmd_str,
+            cwd=cwd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+        stdout_chunks: list[str] = []
+        stderr_chunks: list[str] = []
+
+        async def _read_stream(stream, is_err=False):
+            while True:
+                line = await stream.readline()
+                if not line:
+                    break
+                decoded = line.decode("utf-8", errors="replace")
+                if is_err:
+                    stderr_chunks.append(decoded)
+                    if self.console:
+                        self.console.print(f"  [red]{decoded.rstrip()}[/red]")
+                else:
+                    stdout_chunks.append(decoded)
+                    if self.console:
+                        self.console.print(f"  [dim]{decoded.rstrip()}[/dim]")
+
+        await asyncio.gather(
+            _read_stream(proc.stdout, is_err=False),
+            _read_stream(proc.stderr, is_err=True),
+        )
+
+        returncode = await proc.wait()
+        duration = time.time() - start_time
+        success = (returncode == 0)
+
+        if self.console:
+            if success:
+                self.console.print(f"  [bold green]✓ {title} completed successfully ({duration:.2f}s)[/bold green]\n")
+            else:
+                self.console.print(f"  [bold red]✗ {title} failed (exit code {returncode})[/bold red]\n")
+
+        return CommandResult(
+            success=success,
+            stdout="".join(stdout_chunks),
+            stderr="".join(stderr_chunks),
+            exit_code=returncode or 0,
+            duration_seconds=duration,
+        )
+
     async def install_dependencies(self, project_dir: str) -> CommandResult:
         """Install dependencies based on detected ecosystem."""
         root = find_project_root(project_dir)

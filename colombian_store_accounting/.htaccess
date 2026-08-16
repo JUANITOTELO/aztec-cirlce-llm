@@ -1,0 +1,7 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^(.*)$ public/ [L]
+</IfModule>
+
+# Enforce 10MB request body limit
+LimitRequestBody 10485760

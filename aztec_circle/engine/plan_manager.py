@@ -194,6 +194,7 @@ class PlanManager:
         output_dir: str,
         instruction: str,
         modified_files: List[str],
+        executed_commands: Optional[List[str]] = None,
     ) -> None:
         """
         Update AZTEC_PLAN.md with an incremental edit entry, updating the file table and change log.
@@ -218,7 +219,14 @@ class PlanManager:
         )
 
         # 2. Append to Change Log
-        change_entry = f"- **{now_str}** — Incremental Edit: \"{instruction}\" (Modified: {', '.join(modified_files)}).\n"
+        details_parts = []
+        if modified_files:
+            details_parts.append(f"Modified: {', '.join(modified_files)}")
+        if executed_commands:
+            details_parts.append(f"Executed: {', '.join(executed_commands)}")
+        details_str = f" ({'; '.join(details_parts)})" if details_parts else ""
+
+        change_entry = f"- **{now_str}** — Incremental Edit: \"{instruction}\"{details_str}.\n"
         if "## 📝 Change Log & Iteration History" in existing:
             existing = existing.replace(
                 "## 📝 Change Log & Iteration History\n",
@@ -240,7 +248,7 @@ class PlanManager:
                 )
 
         plan_path.write_text(existing, encoding="utf-8")
-        log.info("plan_manager.edit_recorded", instruction=instruction, files=modified_files)
+        log.info("plan_manager.edit_recorded", instruction=instruction, files=modified_files, commands=executed_commands or [])
 
     @classmethod
     def record_fix_iteration(

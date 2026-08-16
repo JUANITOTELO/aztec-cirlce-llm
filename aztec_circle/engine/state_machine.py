@@ -42,12 +42,14 @@ class AztecOrchestrator:
         youth_agents: Optional[List[YouthAgent]] = None,
         peer_agent: Optional[PeerAgent] = None,
         elder_agents: Optional[List[ElderAgent]] = None,
+        console: Optional[Any] = None,
     ):
         self.state = state
         self.events = event_queue or asyncio.Queue()
         self.checkpoint = checkpoint_store or CheckpointStore()
         self.budget = budget_manager or BudgetManager(limit_usd=state.budget_limit_usd)
         self.consensus = consensus_engine or ConsensusEngine()
+        self.console = console
 
         self.youth_agents = youth_agents or [
             YouthAgent(persona="chaos_brainstormer", model=settings.get_effective_model("YOUTH_CHAOS")),
@@ -63,13 +65,31 @@ class AztecOrchestrator:
         """
         Execute the full multi-generational debate cycle.
         """
+        from aztec_circle.tui.streaming_ui import ParallelStreamVisualizer, SingleStreamVisualizer
+
         log.info("orchestrator.run_started", task_id=self.state.task_id, goal=self.state.goal[:80])
 
         # ── PHASE 1: Youth Brainstorming (Parallel Execution) ────────────────
         if not self.state.youth_outputs:
             await self._transition(CirclePhase.YOUTH_BRAINSTORM)
-            youth_tasks = [agent.run(self.state.goal, images=self.state.images) for agent in self.youth_agents]
-            youth_results = await asyncio.gather(*youth_tasks, return_exceptions=True)
+
+            youth_vis = ParallelStreamVisualizer(
+                console=self.console,
+                title="Youth Rank Parallel Brainstorming",
+                icon="🧠",
+                border_style="yellow",
+            )
+            on_chunk_callbacks = [
+                youth_vis.register_agent(a.agent_id, a.persona.replace("_", " ").title(), icon="🌀" if "chaos" in a.persona else "🛡")
+                for a in self.youth_agents
+            ]
+
+            with youth_vis:
+                youth_tasks = [
+                    agent.run(self.state.goal, images=self.state.images, on_chunk=cb)
+                    for agent, cb in zip(self.youth_agents, on_chunk_callbacks)
+                ]
+                youth_results = await asyncio.gather(*youth_tasks, return_exceptions=True)
 
             for res in youth_results:
                 if isinstance(res, Exception):
@@ -117,13 +137,23 @@ class AztecOrchestrator:
             await self._transition(CirclePhase.PEER_DRAFTING)
             self.budget.check()
 
-            draft = await self.peer_agent.run(
-                goal=self.state.goal,
-                youth_risks=self.state.youth_outputs,
-                elder_instructions=elder_instructions,
-                loop_index=self.state.loop_count,
-                images=self.state.images,
+            peer_vis = SingleStreamVisualizer(
+                console=self.console,
+                title=f"Peer Drafter Architecture & Code (Loop {self.state.loop_count})",
+                icon="⚙",
+                show_preview=True,
             )
+
+            with peer_vis:
+                draft = await self.peer_agent.run(
+                    goal=self.state.goal,
+                    youth_risks=self.state.youth_outputs,
+                    elder_instructions=elder_instructions,
+                    loop_index=self.state.loop_count,
+                    images=self.state.images,
+                    on_chunk=peer_vis.on_chunk,
+                )
+
             self.state.peer_history.append(draft)
             best_draft = draft
             self._record_tokens(draft.input_tokens, draft.output_tokens, draft.tokens_used)
@@ -133,8 +163,23 @@ class AztecOrchestrator:
             await self._transition(CirclePhase.ELDER_AUDIT)
             self.budget.check()
 
-            elder_tasks = [agent.audit(draft, self.state.goal, images=self.state.images) for agent in self.elder_agents]
-            verdicts = await asyncio.gather(*elder_tasks)
+            elder_vis = ParallelStreamVisualizer(
+                console=self.console,
+                title=f"Elder Council Audits (Loop {self.state.loop_count})",
+                icon="👁",
+                border_style="magenta",
+            )
+            on_chunk_elder_cbs = [
+                elder_vis.register_agent(a.agent_id, a.persona.replace("_", " ").title(), icon="🔒" if "security" in a.persona else "🏛")
+                for a in self.elder_agents
+            ]
+
+            with elder_vis:
+                elder_tasks = [
+                    agent.audit(draft, self.state.goal, images=self.state.images, on_chunk=cb)
+                    for agent, cb in zip(self.elder_agents, on_chunk_elder_cbs)
+                ]
+                verdicts = await asyncio.gather(*elder_tasks)
 
             for v in verdicts:
                 self.state.elder_verdicts.append(v)

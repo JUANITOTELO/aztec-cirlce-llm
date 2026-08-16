@@ -9,13 +9,14 @@ import json
 import os
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Coroutine, Dict, List, Optional, Tuple
 import structlog
 from rich.console import Console
 
 from aztec_circle.adapters.llm_provider import LLMProvider, LLMResponse
 from aztec_circle.agents.base import extract_json_payload
 from aztec_circle.config import settings
+from aztec_circle.domain.models import ConsoleCommand, CommandExecutionResult
 from aztec_circle.engine.budget_manager import BudgetManager
 from aztec_circle.engine.project_indexer import ProjectIndex, ProjectIndexer
 from aztec_circle.engine.scaffolder import find_project_root
@@ -44,6 +45,8 @@ class PatchResult:
     files_touched: List[str] = field(default_factory=list)
     files_created: List[str] = field(default_factory=list)
     files_deleted: List[str] = field(default_factory=list)
+    commands_proposed: List[ConsoleCommand] = field(default_factory=list)
+    commands_executed: List[CommandExecutionResult] = field(default_factory=list)
     round1_tokens: int = 0
     round2_tokens: int = 0
     total_cost_usd: float = 0.0
@@ -197,9 +200,11 @@ class PatchAgent:
         project_dir: str,
         images: Optional[List[str]] = None,
         verbose: bool = False,
+        confirm_command_callback: Optional[Callable[[ConsoleCommand], Coroutine[Any, Any, Tuple[bool, Optional[str]]]]] = None,
+        auto_approve_commands: bool = False,
     ) -> PatchResult:
         """
-        Execute precision 2-round edit conversation with optional vision images.
+        Execute precision 2-round edit conversation with optional vision images and executable console commands.
         """
         root = find_project_root(project_dir)
         index: ProjectIndex = self.indexer.build(root)
@@ -231,17 +236,24 @@ class PatchAgent:
 
 Which files must be read and edited to fulfill this instruction?"""
 
-        if self.console and verbose:
-            self.console.print("  [dim]Round 1: Identifying relevant source files...[/dim]")
+        from aztec_circle.tui.streaming_ui import SingleStreamVisualizer
 
+        vis1 = SingleStreamVisualizer(
+            console=self.console,
+            title="Round 1: File Selection & Analysis",
+            icon="🔍",
+            show_preview=False,
+        )
         try:
-            r1_resp: LLMResponse = await self.provider.invoke(
-                model=self.model,
-                system_prompt=round1_system,
-                user_message=round1_user,
-                images=images,
-                temperature=0.1,
-            )
+            with vis1:
+                r1_resp: LLMResponse = await self.provider.invoke(
+                    model=self.model,
+                    system_prompt=round1_system,
+                    user_message=round1_user,
+                    images=images,
+                    temperature=0.1,
+                    on_chunk=vis1.on_chunk,
+                )
             bm1 = BudgetManager()
             total_cost += bm1.record(
                 input_tokens=r1_resp.prompt_tokens,
@@ -287,7 +299,7 @@ Which files must be read and edited to fulfill this instruction?"""
             self.console.print(f"  [green]✓[/green] Selected [bold]{len(valid_files_to_read)}[/bold] file(s) for modification: [dim]{', '.join(valid_files_to_read)}[/dim]")
 
         # ----------------------------------------------------
-        # ROUND 2: Patch Generator
+        # ROUND 2: Patch Generator & Command Proposer
         # ----------------------------------------------------
         round2_system = render("edit_patch_generator")
         files_block = "\n\n".join(numbered_files_section) if numbered_files_section else "(No existing files selected; create new files if required)"
@@ -298,19 +310,24 @@ Which files must be read and edited to fulfill this instruction?"""
 NUMBERED SOURCE FILES:
 {files_block}
 
-Please generate the minimal, atomic JSON patches to fulfill the instruction."""
+Please generate the minimal, atomic JSON patches and any required console/database commands to fulfill the instruction."""
 
-        if self.console and verbose:
-            self.console.print("  [dim]Round 2: Generating structured line-range patches...[/dim]")
-
+        vis2 = SingleStreamVisualizer(
+            console=self.console,
+            title="Round 2: Patch Generator & Command Proposer",
+            icon="⚡",
+            show_preview=True,
+        )
         try:
-            r2_resp: LLMResponse = await self.provider.invoke(
-                model=self.model,
-                system_prompt=round2_system,
-                user_message=round2_user,
-                images=images,
-                temperature=0.1,
-            )
+            with vis2:
+                r2_resp: LLMResponse = await self.provider.invoke(
+                    model=self.model,
+                    system_prompt=round2_system,
+                    user_message=round2_user,
+                    images=images,
+                    temperature=0.1,
+                    on_chunk=vis2.on_chunk,
+                )
             bm2 = BudgetManager()
             total_cost += bm2.record(
                 input_tokens=r2_resp.prompt_tokens,
@@ -321,7 +338,9 @@ Please generate the minimal, atomic JSON patches to fulfill the instruction."""
             r2_data = extract_json_payload(r2_resp.content)
             edit_summary = r2_data.get("edit_summary", "Applied code modifications.")
             raw_patches = r2_data.get("patches", [])
+            raw_commands = r2_data.get("commands", [])
 
+            # Parse patches
             patches: List[FilePatch] = []
             for p in raw_patches:
                 if isinstance(p, dict) and "file" in p:
@@ -337,7 +356,6 @@ Please generate the minimal, atomic JSON patches to fulfill the instruction."""
                     )
 
             if not patches:
-                # Secondary: Check if r2_data itself is a list or contains items key
                 items = r2_data.get("items", []) if isinstance(r2_data, dict) else (r2_data if isinstance(r2_data, list) else [])
                 for p in items:
                     if isinstance(p, dict) and "file" in p:
@@ -352,54 +370,120 @@ Please generate the minimal, atomic JSON patches to fulfill the instruction."""
                             )
                         )
 
-            if not patches:
-                # Tertiary Regex Fallback: Scan text for individual patch objects
-                patch_matches = re.finditer(r"\{[^{}]*\"file\"[^{}]*\}", r2_resp.content, re.DOTALL)
-                for pm in patch_matches:
-                    try:
-                        p_obj = json_repair.loads(pm.group(0))
-                        if isinstance(p_obj, dict) and "file" in p_obj:
-                            patches.append(
-                                FilePatch(
-                                    file=p_obj["file"],
-                                    action=p_obj.get("action", "replace"),
-                                    start_line=p_obj.get("start_line"),
-                                    end_line=p_obj.get("end_line"),
-                                    replacement=p_obj.get("replacement"),
-                                    concern=p_obj.get("concern", "Code edit"),
+            # Parse console commands
+            commands: List[ConsoleCommand] = []
+            if isinstance(raw_commands, list):
+                for cmd_item in raw_commands:
+                    if isinstance(cmd_item, dict) and "command" in cmd_item:
+                        cmd_str = str(cmd_item["command"]).strip()
+                        if cmd_str:
+                            commands.append(
+                                ConsoleCommand(
+                                    command=cmd_str,
+                                    description=str(cmd_item.get("description", "Execute console command")).strip(),
+                                    stage=str(cmd_item.get("stage", "post_patch")).strip(),
+                                    cwd=cmd_item.get("cwd"),
                                 )
                             )
-                    except Exception:
-                        pass
+                    elif isinstance(cmd_item, str) and cmd_item.strip():
+                        commands.append(
+                            ConsoleCommand(
+                                command=cmd_item.strip(),
+                                description="Execute console command",
+                                stage="post_patch",
+                            )
+                        )
 
-            if not patches:
+            if not patches and not commands:
                 return PatchResult(
                     success=False,
-                    edit_summary="No valid patches returned by generator.",
+                    edit_summary="No valid patches or commands returned by generator.",
                     round1_tokens=r1_resp.total_tokens,
                     round2_tokens=r2_resp.total_tokens,
                     total_cost_usd=round(total_cost, 6),
-                    error_message="LLM output did not include actionable patches.",
+                    error_message="LLM output did not include actionable patches or commands.",
                 )
 
             # ----------------------------------------------------
-            # Apply Patches Atomically
+            # Execution Pipeline: Pre-Patch Commands -> File Patches -> Post-Patch Commands
             # ----------------------------------------------------
-            touched, created, deleted = PatchApplicator.apply(root, patches)
+            from aztec_circle.engine.project_runner import ProjectRunner
+            runner = ProjectRunner(console=self.console)
+            executed_commands: List[CommandExecutionResult] = []
 
-            if self.console:
+            async def _execute_single_cmd(cmd_obj: ConsoleCommand) -> CommandExecutionResult:
+                confirmed = True
+                effective_cmd = cmd_obj.command
+
+                if confirm_command_callback is not None and not auto_approve_commands:
+                    confirmed, edited_cmd = await confirm_command_callback(cmd_obj)
+                    if edited_cmd:
+                        effective_cmd = edited_cmd
+
+                if not confirmed:
+                    if self.console:
+                        self.console.print(f"  [yellow]⚡ Skipped console command:[/yellow] [dim]{cmd_obj.command}[/dim]")
+                    return CommandExecutionResult(
+                        command=cmd_obj.command,
+                        description=cmd_obj.description,
+                        success=True,
+                        confirmed=False,
+                        skipped=True,
+                    )
+
+                cwd_target = cmd_obj.cwd or root
+                res = await runner.run_shell_command_streamed(
+                    cmd_str=effective_cmd,
+                    cwd=cwd_target,
+                    title=f"Command ({cmd_obj.description or 'Console'})",
+                )
+                return CommandExecutionResult(
+                    command=effective_cmd,
+                    description=cmd_obj.description,
+                    success=res.success,
+                    stdout=res.stdout,
+                    stderr=res.stderr,
+                    exit_code=res.exit_code,
+                    duration_seconds=res.duration_seconds,
+                    confirmed=True,
+                    skipped=False,
+                )
+
+            # 1. Execute Pre-Patch Commands
+            pre_cmds = [c for c in commands if c.stage == "pre_patch"]
+            for c in pre_cmds:
+                cmd_res = await _execute_single_cmd(c)
+                executed_commands.append(cmd_res)
+
+            # 2. Apply File Patches Atomically
+            touched, created, deleted = [], [], []
+            if patches:
+                touched, created, deleted = PatchApplicator.apply(root, patches)
+
+            if self.console and patches:
                 for p in patches:
-                    action_tag = f"[{p.action}]"
                     line_info = f" (L{p.start_line}-L{p.end_line})" if p.start_line is not None else ""
                     self.console.print(f"    [bold cyan]●[/bold cyan] {p.file}{line_info}: [dim]{p.concern}[/dim]")
-
                 self.console.print(f"  [bold green]✓ Successfully applied {len(patches)} atomic patch(es)![/bold green]")
-                if verbose:
-                    self.console.print(f"  [dim]Telemetry: Round 1: {r1_resp.total_tokens:,} tok | Round 2: {r2_resp.total_tokens:,} tok | Total Cost: ${total_cost:.4f}[/dim]\n")
+
+            # 3. Execute Post-Patch Commands
+            post_cmds = [c for c in commands if c.stage != "pre_patch"]
+            for c in post_cmds:
+                cmd_res = await _execute_single_cmd(c)
+                executed_commands.append(cmd_res)
+
+            if self.console and verbose:
+                self.console.print(f"  [dim]Telemetry: Round 1: {r1_resp.total_tokens:,} tok | Round 2: {r2_resp.total_tokens:,} tok | Total Cost: ${total_cost:.4f}[/dim]\n")
 
             # Update Living Project Plan (AZTEC_PLAN.md)
             applied_files = [p.file for p in patches]
-            PlanManager.record_edit_iteration(output_dir=root, instruction=instruction, modified_files=applied_files)
+            run_cmd_strings = [c.command for c in executed_commands if not c.skipped]
+            PlanManager.record_edit_iteration(
+                output_dir=root,
+                instruction=instruction,
+                modified_files=applied_files,
+                executed_commands=run_cmd_strings,
+            )
 
             return PatchResult(
                 success=True,
@@ -408,6 +492,8 @@ Please generate the minimal, atomic JSON patches to fulfill the instruction."""
                 files_touched=touched,
                 files_created=created,
                 files_deleted=deleted,
+                commands_proposed=commands,
+                commands_executed=executed_commands,
                 round1_tokens=r1_resp.total_tokens,
                 round2_tokens=r2_resp.total_tokens,
                 total_cost_usd=round(total_cost, 6),
@@ -417,7 +503,7 @@ Please generate the minimal, atomic JSON patches to fulfill the instruction."""
             log.error("patch_agent.round2_or_apply_failed", error=str(exc))
             return PatchResult(
                 success=False,
-                edit_summary="Failed to apply generated patches.",
+                edit_summary="Failed to apply generated patches or commands.",
                 round1_tokens=r1_resp.total_tokens,
                 total_cost_usd=round(total_cost, 6),
                 error_message=str(exc),

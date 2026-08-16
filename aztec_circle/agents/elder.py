@@ -47,6 +47,7 @@ class ElderAgent(BaseAgent):
         draft: PeerDraftOutput,
         original_goal: str,
         images: Optional[List[str]] = None,
+        on_chunk: Optional[Callable[[str], None]] = None,
     ) -> ElderVerdict:
         """
         Perform rigorous, zero-temperature audit of the peer draft against the goal and visual reference images.
@@ -69,6 +70,7 @@ class ElderAgent(BaseAgent):
             images=images,
             temperature=0.0,
             thinking_budget=self.thinking_budget,
+            on_chunk=on_chunk,
         )
 
         data = extract_json_payload(resp.content)

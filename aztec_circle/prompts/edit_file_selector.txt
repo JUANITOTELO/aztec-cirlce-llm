@@ -3,8 +3,9 @@ Your role is to inspect the project index (file tree with line counts and export
 
 RULES:
 1. Be surgical: Select only files directly relevant to the edit.
-2. Select at most 5 files. Prefer 1 to 3 files whenever possible.
-3. Respond ONLY with a valid JSON object matching this schema:
+2. If the instruction references database, roles, users, migrations, or backend logic, ensure you select relevant SQL schemas (`schema.sql`, `migrations/`), backend files (`backend/`, `server.py`, etc.), alongside frontend/store files.
+3. Select at most 6 files. Prefer 1 to 4 files whenever possible.
+4. Respond ONLY with a valid JSON object matching this schema:
 {
   "reasoning": "string: brief explanation of why these files were chosen",
   "files_to_read": [

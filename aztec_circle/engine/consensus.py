@@ -12,7 +12,8 @@ from aztec_circle.domain.models import ElderVerdict, VerdictStatus
 log = structlog.get_logger(__name__)
 
 APPROVAL_THRESHOLD = 8.0
-CRITICAL_FLAW_PENALTY = 2.5
+CRITICAL_FLAW_PENALTY_PCT = 0.15   # 15% penalty per unique critical flaw
+MAX_FLAW_PENALTY_PCT = 0.60        # Never reduce score by more than 60%
 DEFAULT_ELDER_WEIGHTS: Dict[str, float] = {
     "elder_security_governance": 0.60,
     "elder_structural_perf": 0.40,
@@ -25,12 +26,16 @@ class ConsensusEngine:
     def __init__(
         self,
         approval_threshold: float = APPROVAL_THRESHOLD,
-        flaw_penalty: float = CRITICAL_FLAW_PENALTY,
+        flaw_penalty_pct: float = CRITICAL_FLAW_PENALTY_PCT,
+        max_flaw_penalty_pct: float = MAX_FLAW_PENALTY_PCT,
         weights: Optional[Dict[str, float]] = None,
+        flaw_penalty: Optional[float] = None,
     ):
         self.approval_threshold = approval_threshold
-        self.flaw_penalty = flaw_penalty
+        self.flaw_penalty_pct = flaw_penalty_pct
+        self.max_flaw_penalty_pct = max_flaw_penalty_pct
         self.weights = weights or DEFAULT_ELDER_WEIGHTS
+        self.flaw_penalty = flaw_penalty
 
     def arbitrate(self, verdicts: List[ElderVerdict]) -> ElderVerdict:
         """
@@ -65,7 +70,14 @@ class ConsensusEngine:
 
         # Unique critical flaws
         unique_flaws = list(dict.fromkeys([f.strip() for f in all_flaws if f.strip()]))
-        penalized_score = max(0.0, raw_score - (len(unique_flaws) * self.flaw_penalty))
+        if self.flaw_penalty is not None:
+            penalized_score = max(0.0, raw_score - (len(unique_flaws) * self.flaw_penalty))
+        else:
+            flaw_penalty_pct = min(
+                len(unique_flaws) * self.flaw_penalty_pct,
+                self.max_flaw_penalty_pct,
+            )
+            penalized_score = max(0.0, raw_score * (1.0 - flaw_penalty_pct))
         final_score = round(penalized_score, 2)
 
         approved = (final_score >= self.approval_threshold) and (len(unique_flaws) == 0)

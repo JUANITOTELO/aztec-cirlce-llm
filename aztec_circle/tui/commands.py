@@ -185,6 +185,31 @@ async def cmd_policy(args: str, state: SessionState, console: Console) -> None:
     console.print("[dim]Usage: /policy <POLICY_NAME>[/dim]\n")
 
 
+async def cmd_budget(args: str, state: SessionState, console: Console) -> None:
+    """Set or display the maximum per-run USD budget limit: /budget [amount]"""
+    from aztec_circle.engine.config_manager import ConfigManager
+
+    raw = args.strip().lstrip("$")
+    if not raw:
+        console.print(f"[bold cyan]Current Budget Limit (Per Run):[/bold cyan] [bold green]${state.budget_limit_usd:.2f}[/bold green]")
+        console.print(f"[dim]Total Session Spend: ${state.total_cost_usd:.4f} ({state.total_tokens:,} tokens)[/dim]")
+        console.print("[dim]To set, use: [bold yellow]/budget <amount>[/bold yellow] (e.g. /budget 2.50, /budget 5, /budget 0.50)[/dim]\n")
+        return
+
+    try:
+        new_budget = float(raw)
+        if new_budget <= 0:
+            console.print("[bold red]Budget must be a positive number greater than 0.[/bold red]\n")
+            return
+
+        state.budget_limit_usd = new_budget
+        ConfigManager.save_api_key("BUDGET_LIMIT_USD", f"{new_budget:.2f}")
+        console.print(f"[bold green]✓ Updated per-run budget limit to:[/bold green] [bold white]${new_budget:.2f}[/bold white]\n")
+
+    except ValueError:
+        console.print(f"[bold red]Invalid budget amount '{raw}'. Example: /budget 2.00 or /budget 5[/bold red]\n")
+
+
 async def cmd_runs(args: str, state: SessionState, console: Console) -> None:
     """List historical task runs from the SQLite checkpoint store."""
     store = CheckpointStore()
@@ -509,11 +534,12 @@ async def cmd_update(args: str, state: SessionState, console: Console) -> None:
         return
 
 async def cmd_plan(args: str, state: SessionState, console: Console) -> None:
-    """Display, synchronize, or inspect the living project blueprint (AZTEC_PLAN.md)."""
+    """Display, synchronize, inspect, or build a new module into the living project blueprint (AZTEC_PLAN.md)."""
     from aztec_circle.engine.plan_manager import PlanManager
 
     target_dir = state.output_dir or "."
-    subcmd = args.strip().lower()
+    raw_args = args.strip()
+    subcmd = raw_args.lower()
 
     if subcmd == "sync":
         p = PlanManager.sync_from_codebase(target_dir, goal=state.last_goal)
@@ -522,6 +548,31 @@ async def cmd_plan(args: str, state: SessionState, console: Console) -> None:
     elif subcmd == "file":
         p = PlanManager.get_plan_path(target_dir)
         console.print(f"[bold cyan]Plan File Path:[/bold cyan] {p} [dim](Exists: {p.exists()})[/dim]\n")
+    elif not raw_args or subcmd in ("view", "show", "dashboard"):
+        PlanManager.render_plan_dashboard(target_dir, console)
+    else:
+        # User entered a module description / goal e.g. "/plan We would like to create a new module..."
+        from aztec_circle.tui.interactive import run_modular_consensus_session
+        await run_modular_consensus_session(raw_args, state, console)
+
+
+async def cmd_roadmap(args: str, state: SessionState, console: Console) -> None:
+    """Display implementation roadmap & milestone progress from AZTEC_PLAN.md."""
+    from aztec_circle.engine.plan_manager import PlanManager
+
+    target_dir = state.output_dir or "."
+    PlanManager.render_plan_dashboard(target_dir, console)
+
+
+async def cmd_consensus(args: str, state: SessionState, console: Console) -> None:
+    """Run multi-generational consensus debate to architect and build a new module: /consensus <goal>"""
+    raw_args = args.strip()
+    if not raw_args:
+        console.print("[yellow]Usage: /consensus <module or feature description e.g. 'Add product management module'>[/yellow]\n")
+        return
+
+    from aztec_circle.tui.interactive import run_modular_consensus_session
+    await run_modular_consensus_session(raw_args, state, console)
 async def cmd_clean(args: str, state: SessionState, console: Console):
     """Clean development ports and temporary workspace artifacts."""
     from aztec_circle.engine.project_runner import free_ports
@@ -533,11 +584,146 @@ async def cmd_clean(args: str, state: SessionState, console: Console):
         console.print("[dim]No lingering server processes found on development ports (5173–5185, 8000–8015).[/dim]\n")
 
 
+async def cmd_run(args: str, state: SessionState, console: Console) -> None:
+    """Execute console/shell command in project directory with streaming output: /run <command>"""
+    from aztec_circle.engine.project_runner import ProjectRunner
+    from aztec_circle.engine.scaffolder import find_project_root
+    from aztec_circle.engine.plan_manager import PlanManager
+
+    cmd_str = args.strip()
+    if not cmd_str:
+        console.print("[yellow]Usage: /run <shell command> (e.g., /run ls -la, /run npm list)[/yellow]\n")
+        return
+
+    target = state.output_dir or "."
+    root = find_project_root(target) or target
+
+    runner = ProjectRunner(console=console)
+    await runner.run_shell_command_streamed(cmd_str=cmd_str, cwd=root, title="Console Command")
+
+    if PlanManager.plan_exists(root):
+        PlanManager.record_edit_iteration(
+            output_dir=root,
+            instruction=f"Interactive Shell: {cmd_str}",
+            modified_files=[],
+            executed_commands=[cmd_str],
+        )
+
+
+async def cmd_php(args: str, state: SessionState, console: Console) -> None:
+    """Execute PHP script or command in project directory: /php <args>"""
+    from aztec_circle.engine.project_runner import ProjectRunner
+    from aztec_circle.engine.scaffolder import find_project_root
+    from aztec_circle.engine.plan_manager import PlanManager
+
+    raw_args = args.strip() or "-v"
+    cmd_str = f"php {raw_args}"
+    target = state.output_dir or "."
+    root = find_project_root(target) or target
+
+    runner = ProjectRunner(console=console)
+    await runner.run_shell_command_streamed(cmd_str=cmd_str, cwd=root, title="PHP Execution")
+
+    if PlanManager.plan_exists(root) and raw_args != "-v":
+        PlanManager.record_edit_iteration(
+            output_dir=root,
+            instruction=f"PHP Command: {cmd_str}",
+            modified_files=[],
+            executed_commands=[cmd_str],
+        )
+
+
+async def cmd_mysql(args: str, state: SessionState, console: Console) -> None:
+    """Execute MySQL command or script: /mysql <args>"""
+    from aztec_circle.engine.project_runner import ProjectRunner
+    from aztec_circle.engine.scaffolder import find_project_root
+    from aztec_circle.engine.plan_manager import PlanManager
+
+    raw_args = args.strip()
+    if not raw_args:
+        console.print("[yellow]Usage: /mysql <args> (e.g., /mysql -u root -p database < schema.sql)[/yellow]\n")
+        return
+
+    cmd_str = f"mysql {raw_args}"
+    target = state.output_dir or "."
+    root = find_project_root(target) or target
+
+    runner = ProjectRunner(console=console)
+    await runner.run_shell_command_streamed(cmd_str=cmd_str, cwd=root, title="MySQL Execution")
+
+    if PlanManager.plan_exists(root):
+        PlanManager.record_edit_iteration(
+            output_dir=root,
+            instruction=f"MySQL Command: {cmd_str}",
+            modified_files=[],
+            executed_commands=[cmd_str],
+        )
+
+
+async def cmd_sqlite(args: str, state: SessionState, console: Console) -> None:
+    """Execute SQLite query or script against project database: /sqlite [db_file] <query_or_file>"""
+    import os
+    from aztec_circle.engine.project_runner import ProjectRunner
+    from aztec_circle.engine.scaffolder import find_project_root
+    from aztec_circle.engine.plan_manager import PlanManager
+
+    raw_args = args.strip()
+    target = state.output_dir or "."
+    root = find_project_root(target) or target
+
+    # Check for existing SQLite db file candidates in project
+    db_candidates = [
+        "database.sqlite",
+        "app.db",
+        "backend/database.sqlite",
+        "backend/app.db",
+        "data.sqlite",
+        "db.sqlite",
+    ]
+    detected_db = None
+    for cand in db_candidates:
+        cand_path = os.path.join(root, cand)
+        if os.path.exists(cand_path):
+            detected_db = cand
+            break
+
+    if not raw_args:
+        if detected_db:
+            cmd_str = f"sqlite3 {detected_db} .tables"
+        else:
+            console.print("[yellow]Usage: /sqlite <database.sqlite> <query or commands> (e.g. /sqlite database.sqlite .schema)[/yellow]\n")
+            return
+    else:
+        parts = raw_args.split(maxsplit=1)
+        if parts[0].endswith((".sqlite", ".db", ".sqlite3")) or os.path.exists(os.path.join(root, parts[0])):
+            cmd_str = f"sqlite3 {raw_args}"
+        elif detected_db:
+            cmd_str = f"sqlite3 {detected_db} {raw_args}"
+        else:
+            cmd_str = f"sqlite3 {raw_args}"
+
+    runner = ProjectRunner(console=console)
+    await runner.run_shell_command_streamed(cmd_str=cmd_str, cwd=root, title="SQLite Execution")
+
+    if PlanManager.plan_exists(root):
+        PlanManager.record_edit_iteration(
+            output_dir=root,
+            instruction=f"SQLite Command: {cmd_str}",
+            modified_files=[],
+            executed_commands=[cmd_str],
+        )
+
+
 COMMAND_HANDLERS: Dict[str, Callable[[str, SessionState, Console], Coroutine]] = {
     "/help": cmd_help,
     "/status": cmd_status,
     "/plan": cmd_plan,
-    "/roadmap": cmd_plan,
+    "/roadmap": cmd_roadmap,
+    "/consensus": cmd_consensus,
+    "/module": cmd_consensus,
+    "/feature": cmd_consensus,
+    "/debate": cmd_consensus,
+    "/circle": cmd_consensus,
     "/config": cmd_config,
     "/setup": cmd_config,
     "/keys": cmd_keys,
@@ -546,6 +732,7 @@ COMMAND_HANDLERS: Dict[str, Callable[[str, SessionState, Console], Coroutine]] =
     "/test-models": cmd_test_models,
     "/models": cmd_models,
     "/policy": cmd_policy,
+    "/budget": cmd_budget,
     "/runs": cmd_runs,
     "/resume": cmd_resume,
     "/build": cmd_build,
@@ -562,6 +749,14 @@ COMMAND_HANDLERS: Dict[str, Callable[[str, SessionState, Console], Coroutine]] =
     "/test": cmd_test,
     "/start": cmd_start,
     "/stop": cmd_stop,
+    "/run": cmd_run,
+    "/sh": cmd_run,
+    "/exec": cmd_run,
+    "/cmd": cmd_run,
+    "/php": cmd_php,
+    "/mysql": cmd_mysql,
+    "/sqlite": cmd_sqlite,
+    "/db": cmd_sqlite,
     "/clean": cmd_clean,
     "/ports": cmd_clean,
     "/free-ports": cmd_clean,

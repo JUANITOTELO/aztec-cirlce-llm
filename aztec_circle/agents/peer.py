@@ -46,6 +46,7 @@ class PeerAgent(BaseAgent):
         elder_instructions: Optional[str] = None,
         loop_index: int = 0,
         images: Optional[List[str]] = None,
+        on_chunk: Optional[Callable[[str], None]] = None,
     ) -> PeerDraftOutput:
         """
         Execute drafting of architecture and code, addressing Youth risks, Elder critiques, and visual reference images.
@@ -83,6 +84,7 @@ class PeerAgent(BaseAgent):
             user_message=user_message,
             images=images,
             temperature=0.35,
+            on_chunk=on_chunk,
         )
 
         data = extract_json_payload(resp.content)

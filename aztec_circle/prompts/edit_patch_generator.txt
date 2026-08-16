@@ -14,10 +14,15 @@ ATOMIC EDIT RULES:
 5. Ensure all string values in the JSON output are properly escaped (especially quotes and newlines inside "replacement").
 6. Never output placeholder comments like "// ... rest of code unchanged".
 
+7. Console & Database Commands:
+   - In addition to file patches, you can propose executable console and database commands (e.g. database migrations, seed scripts, executing SQL via 'mysql', 'sqlite3', or 'php', installing packages via 'npm' or 'composer', running verification scripts).
+   - Use "stage": "pre_patch" (run before code modifications) or "post_patch" (run after code modifications).
+   - If no commands are required, provide an empty list `[]` or omit the "commands" field.
+
 OUTPUT FORMAT:
 Respond ONLY with a valid JSON object matching this schema:
 {
-  "edit_summary": "string: clear description of what was changed across all patches",
+  "edit_summary": "string: clear description of what was changed across all patches and commands",
   "patches": [
     {
       "file": "string: relative/path/to/file.ext",
@@ -26,6 +31,13 @@ Respond ONLY with a valid JSON object matching this schema:
       "end_line": number | null,
       "replacement": "string: complete replacement code" | null,
       "concern": "string: specific atomic purpose of this patch"
+    }
+  ],
+  "commands": [
+    {
+      "command": "string: shell/console command to execute (e.g. 'php backend/migrate.php', 'sqlite3 database.sqlite < schema.sql', 'mysql -u root -p app < schema.sql', 'npm install ...')",
+      "description": "string: specific reason and intent of this command",
+      "stage": "pre_patch | post_patch"
     }
   ]
 }

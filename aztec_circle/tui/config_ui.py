@@ -6,7 +6,8 @@ from __future__ import annotations
 
 import asyncio
 from typing import Optional
-from prompt_toolkit import prompt
+from prompt_toolkit import PromptSession
+from prompt_toolkit.formatted_text import ANSI
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
@@ -159,6 +160,7 @@ def render_presets_table(console: Console) -> None:
 async def run_interactive_role_picker(console: Console, state: SessionState) -> None:
     """Prompt user with numbered menus to assign models to specific roles."""
     roles = ConfigManager.get_granular_roles_status()
+    session: PromptSession = PromptSession()
     
     console.print(Panel(
         "[bold cyan]Select Role to Configure:[/bold cyan]\n\n" +
@@ -169,7 +171,7 @@ async def run_interactive_role_picker(console: Console, state: SessionState) -> 
     ))
 
     try:
-        choice = prompt("Select role number (0-10): ").strip()
+        choice = (await session.prompt_async(ANSI("\x1b[1;36mSelect role number (0-10): \x1b[0m"))).strip()
     except (EOFError, KeyboardInterrupt):
         return
 
@@ -190,7 +192,7 @@ async def run_interactive_role_picker(console: Console, state: SessionState) -> 
     ))
 
     try:
-        model_choice = prompt(f"Model for {role_key}: ").strip()
+        model_choice = (await session.prompt_async(ANSI(f"\x1b[1;36mModel for {role_key}: \x1b[0m"))).strip()
     except (EOFError, KeyboardInterrupt):
         return
 
@@ -249,6 +251,7 @@ async def run_test_models(console: Console) -> None:
 
 async def run_interactive_config_menu(console: Console, state: SessionState) -> None:
     """Launch interactive configuration menu."""
+    session: PromptSession = PromptSession()
     while True:
         console.print(Panel(
             "[bold cyan]Aztec Configuration Center[/bold cyan]\n\n"
@@ -263,7 +266,7 @@ async def run_interactive_config_menu(console: Console, state: SessionState) -> 
         ))
 
         try:
-            choice = prompt("Select an option (0-5): ").strip()
+            choice = (await session.prompt_async(ANSI("\x1b[1;36mSelect an option (0-5): \x1b[0m"))).strip()
         except (EOFError, KeyboardInterrupt):
             break
 
@@ -274,9 +277,12 @@ async def run_interactive_config_menu(console: Console, state: SessionState) -> 
             render_api_keys_table(console)
             console.print("[dim]Enter the key name to set (e.g. GEMINI_API_KEY, ANTHROPIC_API_KEY) or press Enter to cancel:[/dim]")
             try:
-                key_name = prompt("Key Name: ").strip().upper()
+                key_name = (await session.prompt_async(ANSI("\x1b[1;33mKey Name: \x1b[0m"))).strip().upper()
                 if key_name:
-                    new_val = prompt(f"Enter value for {key_name} (masked): ", is_password=True).strip()
+                    new_val = (await session.prompt_async(
+                        ANSI(f"\x1b[1;33mEnter value for {key_name} (masked): \x1b[0m"),
+                        is_password=True,
+                    )).strip()
                     if new_val:
                         ConfigManager.save_api_key(key_name, new_val)
                         console.print(f"[bold green]✓ Successfully updated and secured {key_name} in ~/.aztec/config.env[/bold green]\n")
@@ -293,7 +299,7 @@ async def run_interactive_config_menu(console: Console, state: SessionState) -> 
         elif choice == "4":
             render_presets_table(console)
             try:
-                preset_id = prompt("Preset ID to apply: ").strip().lower()
+                preset_id = (await session.prompt_async(ANSI("\x1b[1;33mPreset ID to apply: \x1b[0m"))).strip().lower()
                 if preset_id in PRESET_CONFIGURATIONS:
                     ConfigManager.apply_preset(preset_id)
                     state.primary_model = settings.PEER_MODEL
@@ -305,4 +311,3 @@ async def run_interactive_config_menu(console: Console, state: SessionState) -> 
 
         elif choice == "5":
             await run_test_models(console)
-

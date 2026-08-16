@@ -380,6 +380,13 @@ def edit(
         "-P",
         help="Grab and attach image directly from system clipboard",
     ),
+    yes: bool = typer.Option(
+        False,
+        "--yes",
+        "-y",
+        "--auto-approve",
+        help="Automatically approve and execute proposed console/database commands without prompt",
+    ),
 ):
     """
     Apply an atomic targeted edit to an existing generated project with optional image references.
@@ -395,7 +402,7 @@ def edit(
         else:
             console.print("  [yellow]Warning: No image found in system clipboard.[/yellow]")
 
-    asyncio.run(_edit_async(instruction, path, auto_typecheck, auto_fix, verbose, all_images))
+    asyncio.run(_edit_async(instruction, path, auto_typecheck, auto_fix, verbose, all_images, yes))
 
 
 async def _edit_async(
@@ -405,17 +412,30 @@ async def _edit_async(
     auto_fix: bool,
     verbose: bool,
     images: Optional[List[str]] = None,
+    auto_approve_commands: bool = False,
 ):
     from aztec_circle.adapters.image_utils import parse_images_input
     from aztec_circle.engine.patch_agent import PatchAgent
     from aztec_circle.engine.project_runner import ProjectRunner
     from aztec_circle.engine.build_fixer import BuildFixAgent
     from aztec_circle.engine.scaffolder import find_project_root
+    from aztec_circle.tui.interactive import prompt_confirm_console_command
 
     parsed_images = parse_images_input(images)
     root = find_project_root(path)
+
+    async def _confirm_cb(cmd_obj):
+        return await prompt_confirm_console_command(cmd_obj, console, root)
+
     agent = PatchAgent(console=console)
-    res = await agent.run(instruction=instruction, project_dir=root, images=parsed_images, verbose=verbose)
+    res = await agent.run(
+        instruction=instruction,
+        project_dir=root,
+        images=parsed_images,
+        verbose=verbose,
+        confirm_command_callback=_confirm_cb if not auto_approve_commands else None,
+        auto_approve_commands=auto_approve_commands,
+    )
 
     if not res.success:
         console.print(f"[bold red]✗ Edit operation failed:[/bold red] {res.error_message or res.edit_summary}\n")

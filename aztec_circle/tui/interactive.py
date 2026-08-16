@@ -48,7 +48,7 @@ async def run_debate_session(
         fallback_policy=state.fallback_policy,
     )
     event_queue: asyncio.Queue = asyncio.Queue()
-    orchestrator = AztecOrchestrator(state=run_state, event_queue=event_queue)
+    orchestrator = AztecOrchestrator(state=run_state, event_queue=event_queue, console=console)
 
     console.print(f"\n[bold cyan]Starting Aztec Debate for:[/bold cyan] {goal}")
     if state.attached_images:
@@ -123,6 +123,173 @@ def _is_edit_followup(goal: str, state: SessionState) -> bool:
     return words[0] not in trigger_words
 
 
+def _is_modular_consensus_request(goal: str, state: SessionState) -> bool:
+    """Check if goal is requesting a new module, major architectural feature, or consensus on existing project."""
+    import os
+    src_dir = os.path.join(state.output_dir, "src")
+    if not (os.path.isdir(src_dir) and any(f.endswith((".ts", ".tsx", ".js", ".jsx", ".py")) for f in os.listdir(src_dir))):
+        return False
+
+    g_lower = goal.strip().lower()
+    module_triggers = [
+        "new module", "create module", "add module", "build module",
+        "create a module", "add a module", "build a module",
+        "new feature", "implement module", "module for",
+        "consensus", "architect a module", "architect module",
+        "production ready module", "holistic",
+    ]
+    return any(t in g_lower for t in module_triggers)
+
+
+async def run_modular_consensus_session(
+    goal: str,
+    state: SessionState,
+    console: Console,
+) -> Optional[Any]:
+    """Execute a modular edit consensus debate to architect and build a new module into the active project."""
+    import os
+    from aztec_circle.engine.modular_consensus import ModularConsensusOrchestrator
+    from aztec_circle.engine.project_runner import ProjectRunner
+    from aztec_circle.engine.build_fixer import BuildFixAgent
+    from aztec_circle.engine.scaffolder import find_project_root
+
+    target_dir = state.output_dir
+    if not os.path.exists(target_dir) or target_dir == "./aztec_output":
+        if os.path.exists("package.json") or os.path.exists("src"):
+            target_dir = "."
+
+    root = find_project_root(target_dir)
+    console.print(f"\n[bold cyan]🏛  Aztec Modular Consensus Engine[/bold cyan] [dim](target: {root})[/dim]")
+    console.print(f"[bold]Architecting Module / Feature:[/bold] {goal}\n")
+
+    async def _confirm_cb(cmd_obj: Any) -> Tuple[bool, Optional[str]]:
+        return await prompt_confirm_console_command(cmd_obj, console, root)
+
+    orchestrator = ModularConsensusOrchestrator(
+        project_dir=root,
+        goal=goal,
+        images=list(state.attached_images),
+        console=console,
+        budget_limit_usd=state.budget_limit_usd,
+        max_loops=state.max_loops,
+    )
+
+    try:
+        res = await orchestrator.run(
+            confirm_command_callback=_confirm_cb,
+            auto_approve_commands=False,
+            verbose=True,
+        )
+
+        if not res.success:
+            console.print(f"[bold red]✗ Modular Consensus failed:[/bold red] {res.error_message}\n")
+            return None
+
+        state.record_cost(res.total_cost_usd, res.total_tokens_used)
+
+        # Quality Gate: Type Check + Test Suite
+        runner = ProjectRunner(console=console)
+        tc_res = await runner.typecheck_project(root)
+        gate_failed = not tc_res.success
+
+        if gate_failed:
+            console.print("[yellow]Type check found compiler errors. Triggering atomic Build Fix Agent...[/yellow]")
+            fixer = BuildFixAgent(console=console, max_iterations=2)
+            fix_res = await fixer.fix(root, tc_res, runner=runner)
+            state.record_cost(fix_res.total_cost_usd)
+            if not fix_res.success:
+                console.print("[bold red]Warning: Unresolved type errors remain.[/bold red]\n")
+                gate_failed = True
+            else:
+                gate_failed = False
+
+        # Run tests if a test script exists in package.json and type check is clean
+        pkg_json_path = os.path.join(root, "package.json")
+        has_test_script = False
+        if os.path.exists(pkg_json_path):
+            try:
+                import json as _json
+                with open(pkg_json_path, "r", encoding="utf-8") as _f:
+                    _pkg = _json.load(_f)
+                has_test_script = "test" in _pkg.get("scripts", {})
+            except Exception:
+                pass
+
+        if not gate_failed and has_test_script:
+            console.print("[dim]Running test suite as secondary quality gate...[/dim]")
+            test_res = await runner.run_shell_command_streamed(
+                cmd_str="npm run test -- --run",
+                cwd=root,
+                title="Quality Gate: Test Suite",
+            )
+            if not test_res.success:
+                console.print("[yellow]Tests failed. Triggering Build Fix Agent on test errors...[/yellow]")
+                fixer = BuildFixAgent(console=console, max_iterations=2)
+                fix_res = await fixer.fix(root, test_res, runner=runner)
+                state.record_cost(fix_res.total_cost_usd)
+                if not fix_res.success:
+                    console.print("[bold red]Warning: Unresolved test failures remain.[/bold red]\n")
+                else:
+                    console.print("[bold green]✓ Quality gate passed: tests healed cleanly![/bold green]\n")
+            else:
+                console.print("[bold green]✓ Quality gate passed: type check + tests clean![/bold green]\n")
+        elif not gate_failed:
+            console.print("[bold green]✓ Quality gate passed: type check clean![/bold green]\n")
+
+        await _show_post_debate_menu(state, console)
+        return res
+
+    except Exception as exc:
+        console.print(f"[bold red]Modular Consensus encountered an error:[/bold red] {exc}\n")
+        return None
+
+
+async def prompt_confirm_console_command(
+    cmd_obj: Any,
+    console: Console,
+    project_root: str,
+) -> Tuple[bool, Optional[str]]:
+    """Interactive confirmation prompt for a proposed console command."""
+    from rich.panel import Panel
+    from rich.table import Table
+    from prompt_toolkit import PromptSession
+    from prompt_toolkit.formatted_text import ANSI
+
+    table = Table(box=None, show_header=False, padding=(0, 1))
+    table.add_column("Field", style="bold cyan", width=14)
+    table.add_column("Value", style="white")
+
+    table.add_row("Command:", f"[bold yellow]{cmd_obj.command}[/bold yellow]")
+    table.add_row("Purpose:", f"[white]{cmd_obj.description}[/white]")
+    table.add_row("Stage:", f"[magenta]{cmd_obj.stage}[/magenta]")
+    table.add_row("Directory:", f"[dim]{cmd_obj.cwd or project_root}[/dim]")
+
+    console.print()
+    console.print(Panel(table, title="[bold yellow]⚡ Proposed Console Command[/bold yellow]", border_style="yellow"))
+
+    prompt_session: PromptSession = PromptSession()
+    try:
+        ans = await prompt_session.prompt_async(
+            ANSI("\x1b[1;36mExecute this command? [\x1b[1;32mY\x1b[0;36mes / \x1b[1;31mn\x1b[0;36mo / \x1b[1;33me\x1b[0;36mdit]: \x1b[0m")
+        )
+        ans_clean = ans.strip().lower()
+        if ans_clean in ("", "y", "yes"):
+            return True, None
+        elif ans_clean in ("n", "no"):
+            return False, None
+        elif ans_clean in ("e", "edit"):
+            edit_prompt: PromptSession = PromptSession()
+            edited = await edit_prompt.prompt_async(
+                ANSI("\x1b[1;33mEdit command: \x1b[0m"),
+                default=cmd_obj.command,
+            )
+            return True, edited.strip() if edited.strip() else cmd_obj.command
+        else:
+            return True, None
+    except (EOFError, KeyboardInterrupt):
+        return False, None
+
+
 async def run_edit_session(
     instruction: str,
     state: SessionState,
@@ -144,8 +311,17 @@ async def run_edit_session(
     console.print(f"\n[bold cyan]✏ Edit Mode Detected[/bold cyan] [dim](target: {root})[/dim]")
     console.print("[dim]Applying atomic line-range patch. Type /rebuild to force full regeneration.[/dim]")
 
+    async def _confirm_cb(cmd_obj: Any) -> Tuple[bool, Optional[str]]:
+        return await prompt_confirm_console_command(cmd_obj, console, root)
+
     agent = PatchAgent(console=console)
-    res = await agent.run(instruction=instruction, project_dir=root, images=list(state.attached_images), verbose=True)
+    res = await agent.run(
+        instruction=instruction,
+        project_dir=root,
+        images=list(state.attached_images),
+        verbose=True,
+        confirm_command_callback=_confirm_cb,
+    )
 
     if not res.success:
         console.print(f"[bold red]✗ Edit failed:[/bold red] {res.error_message or res.edit_summary}\n")
@@ -278,7 +454,10 @@ async def start_interactive_session() -> None:
         # Check if user input is a slash command
         is_cmd = await dispatch_slash_command(cleaned, state, console)
         if not is_cmd:
-            if _is_edit_followup(cleaned, state):
+            if _is_modular_consensus_request(cleaned, state):
+                # Requesting a major module / consensus on existing project
+                await run_modular_consensus_session(cleaned, state, console)
+            elif _is_edit_followup(cleaned, state):
                 # Follow-up edit on existing project -> Run lightweight Edit Engine
                 await run_edit_session(cleaned, state, console)
             else:

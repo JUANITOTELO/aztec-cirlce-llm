@@ -228,13 +228,22 @@ CURRENT FILE CONTENT:
 
 Please output the complete, corrected code for {clean_path}."""
 
+                from aztec_circle.tui.streaming_ui import SingleStreamVisualizer
+                fix_vis = SingleStreamVisualizer(
+                    console=self.console,
+                    title=f"Repairing {clean_path} (Iteration {loop})",
+                    icon="🔧",
+                    show_preview=True,
+                )
                 try:
-                    resp: LLMResponse = await self.provider.invoke(
-                        model=self.model,
-                        system_prompt=self.SYSTEM_PROMPT,
-                        user_message=user_prompt,
-                        temperature=0.1,
-                    )
+                    with fix_vis:
+                        resp: LLMResponse = await self.provider.invoke(
+                            model=self.model,
+                            system_prompt=self.SYSTEM_PROMPT,
+                            user_message=user_prompt,
+                            temperature=0.1,
+                            on_chunk=fix_vis.on_chunk,
+                        )
                     bm = BudgetManager()
                     cost = bm.record(
                         input_tokens=resp.prompt_tokens,

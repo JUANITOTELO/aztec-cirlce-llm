@@ -42,7 +42,12 @@ class YouthAgent(BaseAgent):
             return 1.0
         return 0.9  # devils_advocate
 
-    async def run(self, goal: str, images: Optional[List[str]] = None) -> YouthBrainstormOutput:
+    async def run(
+        self,
+        goal: str,
+        images: Optional[List[str]] = None,
+        on_chunk: Optional[Callable[[str], None]] = None,
+    ) -> YouthBrainstormOutput:
         """
         Execute Youth brainstorming / stress testing against the user goal and optional reference images.
         """
@@ -55,6 +60,7 @@ class YouthAgent(BaseAgent):
             user_message=user_message,
             images=images,
             temperature=self.temperature,
+            on_chunk=on_chunk,
         )
 
         data = extract_json_payload(resp.content)
