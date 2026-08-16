@@ -279,4 +279,32 @@ async def test_cmd_logs_reads_server_log_file(tmp_path):
     assert "HMR update App.tsx" in out
 
 
+def test_is_edit_followup_heuristics(tmp_path):
+    from aztec_circle.tui.interactive import _is_edit_followup, _is_modular_consensus_request
+
+    # Setup simulated project with src/App.tsx
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "App.tsx").write_text("export const App = () => null;", encoding="utf-8")
+
+    state = SessionState(output_dir=str(tmp_path))
+
+    # Edit requests starting with action words
+    assert _is_edit_followup("make the product dialog follow the theme of the whole app", state) is True
+    assert _is_edit_followup("change the button color to emerald", state) is True
+    assert _is_edit_followup("style the modal dialog in dark slate", state) is True
+    assert _is_edit_followup("update the table column widths", state) is True
+    assert _is_edit_followup("fix the stock calculation bug", state) is True
+
+    # Greenfield requests from scratch
+    assert _is_edit_followup("create a new project from scratch", state) is False
+    assert _is_edit_followup("build a brand new app for crypto tracking", state) is False
+
+    # Modular consensus requests
+    assert _is_modular_consensus_request("add a new module for inventory forecasting", state) is True
+    assert _is_modular_consensus_request("architect module for customer loyalty", state) is True
+    assert _is_modular_consensus_request("make the product dialog follow the theme of the whole app", state) is False
+
+
+
 

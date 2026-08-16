@@ -100,33 +100,63 @@ def _is_edit_followup(goal: str, state: SessionState) -> bool:
     Determine whether input is an incremental follow-up edit to the active project.
     Heuristics:
     - Edit mode is enabled
-    - Project output_dir exists and contains source files in src/
-    - Input does NOT start with major project generation trigger keywords
+    - Project output_dir (or current working directory) exists and contains source files in src/
+    - Input does NOT start with major standalone greenfield project creation trigger phrases
     """
     import os
     import re
+    from aztec_circle.engine.scaffolder import find_project_root
+
     if not state.edit_mode_enabled:
         return False
 
-    src_dir = os.path.join(state.output_dir, "src")
+    target_dir = state.output_dir
+    if not os.path.exists(target_dir) or target_dir == "./aztec_output":
+        if os.path.exists("src") or os.path.exists("package.json"):
+            target_dir = "."
+
+    root = find_project_root(target_dir)
+    src_dir = os.path.join(root, "src")
     if not (os.path.isdir(src_dir) and any(f.endswith((".ts", ".tsx", ".js", ".jsx", ".py")) for f in os.listdir(src_dir))):
         return False
 
-    words = re.sub(r"[^\w\s]", "", goal.strip().lower()).split()
+    g_clean = re.sub(r"[^\w\s]", " ", goal.strip().lower())
+    words = g_clean.split()
     if not words:
         return False
 
-    trigger_words = {
-        "create", "build", "design", "make", "generate",
-        "develop", "write", "initialize", "start", "let", "lets",
-    }
-    return words[0] not in trigger_words
+    first_word = words[0]
+
+    # Phrases like "let's build", "let us build", "lets build"
+    if first_word in ("let", "lets") and len(words) > 1 and words[1] in ("s", "build", "create", "design", "make"):
+        return False
+
+    # Standalone app / system greenfield generation triggers
+    if first_word in ("create", "design", "generate", "initialize", "develop", "build"):
+        return False
+
+    if first_word == "make":
+        # "make a new app", "make a 3d robot app" -> Greenfield
+        # "make the product dialog follow the theme...", "make the header dark" -> Edit
+        if len(words) > 1 and words[1] in ("a", "an", "new") and any(w in words for w in ("app", "application", "dashboard", "platform", "system", "game", "visualizer", "website")):
+            return False
+        return True
+
+    return True
 
 
 def _is_modular_consensus_request(goal: str, state: SessionState) -> bool:
     """Check if goal is requesting a new module, major architectural feature, or consensus on existing project."""
     import os
-    src_dir = os.path.join(state.output_dir, "src")
+    from aztec_circle.engine.scaffolder import find_project_root
+
+    target_dir = state.output_dir
+    if not os.path.exists(target_dir) or target_dir == "./aztec_output":
+        if os.path.exists("src") or os.path.exists("package.json"):
+            target_dir = "."
+
+    root = find_project_root(target_dir)
+    src_dir = os.path.join(root, "src")
     if not (os.path.isdir(src_dir) and any(f.endswith((".ts", ".tsx", ".js", ".jsx", ".py")) for f in os.listdir(src_dir))):
         return False
 
