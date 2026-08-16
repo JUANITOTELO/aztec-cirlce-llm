@@ -241,7 +241,13 @@ class ProjectRunner:
         ecosystem = detect_project_ecosystem(root)
 
         if not is_port_available(port):
-            raise PortInUseError(f"Port {port} is already in use. Specify a different port with --port.")
+            orig_port = port
+            while not is_port_available(port) and port < orig_port + 50:
+                port += 1
+            if not is_port_available(port):
+                raise PortInUseError(f"Port {orig_port} is already in use. Specify a different port with --port.")
+            if self.console:
+                self.console.print(f"[yellow]⚡ Notice: Port {orig_port} is in use; automatically bound to free port {port}[/yellow]")
 
         if ecosystem in ("vite_react", "node"):
             cmd = ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", str(port), "--clearScreen=false"]
