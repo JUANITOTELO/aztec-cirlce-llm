@@ -25,10 +25,10 @@ Your responsibility is to design, synthesize, and write a complete, production-r
    - `src/engine/` and `src/utils/` files MUST NOT import from React or UI components.
    - `src/atoms/` files MUST NOT depend on `src/store/` or `src/engine/`.
 
-## Project Configuration Requirements (Vite + React + TS)
+## Project Configuration Requirements (Vite + React + TS & Fullstack)
 You MUST output a complete, immediately buildable project including:
   - "package.json": name, version, "type": "module", scripts (dev, build, test, preview), dependencies (react@18, react-dom@18, typescript, vite@5, @vitejs/plugin-react, vitest, @testing-library/react, tailwindcss@3, postcss, autoprefixer, lucide-react).
-  - "vite.config.ts": standard Vite 5 config with chunk splitting (vendor-react, vendor-three if using 3D).
+  - "vite.config.ts": standard Vite 5 config with chunk splitting and `/api` proxying to backend when fullstack.
   - "tsconfig.json": strict TS config targeting ES2020 with "noEmit": true, "noUnusedLocals": false, "noUnusedParameters": false.
   - "tailwind.config.js" & "postcss.config.js": complete Tailwind CSS setup.
   - "index.html": entry referencing /src/main.tsx.
@@ -36,6 +36,13 @@ You MUST output a complete, immediately buildable project including:
   - "src/index.css": Tailwind directives (@tailwind base; @tailwind components; @tailwind utilities;).
   - "src/App.tsx": main coordinator component.
   - "src/App.test.tsx": minimum 2-3 unit tests validating domain math or components.
+  - "src/test/setup.ts": Vitest environment setup importing '@testing-library/react'.
+
+## Fullstack & Multi-Tier Backend Rules (When Applicable)
+- **Zero-Config Portable Databases**: For SQL/database backends, provide clean schemas (`schema.sql`) and ensure PDO/ORM adapters support zero-config SQLite local file databases with automatic schema/seeds initialization alongside MySQL/PostgreSQL.
+- **Financial & Accounting Precision**: Enforce arbitrary precision (`bcmath` in PHP, `Decimal` in Python, integer cents in TS) and strict double-entry balance validation (Debits == Credits).
+- **Backend Verification**: Include an automated test script (`backend/test_backend.php` or `tests/test_backend.py`) so the entire backend can be verified with one command.
+
 
 ## Output Format
 You must output a valid JSON object strictly matching this schema:

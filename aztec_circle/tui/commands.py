@@ -502,8 +502,15 @@ async def cmd_plan(args: str, state: SessionState, console: Console) -> None:
     elif subcmd == "file":
         p = PlanManager.get_plan_path(target_dir)
         console.print(f"[bold cyan]Plan File Path:[/bold cyan] {p} [dim](Exists: {p.exists()})[/dim]\n")
+async def cmd_clean(args: str, state: SessionState, console: Console):
+    """Clean development ports and temporary workspace artifacts."""
+    from aztec_circle.engine.project_runner import free_ports
+    target_ports = list(range(5173, 5186)) + list(range(8000, 8016))
+    freed = free_ports(target_ports)
+    if freed:
+        console.print(f"[bold green]✓ Freed occupied server ports:[/bold green] {', '.join(str(p) for p in freed)}\n")
     else:
-        PlanManager.render_plan_dashboard(target_dir, console)
+        console.print("[dim]No lingering server processes found on development ports (5173–5185, 8000–8015).[/dim]\n")
 
 
 COMMAND_HANDLERS: Dict[str, Callable[[str, SessionState, Console], Coroutine]] = {
@@ -535,6 +542,9 @@ COMMAND_HANDLERS: Dict[str, Callable[[str, SessionState, Console], Coroutine]] =
     "/test": cmd_test,
     "/start": cmd_start,
     "/stop": cmd_stop,
+    "/clean": cmd_clean,
+    "/ports": cmd_clean,
+    "/free-ports": cmd_clean,
     "/logs": cmd_logs,
     "/server-logs": cmd_logs,
     "/clear": cmd_clear,

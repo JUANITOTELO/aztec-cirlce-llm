@@ -10,8 +10,10 @@ import os
 import re
 import socket
 import time
-from dataclasses import dataclass
-from typing import Callable, Optional
+import json
+import subprocess
+from dataclasses import dataclass, field
+from typing import Callable, List, Optional
 from rich.console import Console
 
 from aztec_circle.engine.scaffolder import find_project_root, detect_project_ecosystem
@@ -34,38 +36,43 @@ class CommandResult:
 
 @dataclass
 class ServerProcess:
-    """Manages an active background development server."""
+    """Manages an active background development server or multi-service cluster."""
     process: asyncio.subprocess.Process
     port: int
     url: str
     project_dir: str
+    backend_process: Optional[asyncio.subprocess.Process] = None
+    backend_port: Optional[int] = None
+    backend_url: Optional[str] = None
     log_file: Optional[str] = None
     monitor_task: Optional[asyncio.Task] = None
 
     async def stop(self) -> None:
-        """Gracefully terminate dev server process and its process group."""
+        """Gracefully terminate all dev server processes and their process groups."""
         if self.monitor_task and not self.monitor_task.done():
             self.monitor_task.cancel()
-        if self.process.returncode is None:
-            try:
-                import signal
-                try:
-                    pgid = os.getpgid(self.process.pid)
-                    os.killpg(pgid, signal.SIGTERM)
-                except Exception:
-                    self.process.terminate()
-                await asyncio.wait_for(self.process.wait(), timeout=3.0)
-            except Exception:
+        
+        for p in [self.process, self.backend_process]:
+            if p and p.returncode is None:
                 try:
                     import signal
                     try:
-                        pgid = os.getpgid(self.process.pid)
-                        os.killpg(pgid, signal.SIGKILL)
+                        pgid = os.getpgid(p.pid)
+                        os.killpg(pgid, signal.SIGTERM)
                     except Exception:
-                        self.process.kill()
-                    await self.process.wait()
+                        p.terminate()
+                    await asyncio.wait_for(p.wait(), timeout=2.0)
                 except Exception:
-                    pass
+                    try:
+                        import signal
+                        try:
+                            pgid = os.getpgid(p.pid)
+                            os.killpg(pgid, signal.SIGKILL)
+                        except Exception:
+                            p.kill()
+                        await p.wait()
+                    except Exception:
+                        pass
 
 
 def is_port_available(port: int, host: str = "127.0.0.1") -> bool:
@@ -74,6 +81,45 @@ def is_port_available(port: int, host: str = "127.0.0.1") -> bool:
         s.settimeout(0.5)
         res = s.connect_ex((host, port))
         return res != 0
+
+
+def find_free_port(start_port: int, max_offset: int = 50, host: str = "127.0.0.1") -> int:
+    """Find the next available TCP port starting from start_port."""
+    port = start_port
+    while not is_port_available(port, host) and port < start_port + max_offset:
+        port += 1
+    return port
+
+
+def free_ports(ports: List[int]) -> List[int]:
+    """
+    Identify and terminate processes listening on the given TCP ports.
+    Returns the list of ports that were freed.
+    """
+    freed: List[int] = []
+    for port in ports:
+        try:
+            # Check via lsof
+            res = subprocess.run(["lsof", "-t", f"-i:{port}"], capture_output=True, text=True)
+            pids = [int(p.strip()) for p in res.stdout.split() if p.strip().isdigit()]
+            if not pids:
+                # Check via fuser
+                res2 = subprocess.run(["fuser", f"{port}/tcp"], capture_output=True, text=True)
+                pids = [int(p.strip()) for p in res2.stdout.split() if p.strip().isdigit()]
+
+            for pid in pids:
+                try:
+                    import signal
+                    os.kill(pid, signal.SIGTERM)
+                    time.sleep(0.05)
+                    os.kill(pid, signal.SIGKILL)
+                except Exception:
+                    pass
+            if pids:
+                freed.append(port)
+        except Exception:
+            pass
+    return freed
 
 
 class ProjectRunner:
@@ -208,62 +254,163 @@ class ProjectRunner:
             return CommandResult(success=True, stdout="No type check step defined", stderr="", exit_code=0, duration_seconds=0.0)
 
     async def test_project(self, project_dir: str) -> CommandResult:
-        """Execute project test suite."""
+        """Execute project test suites across all tiers (Frontend, Backend, Types/Proofs)."""
         root = find_project_root(project_dir)
         ecosystem = detect_project_ecosystem(root)
 
-        if ecosystem in ("vite_react", "node"):
-            return await self.run_command_streamed(
+        results: List[CommandResult] = []
+
+        # 1. Check PHP backend tests
+        php_test_files = [
+            os.path.join(root, "backend", "test_backend.php"),
+            os.path.join(root, "test_backend.php"),
+            os.path.join(root, "tests", "test_backend.php"),
+        ]
+        for ptf in php_test_files:
+            if os.path.exists(ptf):
+                rel = os.path.relpath(ptf, root)
+                res = await self.run_command_streamed(
+                    cmd=["php", rel],
+                    cwd=root,
+                    title=f"Running PHP Backend Tests (php {rel})",
+                )
+                results.append(res)
+                break
+        else:
+            if os.path.exists(os.path.join(root, "vendor", "bin", "phpunit")):
+                res = await self.run_command_streamed(
+                    cmd=["./vendor/bin/phpunit"],
+                    cwd=root,
+                    title="Running PHPUnit Test Suite",
+                )
+                results.append(res)
+
+        # 2. Check Node / React / Vitest tests
+        pkg_path = os.path.join(root, "package.json")
+        if os.path.exists(pkg_path):
+            res = await self.run_command_streamed(
                 cmd=["npm", "test"],
                 cwd=root,
                 title="Running Test Suite (npm test)",
             )
-        elif ecosystem == "python":
-            return await self.run_command_streamed(
-                cmd=["pytest"],
+            results.append(res)
+
+        # 3. Check Python tests
+        if os.path.exists(os.path.join(root, "pyproject.toml")) or os.path.exists(os.path.join(root, "requirements.txt")) or any(f.endswith(".py") for f in os.listdir(root) if os.path.isfile(os.path.join(root, f))):
+            if ecosystem not in ("php_react", "vite_react") or os.path.exists(os.path.join(root, "tests")):
+                if os.path.exists(os.path.join(root, "tests")) or os.path.exists(os.path.join(root, "test")):
+                    res = await self.run_command_streamed(
+                        cmd=["pytest"],
+                        cwd=root,
+                        title="Running Python Test Suite (pytest)",
+                    )
+                    results.append(res)
+
+        # 4. Check Lean 4 proofs
+        if os.path.exists(os.path.join(root, "lakefile.lean")):
+            res = await self.run_command_streamed(
+                cmd=["lake", "build"],
                 cwd=root,
-                title="Running Python Test Suite (pytest)",
+                title="Verifying Lean 4 Formal Proofs (lake build)",
             )
-        else:
-            return CommandResult(success=True, stdout="No test suite defined", stderr="", exit_code=0, duration_seconds=0.0)
+            results.append(res)
+
+        if not results:
+            return CommandResult(success=True, stdout="No test suite discovered in project", stderr="", exit_code=0, duration_seconds=0.0)
+
+        all_success = all(r.success for r in results)
+        merged_stdout = "\n".join(r.stdout for r in results if r.stdout)
+        merged_stderr = "\n".join(r.stderr for r in results if r.stderr)
+        max_exit = max(r.exit_code for r in results)
+        total_duration = sum(r.duration_seconds for r in results)
+
+        return CommandResult(
+            success=all_success,
+            stdout=merged_stdout,
+            stderr=merged_stderr,
+            exit_code=max_exit,
+            duration_seconds=total_duration,
+        )
 
     async def start_dev_server(
         self,
         project_dir: str,
         port: int = 5173,
+        backend_port: int = 8000,
         on_ready: Optional[Callable[[str], None]] = None,
     ) -> ServerProcess:
         """
         Start development server daemon in background, wait for live URL,
-        and redirect background output to a log file to avoid TUI prompt pollution.
+        orchestrating multi-service hybrid fullstack projects cleanly.
         """
         root = find_project_root(project_dir)
         ecosystem = detect_project_ecosystem(root)
 
         if not is_port_available(port):
-            orig_port = port
-            while not is_port_available(port) and port < orig_port + 50:
-                port += 1
-            if not is_port_available(port):
-                raise PortInUseError(f"Port {orig_port} is already in use. Specify a different port with --port.")
+            frontend_port = find_free_port(port)
+            if not is_port_available(frontend_port):
+                raise PortInUseError(f"Port {port} is already in use. Specify a different port with --port.")
             if self.console:
-                self.console.print(f"[yellow]⚡ Notice: Port {orig_port} is in use; automatically bound to free port {port}[/yellow]")
-
-        if ecosystem in ("vite_react", "node"):
-            cmd = ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", str(port), "--clearScreen=false"]
-        elif ecosystem == "python":
-            cmd = ["python3", "-m", "http.server", str(port)]
+                self.console.print(f"[yellow]⚡ Notice: Port {port} is in use; automatically bound frontend to free port {frontend_port}[/yellow]")
         else:
-            cmd = ["python3", "-m", "http.server", str(port)]
-
-        if self.console:
-            self.console.print(f"[bold cyan]▶ Spawning Dev Server:[/bold cyan] [dim]{' '.join(cmd)}[/dim]")
+            frontend_port = port
 
         log_file_path = os.path.join(root, ".aztec_server.log")
-
-        # Initialize log file
         with open(log_file_path, "w", encoding="utf-8") as f:
-            f.write(f"--- Aztec Dev Server Started on Port {port} at {time.strftime('%Y-%m-%d %H:%M:%S')} ---\n")
+            f.write(f"--- Aztec Dev Server Started at {time.strftime('%Y-%m-%d %H:%M:%S')} ---\n")
+
+        backend_proc: Optional[asyncio.subprocess.Process] = None
+        actual_backend_port: Optional[int] = None
+        backend_url: Optional[str] = None
+
+        # Hybrid fullstack: Spawn Backend API Server first
+        if ecosystem == "php_react":
+            actual_backend_port = find_free_port(backend_port)
+            backend_url = f"http://127.0.0.1:{actual_backend_port}"
+            
+            php_entry = "backend/index.php" if os.path.exists(os.path.join(root, "backend", "index.php")) else "index.php"
+            backend_cmd = ["php", "-S", f"127.0.0.1:{actual_backend_port}", php_entry]
+
+            if self.console:
+                self.console.print(f"[bold cyan]▶ Spawning Backend API Server (PHP):[/bold cyan] [dim]{' '.join(backend_cmd)}[/dim]")
+
+            backend_proc = await asyncio.create_subprocess_exec(
+                *backend_cmd,
+                cwd=root,
+                stdin=asyncio.subprocess.DEVNULL,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                start_new_session=True,
+            )
+
+        elif ecosystem == "python_react":
+            actual_backend_port = find_free_port(backend_port)
+            backend_url = f"http://127.0.0.1:{actual_backend_port}"
+            py_entry = "server.py" if os.path.exists(os.path.join(root, "server.py")) else ("app.py" if os.path.exists(os.path.join(root, "app.py")) else "-m http.server")
+            backend_cmd = ["python3", py_entry] if not py_entry.startswith("-m") else ["python3", "-m", "http.server", str(actual_backend_port)]
+
+            if self.console:
+                self.console.print(f"[bold cyan]▶ Spawning Backend API Server (Python):[/bold cyan] [dim]{' '.join(backend_cmd)}[/dim]")
+
+            backend_proc = await asyncio.create_subprocess_exec(
+                *backend_cmd,
+                cwd=root,
+                stdin=asyncio.subprocess.DEVNULL,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                start_new_session=True,
+            )
+
+        # Spawn Frontend / Primary Server
+        if ecosystem in ("vite_react", "php_react", "python_react", "lean4_react", "node"):
+            cmd = ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", str(frontend_port), "--clearScreen=false"]
+        elif ecosystem == "php":
+            cmd = ["php", "-S", f"0.0.0.0:{frontend_port}"]
+        else:
+            cmd = ["python3", "-m", "http.server", str(frontend_port)]
+
+        if self.console:
+            self.console.print(f"[bold cyan]▶ Spawning Frontend Dev Server:[/bold cyan] [dim]{' '.join(cmd)}[/dim]")
 
         proc = await asyncio.create_subprocess_exec(
             *cmd,
@@ -274,32 +421,27 @@ class ProjectRunner:
             start_new_session=True,
         )
 
-        detected_url = f"http://localhost:{port}"
+        detected_url = f"http://localhost:{frontend_port}"
         ready_event = asyncio.Event()
         ansi_regex = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
         url_regex = re.compile(r"(http://localhost:\d+|http://127\.0\.0\.1:\d+|http://0\.0\.0\.0:\d+)")
 
-        async def _monitor_stream():
-            assert proc.stdout is not None
-            assert proc.stderr is not None
-
+        async def _monitor_stream(p: asyncio.subprocess.Process, label: str = "app"):
             async def _drain_out():
                 while True:
-                    line = await proc.stdout.readline()
+                    line = await p.stdout.readline()
                     if not line:
                         break
                     raw_text = line.decode("utf-8", errors="replace")
                     clean_text = ansi_regex.sub("", raw_text)
 
-                    # Write to background log file
                     try:
                         with open(log_file_path, "a", encoding="utf-8") as lf:
-                            lf.write(clean_text)
+                            lf.write(f"[{label}] {clean_text}")
                     except Exception:
                         pass
 
-                    # During startup probe, check for URL and show initial lines
-                    if not ready_event.is_set():
+                    if not ready_event.is_set() and label == "frontend":
                         clean_stripped = clean_text.strip()
                         if clean_stripped and self.console:
                             self.console.print(f"  [dim]{clean_stripped}[/dim]")
@@ -313,22 +455,29 @@ class ProjectRunner:
 
             async def _drain_err():
                 while True:
-                    line = await proc.stderr.readline()
+                    line = await p.stderr.readline()
                     if not line:
                         break
                     raw_text = line.decode("utf-8", errors="replace")
                     clean_text = ansi_regex.sub("", raw_text)
                     try:
                         with open(log_file_path, "a", encoding="utf-8") as lf:
-                            lf.write(f"[stderr] {clean_text}")
+                            lf.write(f"[{label}-stderr] {clean_text}")
                     except Exception:
                         pass
 
             await asyncio.gather(_drain_out(), _drain_err())
 
-        monitor_task = asyncio.create_task(_monitor_stream())
+        tasks = [_monitor_stream(proc, "frontend")]
+        if backend_proc:
+            tasks.append(_monitor_stream(backend_proc, "backend"))
 
-        # Wait up to 5 seconds for Vite/Server startup banner
+        async def _run_all_monitors():
+            await asyncio.gather(*tasks)
+
+        monitor_task = asyncio.create_task(_run_all_monitors())
+
+        # Wait up to 5 seconds for Frontend startup banner
         try:
             await asyncio.wait_for(ready_event.wait(), timeout=5.0)
         except asyncio.TimeoutError:
@@ -336,13 +485,19 @@ class ProjectRunner:
 
         if self.console:
             self.console.print(f"\n[bold green]🚀 Live Application Server Running at:[/bold green] [bold underline cyan]{detected_url}[/bold underline cyan]")
+            if backend_url:
+                self.console.print(f"[bold green]🔗 Backend REST API Running at:[/bold green] [bold underline magenta]{backend_url}[/bold underline magenta]")
             self.console.print(f"[dim]Background logs streaming to {log_file_path} (use /logs to inspect)[/dim]\n")
 
         return ServerProcess(
             process=proc,
-            port=port,
+            port=frontend_port,
             url=detected_url,
             project_dir=root,
+            backend_process=backend_proc,
+            backend_port=actual_backend_port,
+            backend_url=backend_url,
             log_file=log_file_path,
             monitor_task=monitor_task,
         )
+

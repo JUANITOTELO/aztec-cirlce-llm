@@ -630,6 +630,25 @@ def plan(
         PlanManager.render_plan_dashboard(path, console)
 
 
+@app.command("clean")
+def clean(
+    path: str = typer.Argument(None, help="Project directory to clean (optional)"),
+    ports: bool = typer.Option(True, "--ports", "-p", help="Free occupied development server ports (5173-5185, 8000-8015)"),
+):
+    """
+    Clean up temporary artifacts and free lingering background server ports.
+    """
+    from aztec_circle.engine.project_runner import free_ports
+    if ports:
+        target_ports = list(range(5173, 5186)) + list(range(8000, 8016))
+        freed = free_ports(target_ports)
+        if freed:
+            console.print(f"[bold green]✓ Freed occupied server ports:[/bold green] {', '.join(str(p) for p in freed)}")
+        else:
+            console.print("[dim]No lingering server processes found on development ports (5173–5185, 8000–8015).[/dim]")
+    console.print("[bold green]✓ Aztec workspace cleanup complete.[/bold green]")
+
+
 @app.command()
 def serve(
     port: int = typer.Option(8000, "--port", "-p", help="Port to bind Web Inspector"),

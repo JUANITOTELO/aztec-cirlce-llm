@@ -28,10 +28,25 @@ TS_ERROR_PATTERN = re.compile(
     re.MULTILINE,
 )
 
+PHP_ERROR_PATTERN = re.compile(
+    r"(?:PHP Fatal error|Fatal error|Parse error|PHP Parse error):\s+(?P<msg>.+?)\s+in\s+(?P<file>.+?)\s+on\s+line\s+(?P<line>\d+)",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+PYTHON_ERROR_PATTERN = re.compile(
+    r'File "(?P<file>[^"]+)", line (?P<line>\d+).*?\n\s*(?P<msg>[A-Za-z0-9_]+Error:\s*.+)',
+    re.DOTALL,
+)
+
+LEAN_ERROR_PATTERN = re.compile(
+    r"^(?P<file>[^\s:]+\.lean):(?P<line>\d+):(?P<col>\d+):\s+error:\s+(?P<msg>.+)$",
+    re.MULTILINE,
+)
+
 
 @dataclass
 class TSError:
-    """Represents an individual TypeScript compiler error."""
+    """Represents an individual compiler or test error diagnostic."""
     file: str
     line: int
     code: str
@@ -50,15 +65,16 @@ class FixResult:
 
 class BuildFixAgent:
     """
-    Automated self-healing build error agent.
-    Extracts compiler diagnostics, groups them by file, and prompts LLM for targeted atomic file repairs.
+    Automated self-healing multi-tier build and test error repair agent.
+    Extracts compiler diagnostics (TypeScript, PHP, Python, SQL, Lean 4), groups them by file,
+    and prompts LLM for targeted atomic file repairs.
     """
 
-    SYSTEM_PROMPT = """You are an expert TypeScript, React, and Build Repair Engineer.
-Your task is to fix build and compilation errors in the provided project files.
+    SYSTEM_PROMPT = """You are an expert Multi-Tier Software Engineer & Build Repair Specialist (TypeScript, React, PHP, Python, SQL, Lean 4).
+Your task is to fix build, test, and compilation errors in the provided project files.
 
 You will receive:
-1. The exact compiler / build errors for a file.
+1. The exact compiler / test / runtime errors for a file.
 2. The full content of that file.
 
 CRITICAL INSTRUCTIONS:
@@ -70,8 +86,8 @@ CRITICAL INSTRUCTIONS:
     }
   }
 - Provide the COMPLETE corrected file content for the file. Never use placeholders or truncation comments like "// ... rest of code".
-- Fix all compiler errors shown (missing imports, undeclared types, unused variable strictness, incorrect signatures).
-- Keep files modular (under 150 lines where possible).
+- Fix all errors shown (missing imports, unhandled SQL dialects, type mismatches, missing test setups, syntax errors).
+- Keep files modular and clean.
 - Respond ONLY with the JSON object.
 """
 
@@ -88,8 +104,10 @@ CRITICAL INSTRUCTIONS:
         self.model = model or settings.PEER_MODEL
 
     def parse_errors(self, build_output: str) -> List[TSError]:
-        """Extract structured errors from compiler diagnostics."""
+        """Extract structured errors from compiler diagnostics across TS, PHP, Python, and Lean."""
         errors: List[TSError] = []
+        
+        # 1. TypeScript errors
         for match in TS_ERROR_PATTERN.finditer(build_output):
             errors.append(
                 TSError(
@@ -99,6 +117,29 @@ CRITICAL INSTRUCTIONS:
                     message=match.group("msg").strip(),
                 )
             )
+
+        # 2. PHP errors
+        for match in PHP_ERROR_PATTERN.finditer(build_output):
+            errors.append(
+                TSError(
+                    file=match.group("file").strip(),
+                    line=int(match.group("line")),
+                    code="PHP_ERROR",
+                    message=match.group("msg").strip(),
+                )
+            )
+
+        # 3. Lean 4 errors
+        for match in LEAN_ERROR_PATTERN.finditer(build_output):
+            errors.append(
+                TSError(
+                    file=match.group("file").strip(),
+                    line=int(match.group("line")),
+                    code="LEAN_ERROR",
+                    message=match.group("msg").strip(),
+                )
+            )
+
         return errors
 
     async def fix(

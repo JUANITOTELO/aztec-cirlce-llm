@@ -97,6 +97,35 @@ export default defineConfig({
 });
 """
 
+VITE_CONFIG_TS_PROXY = """import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+// https://vitejs.dev/config/
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    port: 5173,
+    host: '0.0.0.0',
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+    },
+  },
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './src/test/setup.ts',
+  },
+});
+"""
+
+SRC_TEST_SETUP_TS = """// Vitest test environment setup
+import '@testing-library/react';
+"""
+
+
 TAILWIND_CONFIG_JS = """/** @type {import('tailwindcss').Config} */
 export default {
   content: [
@@ -241,7 +270,7 @@ def find_project_root(target_dir: str) -> str:
 def detect_project_ecosystem(project_dir: str) -> str:
     """
     Scan files within project_dir and classify ecosystem:
-    Returns 'vite_react', 'node', 'python', or 'generic'.
+    Returns 'php_react', 'python_react', 'lean4_react', 'vite_react', 'node', 'php', 'python', 'lean4', or 'generic'.
     """
     if not os.path.exists(project_dir):
         return "generic"
@@ -255,6 +284,18 @@ def detect_project_ecosystem(project_dir: str) -> str:
     has_tsx_or_jsx = any(f.endswith((".tsx", ".jsx")) for f in all_files)
     has_ts_or_js = any(f.endswith((".ts", ".js", ".mjs")) for f in all_files)
     has_py = any(f.endswith(".py") for f in all_files)
+    has_php = any(f.endswith(".php") for f in all_files)
+    has_lean = any(f.endswith(".lean") for f in all_files) or "lakefile.lean" in all_files
+
+    has_frontend = has_package_json or has_tsx_or_jsx
+
+    # Hybrid fullstack ecosystems
+    if has_frontend and has_php:
+        return "php_react"
+    if has_frontend and (has_py or "pyproject.toml" in all_files or "requirements.txt" in all_files):
+        return "python_react"
+    if has_frontend and has_lean:
+        return "lean4_react"
 
     if has_package_json:
         try:
@@ -267,8 +308,14 @@ def detect_project_ecosystem(project_dir: str) -> str:
         except Exception:
             pass
 
-    if has_tsx_or_jsx or (has_ts_or_js and not has_py):
+    if has_tsx_or_jsx or (has_ts_or_js and not has_py and not has_php and not has_lean):
         return "vite_react"
+
+    if has_php:
+        return "php"
+
+    if has_lean:
+        return "lean4"
 
     if has_py or "pyproject.toml" in all_files or "requirements.txt" in all_files:
         return "python"
@@ -308,14 +355,11 @@ def detect_uses_tailwind(project_root: str) -> bool:
 
 
 def detect_heavy_deps(project_root: str) -> List[str]:
-    """
-    Inspect package.json dependencies for heavy packages requiring code-splitting.
-    """
+    """Inspect dependencies and detect heavy 3D / graphics libraries requiring chunking."""
     pkg_path = os.path.join(project_root, "package.json")
+    found: List[str] = []
     if not os.path.exists(pkg_path):
-        return []
-
-    found = []
+        return found
     try:
         with open(pkg_path, "r", encoding="utf-8") as fh:
             data = json.load(fh)
@@ -331,14 +375,14 @@ def detect_heavy_deps(project_root: str) -> List[str]:
 def scaffold_project(output_dir: str) -> ScaffoldResult:
     """
     Inspect output_dir, determine ecosystem, and inject any missing boilerplate files.
-    Ensures Tailwind CSS config, chunking, and typecheck compatibility.
+    Ensures Tailwind CSS config, chunking, fullstack proxy, and typecheck compatibility.
     """
     os.makedirs(output_dir, exist_ok=True)
     root = find_project_root(output_dir)
     ecosystem = detect_project_ecosystem(root)
     injected: List[str] = []
 
-    if ecosystem == "vite_react":
+    if ecosystem in ("vite_react", "php_react", "python_react", "lean4_react", "node"):
         # 1. package.json
         pkg_path = os.path.join(root, "package.json")
         if not os.path.exists(pkg_path):
@@ -405,7 +449,12 @@ def scaffold_project(output_dir: str) -> ScaffoldResult:
         has_heavy = bool(detect_heavy_deps(root))
 
         if not os.path.exists(vite_cfg_path) and not os.path.exists(vite_js_path):
-            config_template = VITE_CONFIG_TS_CHUNKS if has_heavy else VITE_CONFIG_TS
+            if ecosystem in ("php_react", "python_react"):
+                config_template = VITE_CONFIG_TS_PROXY
+            elif has_heavy:
+                config_template = VITE_CONFIG_TS_CHUNKS
+            else:
+                config_template = VITE_CONFIG_TS
             with open(vite_cfg_path, "w", encoding="utf-8") as f:
                 f.write(config_template)
             injected.append("vite.config.ts")
@@ -454,12 +503,20 @@ def scaffold_project(output_dir: str) -> ScaffoldResult:
                 f.write(INDEX_CSS_TAILWIND)
             injected.append("src/index.css")
 
-        # 8. src/App.test.tsx
+        # 8. src/App.test.tsx & src/test/setup.ts
         test_path = os.path.join(src_dir, "App.test.tsx")
         if not os.path.exists(test_path):
             with open(test_path, "w", encoding="utf-8") as f:
                 f.write(APP_TEST_TSX)
             injected.append("src/App.test.tsx")
+
+        test_setup_dir = os.path.join(src_dir, "test")
+        test_setup_file = os.path.join(test_setup_dir, "setup.ts")
+        if not os.path.exists(test_setup_file):
+            os.makedirs(test_setup_dir, exist_ok=True)
+            with open(test_setup_file, "w", encoding="utf-8") as f:
+                f.write(SRC_TEST_SETUP_TS)
+            injected.append("src/test/setup.ts")
 
     elif ecosystem == "python":
         pyproj_path = os.path.join(root, "pyproject.toml")
