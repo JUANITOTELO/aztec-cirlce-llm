@@ -11,6 +11,7 @@ from typing import Optional
 from prompt_toolkit import PromptSession
 from prompt_toolkit.formatted_text import ANSI
 from prompt_toolkit.history import FileHistory
+from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.styles import Style
 from rich.console import Console
 from rich.live import Live
@@ -228,15 +229,36 @@ async def _show_post_debate_menu(state: SessionState, console: Console) -> None:
 async def start_interactive_session() -> None:
     """Launch the interactive Aztec TUI session loop."""
     history_file = Path("~/.aztec_history").expanduser()
-    session: PromptSession = PromptSession(
-        history=FileHistory(str(history_file)),
-        completer=SlashCompleter(),
-        style=TUI_STYLE,
-    )
-
     state = SessionState()
     renderer = TranscriptRenderer(console)
     print_welcome_banner(console, state)
+
+    main_kb = KeyBindings()
+
+    @main_kb.add("c-v")
+    @main_kb.add("escape", "v")
+    def _handle_paste(event):
+        from aztec_circle.adapters.clipboard_utils import get_clipboard_image
+        from aztec_circle.adapters.image_utils import encode_image_to_data_uri
+
+        clip_img = get_clipboard_image()
+        if clip_img:
+            try:
+                data_uri = encode_image_to_data_uri(clip_img)
+                state.attached_images.append(data_uri)
+                console.print(f"\n[bold green]✓ Attached clipboard image:[/bold green] [underline]{clip_img}[/underline] [dim]({len(state.attached_images)} attached)[/dim]")
+                event.app.invalidate()
+            except Exception as exc:
+                console.print(f"\n[bold red]✗ Failed to attach clipboard image:[/bold red] {exc}")
+        else:
+            event.current_buffer.paste_clipboard_data(event.app.clipboard.get_data())
+
+    session: PromptSession = PromptSession(
+        history=FileHistory(str(history_file)),
+        completer=SlashCompleter(),
+        key_bindings=main_kb,
+        style=TUI_STYLE,
+    )
 
     while True:
         try:

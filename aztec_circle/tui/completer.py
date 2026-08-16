@@ -24,6 +24,8 @@ SLASH_COMMAND_METADATA = {
     "/stop": "Stop active running background dev server",
     "/clear": "Clear the terminal screen",
     "/image": "Attach reference image to session: /image <path_or_url>",
+    "/paste": "Grab and attach image from system clipboard (Ctrl+V)",
+    "/paste-image": "Grab and attach image from system clipboard (Ctrl+V)",
     "/images": "List all attached reference images in the active session",
     "/clear-images": "Remove all attached images from the active session",
     "/update": "Check for and apply latest Aztec framework updates",

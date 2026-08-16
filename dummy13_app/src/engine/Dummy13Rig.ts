@@ -378,10 +378,10 @@ export class Dummy13Rig {
     spineUNode.add(chestArmor);
     this.armorMeshes.push(chestArmor);
 
-    const chestPlate = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.18, 0.08), this.visorMaterial);
-    chestPlate.position.set(0, 0.14, 0.11);
-    spineUNode.add(chestPlate);
-    this.armorMeshes.push(chestPlate);
+    const backPlate = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.18, 0.08), this.visorMaterial);
+    backPlate.position.set(0, 0.14, -0.11);
+    spineUNode.add(backPlate);
+    this.armorMeshes.push(backPlate);
     this.attachHandle(spineUNode, 'spine_upper', 0.22);
 
     // 4. Neck & Head

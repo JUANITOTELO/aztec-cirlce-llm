@@ -253,3 +253,13 @@ async def test_cmd_fix_records_cost_in_session_state(tmp_path):
     assert state.total_cost_usd == 0.072
     assert "$0.07" in state.prompt_text()
 
+
+@pytest.mark.asyncio
+async def test_start_interactive_session_initializes_cleanly():
+    from aztec_circle.tui.interactive import start_interactive_session
+
+    with patch("prompt_toolkit.PromptSession.prompt_async", side_effect=EOFError), \
+         patch("aztec_circle.tui.renderer.print_welcome_banner"):
+        await start_interactive_session()
+
+

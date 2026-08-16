@@ -106,9 +106,14 @@ Pass design mockups, wireframes, 3D diagrams, or screenshots directly into the d
 # Generate full project from a design wireframe
 aztec run "Build an interactive 3D robot mannequin studio" --image ./wireframe.png --auto-build
 
-# Apply an incremental edit matching a UI mockup
-aztec edit "Match toolbar styling to screenshot" --image ./mockup.png --path ./my_app
+# Apply an incremental edit using an image directly from your system clipboard
+aztec edit "Match toolbar styling to screenshot" --paste --path ./my_app
 ```
+
+- **Instant Clipboard Pasting (`Ctrl+V`)**: Press `Ctrl+V` or `Alt+V` in the interactive TUI to attach any screenshot or image currently on your system clipboard (Wayland, X11, macOS, Windows).
+- **Drag & Drop Path Cleaning**: Paste or drag file paths with `file://` or quotes directly into `/image` or the prompt.
+
+---
 
 ### 2. ⚡ Incremental Edit Engine (Precision 2-Round Patching)
 Update and improve existing projects with token-effective line-range modifications:
@@ -119,7 +124,7 @@ aztec edit "Add keyboard shortcuts: R for reset, W for wireframe toggle" --path 
 ```
 
 - **Round 1 (File Selector)**: Analyzes project symbol index (~300 tokens) to identify only the files needing changes.
-- **Round 2 (Patch Generator)**: Generates minimal, structured JSON line replacements (`replace`, `insert_before`, `insert_after`, `create`, `delete`) with atomic rollback protection.
+- **Round 2 (Patch Generator)**: Generates minimal, structured JSON line replacements (`replace`, `insert_before`, `insert_after`, `create`, `delete`) with atomic rollback protection and resilient `json-repair` parsing.
 
 ### 3. 🔧 Self-Healing Quality Gate & Build Runner
 Automated end-to-end build runner:
@@ -133,9 +138,9 @@ Automated end-to-end build runner:
 
 | Command | Description | Example |
 | :--- | :--- | :--- |
-| `aztec` | Launch interactive TUI session | `aztec` |
-| `aztec run <goal>` | Execute full debate loop for a task | `aztec run "Build a Kanban app" -B -S` |
-| `aztec edit <instruction>`| Apply targeted line-range patch | `aztec edit "Add dark mode toggle" -p ./app` |
+| `aztec` | Launch interactive TUI session (supports `Ctrl+V` image paste) | `aztec` |
+| `aztec run <goal>` | Execute full debate loop for a task (`--image`, `--paste` / `-P`) | `aztec run "Build a Kanban app" -B -S --paste` |
+| `aztec edit <instruction>`| Apply targeted line-range patch (`--image`, `--paste` / `-P`) | `aztec edit "Add dark mode toggle" -p ./app -P` |
 | `aztec build <path>` | Scaffold, install deps, and build | `aztec build ./aztec_output` |
 | `aztec fix <path>` | Run self-healing compiler error repair | `aztec fix ./aztec_output` |
 | `aztec test <path>` | Execute project unit test suite | `aztec test ./aztec_output` |
@@ -152,7 +157,9 @@ Inside the interactive `aztec` TUI prompt:
 
 | Slash Command | Description |
 | :--- | :--- |
-| `/image <path_or_url>` | Attach reference image(s) to the active session |
+| `Ctrl+V` / `Alt+V` | **Paste image directly from system clipboard** (updates prompt badge) |
+| `/paste` / `/paste-image` | Grab and attach image from system clipboard |
+| `/image <path_or_url>` | Attach reference image(s) or drag & dropped file path |
 | `/images` | List all attached images in the session |
 | `/clear-images` | Clear attached images |
 | `/edit <instruction>` | Apply an atomic incremental edit to active project |

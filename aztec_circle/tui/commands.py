@@ -318,18 +318,39 @@ async def cmd_rebuild(args: str, state: SessionState, console: Console) -> None:
     await run_debate_session(goal, state, renderer)
 
 
-async def cmd_image(args: str, state: SessionState, console: Console) -> None:
-    """Attach reference image to the active session: /image <path_or_url>"""
-    target = args.strip()
-    if not target:
-        console.print("[yellow]Usage: /image <path_or_url_to_image>[/yellow]\n")
+async def cmd_paste(args: str, state: SessionState, console: Console) -> None:
+    """Grab and attach an image directly from the system clipboard."""
+    from aztec_circle.adapters.clipboard_utils import get_clipboard_image
+    from aztec_circle.adapters.image_utils import encode_image_to_data_uri
+
+    clip_img = get_clipboard_image()
+    if not clip_img:
+        console.print("[yellow]No image data found in system clipboard.[/yellow] [dim](Copy a screenshot/image first, or use /image <path>)[/dim]\n")
         return
 
-    from aztec_circle.adapters.image_utils import encode_image_to_data_uri
     try:
-        data_uri = encode_image_to_data_uri(target)
+        data_uri = encode_image_to_data_uri(clip_img)
         state.attached_images.append(data_uri)
-        console.print(f"[bold green]✓ Attached reference image:[/bold green] [underline]{target}[/underline] (Total attached: {len(state.attached_images)})\n")
+        console.print(f"[bold green]✓ Attached clipboard image:[/bold green] [underline]{clip_img}[/underline] [dim](Total attached: {len(state.attached_images)})[/dim]\n")
+    except Exception as exc:
+        console.print(f"[bold red]✗ Failed to process clipboard image:[/bold red] {exc}\n")
+
+
+async def cmd_image(args: str, state: SessionState, console: Console) -> None:
+    """Attach reference image to the active session: /image <path_or_url> or /image paste"""
+    target = args.strip()
+    if not target or target.lower() in ("paste", "clip"):
+        await cmd_paste("", state, console)
+        return
+
+    from aztec_circle.adapters.clipboard_utils import clean_image_path
+    from aztec_circle.adapters.image_utils import encode_image_to_data_uri
+
+    cleaned_target = clean_image_path(target)
+    try:
+        data_uri = encode_image_to_data_uri(cleaned_target)
+        state.attached_images.append(data_uri)
+        console.print(f"[bold green]✓ Attached reference image:[/bold green] [underline]{cleaned_target}[/underline] [dim](Total attached: {len(state.attached_images)})[/dim]\n")
     except Exception as exc:
         console.print(f"[bold red]✗ Failed to attach image:[/bold red] {exc}\n")
 
@@ -381,6 +402,9 @@ COMMAND_HANDLERS: Dict[str, Callable[[str, SessionState, Console], Coroutine]] =
     "/edit": cmd_edit,
     "/rebuild": cmd_rebuild,
     "/image": cmd_image,
+    "/paste": cmd_paste,
+    "/paste-image": cmd_paste,
+    "/clip": cmd_paste,
     "/images": cmd_images,
     "/clear-images": cmd_clear_images,
     "/update": cmd_update,

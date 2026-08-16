@@ -171,14 +171,30 @@ def run(
         "-i",
         help="Path or URL to reference image(s) for visual design and specification",
     ),
+    paste: bool = typer.Option(
+        False,
+        "--paste",
+        "-P",
+        help="Grab and attach image directly from system clipboard",
+    ),
 ):
     """
     Launch a full multi-generational Aztec Circle debate loop.
     """
+    all_images = list(image or [])
+    if paste:
+        from aztec_circle.adapters.clipboard_utils import get_clipboard_image
+        clip_img = get_clipboard_image()
+        if clip_img:
+            all_images.append(clip_img)
+            console.print(f"  [green]📷 Attached image from clipboard:[/green] [dim]{clip_img}[/dim]")
+        else:
+            console.print("  [yellow]Warning: No image found in system clipboard.[/yellow]")
+
     console.print(f"[bold cyan]Initializing Aztec Circle for task:[/bold cyan] {goal}")
-    if image:
-        console.print(f"  [dim]Attached {len(image)} reference image(s)[/dim]")
-    asyncio.run(_run_async(goal, budget, max_loops, fallback, auto_build, start_server, port, output_dir, max_fix_loops, image))
+    if all_images:
+        console.print(f"  [dim]Attached {len(all_images)} reference image(s)[/dim]")
+    asyncio.run(_run_async(goal, budget, max_loops, fallback, auto_build, start_server, port, output_dir, max_fix_loops, all_images))
 
 
 async def _run_async(
@@ -310,12 +326,28 @@ def edit(
         "-i",
         help="Path or URL to reference image(s) for visual edit guidance",
     ),
+    paste: bool = typer.Option(
+        False,
+        "--paste",
+        "-P",
+        help="Grab and attach image directly from system clipboard",
+    ),
 ):
     """
     Apply an atomic targeted edit to an existing generated project with optional image references.
     Uses a 2-round LLM conversation for maximum token efficiency.
     """
-    asyncio.run(_edit_async(instruction, path, auto_typecheck, auto_fix, verbose, image))
+    all_images = list(image or [])
+    if paste:
+        from aztec_circle.adapters.clipboard_utils import get_clipboard_image
+        clip_img = get_clipboard_image()
+        if clip_img:
+            all_images.append(clip_img)
+            console.print(f"  [green]📷 Attached image from clipboard:[/green] [dim]{clip_img}[/dim]")
+        else:
+            console.print("  [yellow]Warning: No image found in system clipboard.[/yellow]")
+
+    asyncio.run(_edit_async(instruction, path, auto_typecheck, auto_fix, verbose, all_images))
 
 
 async def _edit_async(

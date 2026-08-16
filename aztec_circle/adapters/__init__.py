@@ -11,6 +11,12 @@ from aztec_circle.adapters.image_utils import (
     format_multimodal_content,
 )
 
+from aztec_circle.adapters.clipboard_utils import (
+    get_clipboard_image,
+    has_clipboard_image,
+    clean_image_path,
+)
+
 __all__ = [
     "LLMProvider",
     "LLMResponse",
@@ -20,4 +26,7 @@ __all__ = [
     "is_image_path",
     "parse_images_input",
     "format_multimodal_content",
+    "get_clipboard_image",
+    "has_clipboard_image",
+    "clean_image_path",
 ]
