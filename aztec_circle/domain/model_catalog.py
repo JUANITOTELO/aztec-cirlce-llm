@@ -162,6 +162,16 @@ CURATED_MODELS: List[Dict[str, Any]] = [
         "cache_hit_cost_per_m": 0.01875,
     },
     {
+        "id": "gemini/gemini-3.1-flash-lite",
+        "name": "Gemini 3.1 Flash-Lite",
+        "provider": "gemini",
+        "description": "Ultra low-cost, high-speed multimodal model ($0.025 in / $0.10 out)",
+        "recommended_ranks": ["YOUTH", "PEER", "FALLBACK"],
+        "input_cost_per_m": 0.025,
+        "output_cost_per_m": 0.10,
+        "cache_hit_cost_per_m": 0.00625,
+    },
+    {
         "id": "gemini/gemini-2.5-flash-lite",
         "name": "Gemini 2.5 Flash-Lite",
         "provider": "gemini",

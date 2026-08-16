@@ -94,24 +94,54 @@ class PeerAgent(BaseAgent):
         resp: Any,
         loop_index: int,
     ) -> PeerDraftOutput:
+        import json
         overview = data.get("architecture_overview", "Synthesized architecture plan.")
         code_dict = data.get("implementation_code", {})
         if not isinstance(code_dict, dict):
             code_dict = {"main.py": str(code_dict)}
 
+        # Extract nested metadata if LLM placed them inside implementation_code
+        clean_code: Dict[str, str] = {}
+        nested_mitigations: List[str] = []
+        nested_assumptions: List[str] = []
+
+        for k, v in code_dict.items():
+            if k == "mitigations_applied":
+                if isinstance(v, list):
+                    nested_mitigations.extend(str(item) for item in v)
+                elif v:
+                    nested_mitigations.append(str(v))
+            elif k == "assumptions_made":
+                if isinstance(v, list):
+                    nested_assumptions.extend(str(item) for item in v)
+                elif v:
+                    nested_assumptions.append(str(v))
+            elif k == "architecture_overview" and isinstance(v, str):
+                if not overview or overview == "Synthesized architecture plan.":
+                    overview = v
+            else:
+                if isinstance(v, list):
+                    clean_code[k] = "\n".join(str(item) for item in v)
+                elif isinstance(v, dict):
+                    clean_code[k] = json.dumps(v, indent=2)
+                else:
+                    clean_code[k] = str(v)
+
         mitigations = data.get("mitigations_applied", [])
         if not isinstance(mitigations, list):
-            mitigations = [str(mitigations)]
+            mitigations = [str(mitigations)] if mitigations else []
+        mitigations.extend(nested_mitigations)
 
         assumptions = data.get("assumptions_made", [])
         if not isinstance(assumptions, list):
-            assumptions = [str(assumptions)]
+            assumptions = [str(assumptions)] if assumptions else []
+        assumptions.extend(nested_assumptions)
 
         return PeerDraftOutput(
             agent_id=self.agent_id,
             loop_index=loop_index,
-            architecture_overview=overview,
-            implementation_code=code_dict,
+            architecture_overview=str(overview),
+            implementation_code=clean_code,
             mitigations_applied=mitigations,
             assumptions_made=assumptions,
             tool_calls=[],

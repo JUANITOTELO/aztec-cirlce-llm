@@ -233,9 +233,14 @@ class LLMProvider:
             else:
                 extra_kwargs["thinking"] = {"type": "enabled", "budget_tokens": thinking_budget}
 
-        # Gemini 3+ models and Claude 5 models manage temperature/thinking adaptively
-        is_gemini_3_plus = "gemini-3" in target_model.lower()
-        if not is_gemini_3_plus and temperature is not None:
+        # Gemini 3+ models and Claude models with thinking manage temperature adaptively (Anthropic requires temperature=1.0 when thinking is active)
+        m_lower = target_model.lower()
+        is_gemini_3_plus = "gemini-3" in m_lower
+        is_claude_thinking = ("claude" in m_lower or "anthropic" in m_lower) and "thinking" in extra_kwargs
+
+        if is_claude_thinking:
+            extra_kwargs["temperature"] = 1.0
+        elif not is_gemini_3_plus and temperature is not None:
             extra_kwargs["temperature"] = temperature
 
         optimized_messages = self.optimize_messages_for_prompt_caching(messages, target_model)
