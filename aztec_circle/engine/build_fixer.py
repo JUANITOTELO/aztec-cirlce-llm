@@ -195,7 +195,12 @@ Please output the complete, corrected code for {clean_path}."""
                         temperature=0.1,
                     )
                     bm = BudgetManager()
-                    cost = bm.record(input_tokens=resp.prompt_tokens, output_tokens=resp.completion_tokens, total_tokens=resp.total_tokens)
+                    cost = bm.record(
+                        input_tokens=resp.prompt_tokens,
+                        output_tokens=resp.completion_tokens,
+                        total_tokens=resp.total_tokens,
+                        cached_tokens=resp.cached_tokens,
+                    )
                     total_cost += cost
 
                     data = extract_json_payload(resp.content)
@@ -241,6 +246,8 @@ Please output the complete, corrected code for {clean_path}."""
             if current_build.success:
                 if self.console:
                     self.console.print(f"  [bold green]🎉 Build healed successfully in iteration {loop}![/bold green]\n")
+                from aztec_circle.engine.plan_manager import PlanManager
+                PlanManager.record_fix_iteration(output_dir=root, fixed_files=all_patched)
                 return FixResult(
                     success=True,
                     iterations=loop,
@@ -248,6 +255,10 @@ Please output the complete, corrected code for {clean_path}."""
                     patches_applied=all_patched,
                     total_cost_usd=round(total_cost, 6),
                 )
+
+        if all_patched:
+            from aztec_circle.engine.plan_manager import PlanManager
+            PlanManager.record_fix_iteration(output_dir=root, fixed_files=all_patched)
 
         return FixResult(
             success=current_build.success,

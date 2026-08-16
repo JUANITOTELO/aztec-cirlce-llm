@@ -11,7 +11,8 @@ import {
   Palette,
   SlidersHorizontal,
   ArrowDownToLine,
-  Magnet
+  Magnet,
+  Database
 } from 'lucide-react';
 import { POSE_PRESETS } from '../engine/PresetLibrary';
 import { GizmoMode, PoseData } from '../types/dummy13';
@@ -30,9 +31,10 @@ interface ToolbarProps {
   onToggleInspector: () => void;
   onToggleHelpModal: () => void;
   isGravityEnabled: boolean;
-  onToggleGravity: () => void;
+  onToggleGravity?: () => void;
   onDropToFloor: () => void;
   isInspectorOpen: boolean;
+  onOpenSavedPoses: () => void;
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({
@@ -48,10 +50,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onToggleThemeModal,
   onToggleInspector,
   onToggleHelpModal,
-  isInspectorOpen,
   isGravityEnabled,
   onToggleGravity,
-  onDropToFloor
+  onDropToFloor,
+  isInspectorOpen,
+  onOpenSavedPoses
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -169,6 +172,14 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           className="p-2 rounded-lg bg-dummyDark hover:bg-slate-800 text-slate-300 hover:text-white border border-dummyBorder transition"
         >
           <FlipHorizontal className="w-4 h-4" />
+        </button>
+        <button
+          onClick={onOpenSavedPoses}
+          title="Saved Poses Library (IndexedDB)"
+          className="p-2 rounded-lg bg-dummyDark hover:bg-slate-800 text-dummyAccent hover:text-white border border-dummyBorder hover:border-dummyAccent/50 transition flex items-center gap-1.5 text-xs font-semibold shadow-sm"
+        >
+          <Database className="w-4 h-4 text-dummyAccent" />
+          <span className="hidden sm:inline">Library</span>
         </button>
 
         <div className="h-5 w-[1px] bg-dummyBorder mx-1 hidden sm:block" />

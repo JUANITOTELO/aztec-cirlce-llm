@@ -88,3 +88,14 @@ export interface JointDefinition {
   weight?: number; // Limb mass in kg
   stiffness?: number; // Joint tightness from 0.0 (flaccid) to 1.0 (rigid lock)
 }
+
+export interface SavedPoseRecord extends PoseData {
+  thumbnail?: string;
+  tags?: string[];
+  isFavorite?: boolean;
+}
+
+export interface SavedThemeRecord extends MannequinTheme {
+  id: string;
+  createdAt: number;
+}

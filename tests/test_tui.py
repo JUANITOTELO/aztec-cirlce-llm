@@ -82,7 +82,7 @@ async def test_dispatch_slash_models():
     handled = await dispatch_slash_command("/models", state, console)
     assert handled is True
     out = console.export_text()
-    assert "Aztec Agent Model Assignments" in out
+    assert "Active Aztec Rank Model Assignments" in out
     assert "Youth" in out
     assert "Peer" in out
     assert "Elder" in out
@@ -261,5 +261,22 @@ async def test_start_interactive_session_initializes_cleanly():
     with patch("prompt_toolkit.PromptSession.prompt_async", side_effect=EOFError), \
          patch("aztec_circle.tui.renderer.print_welcome_banner"):
         await start_interactive_session()
+
+
+@pytest.mark.asyncio
+async def test_cmd_logs_reads_server_log_file(tmp_path):
+    from aztec_circle.tui.commands import cmd_logs
+
+    console = Console(record=True)
+    state = SessionState(output_dir=str(tmp_path))
+
+    log_file = tmp_path / ".aztec_server.log"
+    log_file.write_text("Line 1: Server ready on port 5173\nLine 2: HMR update App.tsx\n", encoding="utf-8")
+
+    await cmd_logs("", state, console)
+    out = console.export_text()
+    assert "Server ready on port 5173" in out
+    assert "HMR update App.tsx" in out
+
 
 

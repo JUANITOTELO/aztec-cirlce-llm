@@ -49,40 +49,102 @@ async def cmd_status(args: str, state: SessionState, console: Console) -> None:
     console.print(table)
 
 
+async def cmd_config(args: str, state: SessionState, console: Console) -> None:
+    """Open interactive configuration center or run subcommand: /config [keys|models|presets|test]"""
+    from aztec_circle.tui.config_ui import (
+        run_interactive_config_menu,
+        render_api_keys_table,
+        render_ranks_table,
+        render_presets_table,
+        run_test_models,
+    )
+
+    arg = args.strip().lower()
+    if not arg:
+        await run_interactive_config_menu(console, state)
+        return
+
+    if arg.startswith("key"):
+        render_api_keys_table(console)
+    elif arg.startswith("model"):
+        render_ranks_table(console)
+    elif arg.startswith("preset"):
+        render_presets_table(console)
+    elif arg.startswith("test"):
+        await run_test_models(console)
+    else:
+        await run_interactive_config_menu(console, state)
+
+
+async def cmd_keys(args: str, state: SessionState, console: Console) -> None:
+    """View or set API keys: /keys or /keys <KEY_NAME> <KEY_VALUE>"""
+    from aztec_circle.engine.config_manager import ConfigManager
+    from aztec_circle.tui.config_ui import render_api_keys_table
+
+    parts = args.strip().split(maxsplit=1)
+    if len(parts) == 2:
+        k_name, k_val = parts[0].upper(), parts[1].strip()
+        ConfigManager.save_api_key(k_name, k_val)
+        console.print(f"[bold green]✓ Successfully updated and saved {k_name} to ~/.aztec/config.env[/bold green]\n")
+        return
+
+    render_api_keys_table(console)
+    console.print("[dim]Usage to update: /keys <KEY_NAME> <KEY_VALUE>  (e.g., /keys GEMINI_API_KEY AIzaSy...)[/dim]\n")
+
+
 async def cmd_models(args: str, state: SessionState, console: Console) -> None:
-    """Display or change model assignments per agent rank."""
+    """Display or change model assignments per agent rank: /models or /models <RANK> <MODEL_ID>"""
+    from aztec_circle.engine.config_manager import ConfigManager
+    from aztec_circle.tui.config_ui import render_ranks_table, render_model_catalog_table
+
     parts = args.strip().split()
     if len(parts) >= 2:
         rank = parts[0].upper()
         model_name = parts[1]
         if rank in ("YOUTH", "PEER", "ELDER", "FALLBACK"):
-            if rank == "YOUTH":
-                settings.YOUTH_MODEL = model_name
-            elif rank == "PEER":
-                settings.PEER_MODEL = model_name
+            ConfigManager.save_model_assignment(rank, model_name)
+            if rank == "PEER":
                 state.primary_model = model_name
-            elif rank == "ELDER":
-                settings.ELDER_MODEL = model_name
-            elif rank == "FALLBACK":
-                settings.FALLBACK_MODEL = model_name
-            console.print(f"[bold green]Updated {rank} model to:[/bold green] {model_name}")
+            console.print(f"[bold green]✓ Updated and saved {rank} model to:[/bold green] {model_name}\n")
             return
         else:
-            console.print("[bold red]Invalid rank. Choose from: YOUTH, PEER, ELDER, FALLBACK[/bold red]")
+            console.print("[bold red]Invalid rank. Choose from: YOUTH, PEER, ELDER, FALLBACK[/bold red]\n")
             return
 
-    table = Table(title="Aztec Agent Model Assignments", header_style="bold gold1", expand=True)
-    table.add_column("Rank", style="bold cyan", width=12)
-    table.add_column("Role / Responsibility", style="dim", width=36)
-    table.add_column("Configured Model", style="bold green")
+    if args.strip().lower() == "catalog" or args.strip().lower() == "all":
+        render_model_catalog_table(console)
+        return
 
-    table.add_row("Youth", "Chaos Brainstorming & Devil's Advocate (Parallel)", settings.YOUTH_MODEL)
-    table.add_row("Peer", "Synthesis, Architecture & Code Drafting", settings.PEER_MODEL)
-    table.add_row("Elder", "Security Governance & Structural Performance Council", settings.ELDER_MODEL)
-    table.add_row("Fallback", "Provider Failover & Emergency Redirection", str(settings.FALLBACK_MODEL or "None"))
+    render_ranks_table(console)
+    console.print("[dim]Usage to assign: /models <YOUTH|PEER|ELDER|FALLBACK> <model_name>[/dim]")
+    console.print("[dim]Type '/models catalog' to view all available models across providers.[/dim]\n")
 
-    console.print(table)
-    console.print("[dim]Usage to update: /models <YOUTH|PEER|ELDER|FALLBACK> <model_name>[/dim]\n")
+
+async def cmd_preset(args: str, state: SessionState, console: Console) -> None:
+    """Apply an architecture preset: /preset <speed_budget|max_reasoning|google_suite|openai_suite|local_offline>"""
+    from aztec_circle.domain.model_catalog import PRESET_CONFIGURATIONS
+    from aztec_circle.engine.config_manager import ConfigManager
+    from aztec_circle.tui.config_ui import render_presets_table
+
+    preset_id = args.strip().lower()
+    if not preset_id:
+        render_presets_table(console)
+        return
+
+    if preset_id in PRESET_CONFIGURATIONS:
+        ConfigManager.apply_preset(preset_id)
+        state.primary_model = settings.PEER_MODEL
+        console.print(f"[bold green]✓ Successfully applied preset:[/bold green] {PRESET_CONFIGURATIONS[preset_id]['name']}")
+        console.print(f"[dim]{PRESET_CONFIGURATIONS[preset_id]['description']}[/dim]\n")
+    else:
+        console.print(f"[bold red]Unknown preset '{preset_id}'.[/bold red]")
+        render_presets_table(console)
+
+
+async def cmd_test_models(args: str, state: SessionState, console: Console) -> None:
+    """Probe active rank models with a live 1-token test ping."""
+    from aztec_circle.tui.config_ui import run_test_models
+    await run_test_models(console)
 
 
 async def cmd_policy(args: str, state: SessionState, console: Console) -> None:
@@ -217,10 +279,15 @@ async def cmd_test(args: str, state: SessionState, console: Console) -> None:
 
 async def cmd_start(args: str, state: SessionState, console: Console) -> None:
     """Start live background development server."""
-    from aztec_circle.engine.scaffolder import scaffold_project
+    import os
+    from aztec_circle.engine.scaffolder import scaffold_project, find_project_root
     from aztec_circle.engine.project_runner import ProjectRunner
 
     target = args.strip() or state.output_dir
+    if not os.path.exists(target) or target == "./aztec_output":
+        if os.path.exists("package.json") or os.path.exists("src"):
+            target = "."
+
     scaffold_res = scaffold_project(target)
     runner = ProjectRunner(console=console)
 
@@ -236,7 +303,40 @@ async def cmd_start(args: str, state: SessionState, console: Console) -> None:
 
     server_proc = await runner.start_dev_server(scaffold_res.project_root, port=5173)
     state.active_server = server_proc
-    console.print(f"[dim]Background dev server active on PID {server_proc.process.pid}. Use /stop to terminate.[/dim]\n")
+    console.print(f"[dim]Background dev server active on PID {server_proc.process.pid}. Use /stop to terminate, /logs to inspect.[/dim]\n")
+
+
+async def cmd_logs(args: str, state: SessionState, console: Console) -> None:
+    """View background development server logs: /logs [num_lines]"""
+    import os
+    from aztec_circle.engine.scaffolder import find_project_root
+
+    target = state.output_dir
+    if not os.path.exists(target) or target == "./aztec_output":
+        if os.path.exists("package.json") or os.path.exists("src"):
+            target = "."
+
+    root = find_project_root(target)
+    log_file = os.path.join(root, ".aztec_server.log")
+
+    if not os.path.exists(log_file):
+        console.print("[dim]No dev server log file found. Start the server with /start first.[/dim]\n")
+        return
+
+    num_lines = 30
+    if args.strip().isdigit():
+        num_lines = int(args.strip())
+
+    try:
+        with open(log_file, "r", encoding="utf-8", errors="replace") as f:
+            lines = f.readlines()
+        tail = lines[-num_lines:]
+        console.print(f"[bold cyan]Server Logs ({os.path.basename(log_file)} - last {len(tail)} lines):[/bold cyan]")
+        for l in tail:
+            console.print(f"  [dim]{l.rstrip()}[/dim]")
+        console.print()
+    except Exception as exc:
+        console.print(f"[bold red]Failed to read server logs:[/bold red] {exc}\n")
 
 
 async def cmd_stop(args: str, state: SessionState, console: Console) -> None:
@@ -388,12 +488,35 @@ async def cmd_update(args: str, state: SessionState, console: Console) -> None:
             console.print(f"[green]✓ {res.message}[/green] [dim](current: v{res.current_version})[/dim]\n")
         return
 
-    await updater.perform_update()
+async def cmd_plan(args: str, state: SessionState, console: Console) -> None:
+    """Display, synchronize, or inspect the living project blueprint (AZTEC_PLAN.md)."""
+    from aztec_circle.engine.plan_manager import PlanManager
+
+    target_dir = state.output_dir or "."
+    subcmd = args.strip().lower()
+
+    if subcmd == "sync":
+        p = PlanManager.sync_from_codebase(target_dir, goal=state.last_goal)
+        console.print(f"[bold green]✓ Synchronized Living Blueprint from source codebase:[/bold green] [underline]{p}[/underline]\n")
+        PlanManager.render_plan_dashboard(target_dir, console)
+    elif subcmd == "file":
+        p = PlanManager.get_plan_path(target_dir)
+        console.print(f"[bold cyan]Plan File Path:[/bold cyan] {p} [dim](Exists: {p.exists()})[/dim]\n")
+    else:
+        PlanManager.render_plan_dashboard(target_dir, console)
 
 
 COMMAND_HANDLERS: Dict[str, Callable[[str, SessionState, Console], Coroutine]] = {
     "/help": cmd_help,
     "/status": cmd_status,
+    "/plan": cmd_plan,
+    "/roadmap": cmd_plan,
+    "/config": cmd_config,
+    "/setup": cmd_config,
+    "/keys": cmd_keys,
+    "/preset": cmd_preset,
+    "/presets": cmd_preset,
+    "/test-models": cmd_test_models,
     "/models": cmd_models,
     "/policy": cmd_policy,
     "/runs": cmd_runs,
@@ -412,6 +535,8 @@ COMMAND_HANDLERS: Dict[str, Callable[[str, SessionState, Console], Coroutine]] =
     "/test": cmd_test,
     "/start": cmd_start,
     "/stop": cmd_stop,
+    "/logs": cmd_logs,
+    "/server-logs": cmd_logs,
     "/clear": cmd_clear,
     "/exit": cmd_exit,
     "/quit": cmd_exit,

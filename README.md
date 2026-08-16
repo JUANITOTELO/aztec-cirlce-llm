@@ -141,6 +141,7 @@ Automated end-to-end build runner:
 | `aztec` | Launch interactive TUI session (supports `Ctrl+V` image paste) | `aztec` |
 | `aztec run <goal>` | Execute full debate loop for a task (`--image`, `--paste` / `-P`) | `aztec run "Build a Kanban app" -B -S --paste` |
 | `aztec edit <instruction>`| Apply targeted line-range patch (`--image`, `--paste` / `-P`) | `aztec edit "Add dark mode toggle" -p ./app -P` |
+| `aztec config` | Manage API keys, model assignments, presets, and ping tests | `aztec config --preset max_reasoning` |
 | `aztec build <path>` | Scaffold, install deps, and build | `aztec build ./aztec_output` |
 | `aztec fix <path>` | Run self-healing compiler error repair | `aztec fix ./aztec_output` |
 | `aztec test <path>` | Execute project unit test suite | `aztec test ./aztec_output` |
@@ -157,6 +158,11 @@ Inside the interactive `aztec` TUI prompt:
 
 | Slash Command | Description |
 | :--- | :--- |
+| `/config` / `/setup` | **Open interactive configuration center** (API keys, models, presets, test) |
+| `/keys` | View status and securely set LLM provider API keys (`0600` permissions) |
+| `/models` | View model catalog and assign models to agent ranks (`/models catalog`) |
+| `/preset <name>` | Apply one-click architecture preset (`speed_budget`, `max_reasoning`, etc.) |
+| `/test-models` | Probe all active rank models with a live 1-token latency ping |
 | `Ctrl+V` / `Alt+V` | **Paste image directly from system clipboard** (updates prompt badge) |
 | `/paste` / `/paste-image` | Grab and attach image from system clipboard |
 | `/image <path_or_url>` | Attach reference image(s) or drag & dropped file path |
@@ -168,6 +174,7 @@ Inside the interactive `aztec` TUI prompt:
 | `/test` | Run project test suite |
 | `/start` | Launch live development server on port 5173 |
 | `/stop` | Stop background development server |
+| `/logs` | View background development server output logs |
 | `/update` | Check for and apply latest Aztec updates |
 | `/status` | View session spend, token usage, and active models |
 | `/runs` | List checkpointed task runs |

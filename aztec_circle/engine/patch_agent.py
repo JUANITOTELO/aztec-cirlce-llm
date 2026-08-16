@@ -218,11 +218,15 @@ class PatchAgent:
         # ----------------------------------------------------
         # ROUND 1: File Selector
         # ----------------------------------------------------
+        from aztec_circle.engine.plan_manager import PlanManager
+        plan_context = PlanManager.get_compact_plan_context(root)
+        plan_section = f"\n{plan_context}\n" if plan_context else ""
+
         index_context = self.indexer.to_prompt_context(index)
         round1_system = render("edit_file_selector")
         round1_user = f"""EDIT INSTRUCTION:
 {instruction}
-
+{plan_section}
 {index_context}
 
 Which files must be read and edited to fulfill this instruction?"""
@@ -239,7 +243,12 @@ Which files must be read and edited to fulfill this instruction?"""
                 temperature=0.1,
             )
             bm1 = BudgetManager()
-            total_cost += bm1.record(input_tokens=r1_resp.prompt_tokens, output_tokens=r1_resp.completion_tokens, total_tokens=r1_resp.total_tokens)
+            total_cost += bm1.record(
+                input_tokens=r1_resp.prompt_tokens,
+                output_tokens=r1_resp.completion_tokens,
+                total_tokens=r1_resp.total_tokens,
+                cached_tokens=r1_resp.cached_tokens,
+            )
             r1_data = extract_json_payload(r1_resp.content)
             files_to_read = r1_data.get("files_to_read", [])
 
@@ -285,7 +294,7 @@ Which files must be read and edited to fulfill this instruction?"""
 
         round2_user = f"""EDIT INSTRUCTION:
 {instruction}
-
+{plan_section}
 NUMBERED SOURCE FILES:
 {files_block}
 
@@ -303,7 +312,12 @@ Please generate the minimal, atomic JSON patches to fulfill the instruction."""
                 temperature=0.1,
             )
             bm2 = BudgetManager()
-            total_cost += bm2.record(input_tokens=r2_resp.prompt_tokens, output_tokens=r2_resp.completion_tokens, total_tokens=r2_resp.total_tokens)
+            total_cost += bm2.record(
+                input_tokens=r2_resp.prompt_tokens,
+                output_tokens=r2_resp.completion_tokens,
+                total_tokens=r2_resp.total_tokens,
+                cached_tokens=r2_resp.cached_tokens,
+            )
             r2_data = extract_json_payload(r2_resp.content)
             edit_summary = r2_data.get("edit_summary", "Applied code modifications.")
             raw_patches = r2_data.get("patches", [])
@@ -382,6 +396,10 @@ Please generate the minimal, atomic JSON patches to fulfill the instruction."""
                 self.console.print(f"  [bold green]✓ Successfully applied {len(patches)} atomic patch(es)![/bold green]")
                 if verbose:
                     self.console.print(f"  [dim]Telemetry: Round 1: {r1_resp.total_tokens:,} tok | Round 2: {r2_resp.total_tokens:,} tok | Total Cost: ${total_cost:.4f}[/dim]\n")
+
+            # Update Living Project Plan (AZTEC_PLAN.md)
+            applied_files = [p.file for p in patches]
+            PlanManager.record_edit_iteration(output_dir=root, instruction=instruction, modified_files=applied_files)
 
             return PatchResult(
                 success=True,

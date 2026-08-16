@@ -3,8 +3,13 @@ from typing import Optional
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Load .env file
+from pathlib import Path
+
+# Load local .env and user ~/.aztec/config.env
 load_dotenv()
+_user_cfg = Path("~/.aztec/config.env").expanduser()
+if _user_cfg.exists():
+    load_dotenv(dotenv_path=_user_cfg)
 
 
 def is_valid_key(key: Optional[str]) -> bool:
@@ -35,13 +40,18 @@ class Settings(BaseSettings):
     GOOGLE_AI_API_KEY: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None
     OPENAI_API_KEY: Optional[str] = None
+    DEEPSEEK_API_KEY: Optional[str] = None
+    GROQ_API_KEY: Optional[str] = None
+    MISTRAL_API_KEY: Optional[str] = None
+    OPENROUTER_API_KEY: Optional[str] = None
+    COHERE_API_KEY: Optional[str] = None
     OLLAMA_BASE_URL: str = "http://localhost:11434"
 
     # Model configuration
-    YOUTH_MODEL: str = "gemini/gemini-2.5-flash"
-    PEER_MODEL: str = "gemini/gemini-2.5-flash"
+    YOUTH_MODEL: str = "gemini/gemini-3.7-flash"
+    PEER_MODEL: str = "gemini/gemini-3.7-flash"
     ELDER_MODEL: str = "gemini/gemini-2.5-pro"
-    FALLBACK_MODEL: Optional[str] = "gemini/gemini-2.5-flash"
+    FALLBACK_MODEL: Optional[str] = "gemini/gemini-3.7-flash"
 
     # Debate governance
     MAX_DEBATE_LOOPS: int = 2
@@ -57,7 +67,7 @@ class Settings(BaseSettings):
     CHECKPOINT_DB_PATH: str = "./aztec_runs.db"
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(".env", str(_user_cfg)),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -82,6 +92,18 @@ if is_valid_key(settings.OPENAI_API_KEY):
     os.environ["OPENAI_API_KEY"] = settings.OPENAI_API_KEY
 else:
     os.environ.pop("OPENAI_API_KEY", None)
+
+if is_valid_key(settings.DEEPSEEK_API_KEY):
+    os.environ["DEEPSEEK_API_KEY"] = settings.DEEPSEEK_API_KEY
+
+if is_valid_key(settings.GROQ_API_KEY):
+    os.environ["GROQ_API_KEY"] = settings.GROQ_API_KEY
+
+if is_valid_key(settings.MISTRAL_API_KEY):
+    os.environ["MISTRAL_API_KEY"] = settings.MISTRAL_API_KEY
+
+if is_valid_key(settings.OPENROUTER_API_KEY):
+    os.environ["OPENROUTER_API_KEY"] = settings.OPENROUTER_API_KEY
 
 has_anthropic = is_valid_key(os.environ.get("ANTHROPIC_API_KEY"))
 has_openai = is_valid_key(os.environ.get("OPENAI_API_KEY"))

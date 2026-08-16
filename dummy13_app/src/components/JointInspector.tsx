@@ -33,7 +33,11 @@ export const JointInspector: React.FC<JointInspectorProps> = ({
   }
 
   const def = JOINT_DEFINITIONS[selectedJointId];
-  const euler = new THREE.Euler().setFromQuaternion(rotation, 'XYZ');
+  const canonicalQuat = rotation.clone().normalize();
+  if (canonicalQuat.w < 0) {
+    canonicalQuat.set(-canonicalQuat.x, -canonicalQuat.y, -canonicalQuat.z, -canonicalQuat.w);
+  }
+  const euler = new THREE.Euler().setFromQuaternion(canonicalQuat, 'XYZ');
 
   const handleEulerChange = (axis: 'x' | 'y' | 'z', degrees: number) => {
     const rad = THREE.MathUtils.degToRad(degrees);
@@ -42,7 +46,6 @@ export const JointInspector: React.FC<JointInspectorProps> = ({
     const newQuat = new THREE.Quaternion().setFromEuler(newEuler);
     onUpdateRotation(selectedJointId, newQuat);
   };
-
   const degX = THREE.MathUtils.radToDeg(euler.x);
   const degY = THREE.MathUtils.radToDeg(euler.y);
   const degZ = THREE.MathUtils.radToDeg(euler.z);

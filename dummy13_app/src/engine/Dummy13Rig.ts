@@ -57,7 +57,6 @@ export const JOINT_DEFINITIONS: Record<JointId, JointDefinition> = {
     side: 'center',
     weight: 1.5
   },
-  // Left Arm
   clavicle_l: {
     id: 'clavicle_l',
     name: 'Clavicle (L)',
@@ -103,7 +102,6 @@ export const JOINT_DEFINITIONS: Record<JointId, JointDefinition> = {
     side: 'left',
     weight: 0.3
   },
-  // Right Arm
   clavicle_r: {
     id: 'clavicle_r',
     name: 'Clavicle (R)',
@@ -149,7 +147,6 @@ export const JOINT_DEFINITIONS: Record<JointId, JointDefinition> = {
     side: 'right',
     weight: 0.3
   },
-  // Left Leg
   hip_l: {
     id: 'hip_l',
     name: 'Hip (L)',
@@ -186,7 +183,6 @@ export const JOINT_DEFINITIONS: Record<JointId, JointDefinition> = {
     side: 'left',
     weight: 0.5
   },
-  // Right Leg
   hip_r: {
     id: 'hip_r',
     name: 'Hip (R)',
@@ -225,16 +221,87 @@ export const JOINT_DEFINITIONS: Record<JointId, JointDefinition> = {
   }
 };
 
+const _gravityDir = new THREE.Vector3(0, -9.81, 0);
+const _parentWorldQuat = new THREE.Quaternion();
+const _invParentWorldQuat = new THREE.Quaternion();
+const _gParent = new THREE.Vector3();
+const _rParent = new THREE.Vector3();
+const _torqueAxis = new THREE.Vector3();
+const _deltaQuat = new THREE.Quaternion();
+const _qNext = new THREE.Quaternion();
+const _tempBox = new THREE.Box3();
+const _comVec = new THREE.Vector3();
+const _qDiff = new THREE.Quaternion();
+const _qInvCurrent = new THREE.Quaternion();
+const _springTorque = new THREE.Vector3();
+const _gravTorque = new THREE.Vector3();
+const _totalTorque = new THREE.Vector3();
+
+const PHYSICS_JOINT_ORDER: JointId[] = [
+  'spine_lower',
+  'spine_upper',
+  'neck',
+  'head',
+  'clavicle_l',
+  'shoulder_l',
+  'elbow_l',
+  'wrist_l',
+  'hand_l',
+  'clavicle_r',
+  'shoulder_r',
+  'elbow_r',
+  'wrist_r',
+  'hand_r',
+  'hip_l',
+  'knee_l',
+  'ankle_l',
+  'foot_l',
+  'hip_r',
+  'knee_r',
+  'ankle_r',
+  'foot_r'
+];
+
+const SUBTREE_MASS: Record<JointId, number> = {
+  root: 0,
+  pelvis: 18.0,
+  spine_lower: 13.5,
+  spine_upper: 11.3,
+  neck: 2.1,
+  head: 1.5,
+  clavicle_l: 3.8,
+  shoulder_l: 3.2,
+  elbow_l: 1.8,
+  wrist_l: 0.8,
+  hand_l: 0.3,
+  clavicle_r: 3.8,
+  shoulder_r: 3.2,
+  elbow_r: 1.8,
+  wrist_r: 0.8,
+  hand_r: 0.3,
+  hip_l: 6.3,
+  knee_l: 3.3,
+  ankle_l: 1.3,
+  foot_l: 0.5,
+  hip_r: 6.3,
+  knee_r: 3.3,
+  ankle_r: 1.3,
+  foot_r: 0.5
+};
+
 export class Dummy13Rig {
   public rootGroup: THREE.Group;
   public jointNodes: Map<JointId, THREE.Group> = new Map();
   public jointMeshMap: Map<JointId, THREE.Mesh[]> = new Map();
   public armorMeshes: THREE.Mesh[] = [];
   public frameMeshes: THREE.Mesh[] = [];
+  public solidMeshes: THREE.Mesh[] = [];
   public jointSpheres: Map<JointId, THREE.Mesh> = new Map();
   public hitHandles: Map<JointId, THREE.Mesh> = new Map();
   
   public jointStiffness: Map<JointId, number> = new Map();
+  public targetRotations: Map<JointId, THREE.Quaternion> = new Map();
+  public jointAngularVelocity: Map<JointId, THREE.Vector3> = new Map();
   private armorMaterial: THREE.MeshStandardMaterial;
   private frameMaterial: THREE.MeshStandardMaterial;
   private jointMaterial: THREE.MeshStandardMaterial;
@@ -252,7 +319,6 @@ export class Dummy13Rig {
     this.rootGroup = new THREE.Group();
     this.rootGroup.name = 'Dummy13_Rig';
 
-    // Create PBR materials matching Dummy 13 3D-printed aesthetics
     this.armorMaterial = new THREE.MeshStandardMaterial({
       color: new THREE.Color(theme.armorColor),
       roughness: theme.roughness,
@@ -310,15 +376,17 @@ export class Dummy13Rig {
     });
 
     Object.values(JOINT_DEFINITIONS).forEach((def) => {
-      this.jointStiffness.set(def.id, 0.85);
+      this.jointStiffness.set(def.id, 0.9);
+      this.targetRotations.set(def.id, new THREE.Quaternion());
+      this.jointAngularVelocity.set(def.id, new THREE.Vector3(0, 0, 0));
     });
 
     this.buildSkeletonHierarchy();
     this.generateDummy13Geometry();
+    this.cacheSolidMeshes();
   }
 
   private buildSkeletonHierarchy(): void {
-    // Create Groups for each joint
     Object.values(JOINT_DEFINITIONS).forEach((def) => {
       const jointNode = new THREE.Group();
       jointNode.name = `joint_${def.id}`;
@@ -326,7 +394,6 @@ export class Dummy13Rig {
       this.jointNodes.set(def.id, jointNode);
     });
 
-    // Establish Parent-Child Hierarchy
     Object.values(JOINT_DEFINITIONS).forEach((def) => {
       const jointNode = this.jointNodes.get(def.id)!;
       if (def.parentId === null) {
@@ -341,8 +408,7 @@ export class Dummy13Rig {
   }
 
   private generateDummy13Geometry(): void {
-    // 1. Pelvis (Waist core frame + armor)
-    const pelvisNode = this.jointNodes.get('pelvis')!
+    const pelvisNode = this.jointNodes.get('pelvis')!;
     const pelvisFrame = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.12, 0.16, 8), this.frameMaterial);
     pelvisFrame.castShadow = true;
     pelvisNode.add(pelvisFrame);
@@ -355,7 +421,6 @@ export class Dummy13Rig {
     this.armorMeshes.push(pelvisArmor);
     this.attachHandle(pelvisNode, 'pelvis', 0.2);
 
-    // 2. Spine Lower (Abdominal segment)
     const spineLNode = this.jointNodes.get('spine_lower')!;
     const abFrame = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.12, 0.18, 8), this.frameMaterial);
     abFrame.position.set(0, 0.09, 0);
@@ -370,7 +435,6 @@ export class Dummy13Rig {
     this.armorMeshes.push(abArmor);
     this.attachHandle(spineLNode, 'spine_lower', 0.16);
 
-    // 3. Spine Upper (Chest + Ribcage)
     const spineUNode = this.jointNodes.get('spine_upper')!;
     const chestArmor = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.24, 0.24), this.armorMaterial);
     chestArmor.position.set(0, 0.12, 0);
@@ -378,13 +442,16 @@ export class Dummy13Rig {
     spineUNode.add(chestArmor);
     this.armorMeshes.push(chestArmor);
 
-    const backPlate = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.18, 0.08), this.visorMaterial);
-    backPlate.position.set(0, 0.14, -0.11);
-    spineUNode.add(backPlate);
-    this.armorMeshes.push(backPlate);
-    this.attachHandle(spineUNode, 'spine_upper', 0.22);
+    const chestPlate = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.16, 0.04), this.frameMaterial);
+    chestPlate.position.set(0, 0.13, 0.11);
+    spineUNode.add(chestPlate);
+    this.frameMeshes.push(chestPlate);
 
-    // 4. Neck & Head
+    const backPlate = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.16, 0.04), this.frameMaterial);
+    backPlate.position.set(0, 0.13, -0.11);
+    spineUNode.add(backPlate);
+    this.frameMeshes.push(backPlate);
+
     const neckNode = this.jointNodes.get('neck')!;
     const neckMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.14, 8), this.frameMaterial);
     neckMesh.position.set(0, 0.07, 0);
@@ -404,23 +471,18 @@ export class Dummy13Rig {
     headNode.add(visorMesh);
     this.attachHandle(headNode, 'head', 0.18);
 
-    // 5. Clavicles & Arms (Left & Right)
     this.buildLimb('l', 1);
     this.buildLimb('r', -1);
-
-    // 6. Legs (Left & Right)
     this.buildLeg('l', 1);
     this.buildLeg('r', -1);
   }
 
   private buildLimb(side: 'l' | 'r', dir: number): void {
-    // Clavicle / Shoulder socket
     const clavNode = this.jointNodes.get(`clavicle_${side}` as JointId)!;
     const clavMesh = new THREE.Mesh(new THREE.SphereGeometry(0.08, 12, 12), this.jointMaterial);
     clavNode.add(clavMesh);
     this.attachHandle(clavNode, `clavicle_${side}` as JointId, 0.1);
 
-    // Shoulder armor
     const shNode = this.jointNodes.get(`shoulder_${side}` as JointId)!;
     const shPad = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.18, 0.18), this.armorMaterial);
     shPad.position.set(0.02 * dir, -0.05, 0);
@@ -428,7 +490,6 @@ export class Dummy13Rig {
     shNode.add(shPad);
     this.armorMeshes.push(shPad);
 
-    // Upper Arm Bone
     const bicepMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.06, 0.28, 8), this.frameMaterial);
     bicepMesh.position.set(0, -0.18, 0);
     bicepMesh.castShadow = true;
@@ -436,13 +497,11 @@ export class Dummy13Rig {
     this.frameMeshes.push(bicepMesh);
     this.attachHandle(shNode, `shoulder_${side}` as JointId, 0.14);
 
-    // Elbow Joint
     const elNode = this.jointNodes.get(`elbow_${side}` as JointId)!;
     const elJoint = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.12, 12), this.jointMaterial);
     elJoint.rotation.z = Math.PI / 2;
     elNode.add(elJoint);
 
-    // Forearm
     const forearmMesh = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.26, 0.14), this.armorMaterial);
     forearmMesh.position.set(0, -0.16, 0);
     forearmMesh.castShadow = true;
@@ -450,7 +509,6 @@ export class Dummy13Rig {
     this.armorMeshes.push(forearmMesh);
     this.attachHandle(elNode, `elbow_${side}` as JointId, 0.14);
 
-    // Wrist & Hand
     const wrNode = this.jointNodes.get(`wrist_${side}` as JointId)!;
     const handMesh = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, 0.06), this.frameMaterial);
     handMesh.position.set(0, -0.07, 0);
@@ -461,11 +519,9 @@ export class Dummy13Rig {
 
   private buildLeg(side: 'l' | 'r', _dir: number): void {
     const hipNode = this.jointNodes.get(`hip_${side}` as JointId)!;
-    // Hip socket sphere
     const hipSphere = new THREE.Mesh(new THREE.SphereGeometry(0.09, 12, 12), this.jointMaterial);
     hipNode.add(hipSphere);
 
-    // Thigh armor & core
     const thighArmor = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.36, 0.2), this.armorMaterial);
     thighArmor.position.set(0, -0.22, 0);
     thighArmor.castShadow = true;
@@ -473,7 +529,6 @@ export class Dummy13Rig {
     this.armorMeshes.push(thighArmor);
     this.attachHandle(hipNode, `hip_${side}` as JointId, 0.18);
 
-    // Knee Joint
     const kneeNode = this.jointNodes.get(`knee_${side}` as JointId)!;
     const kneeJoint = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.14, 12), this.jointMaterial);
     kneeJoint.rotation.z = Math.PI / 2;
@@ -486,7 +541,6 @@ export class Dummy13Rig {
     this.armorMeshes.push(shinArmor);
     this.attachHandle(kneeNode, `knee_${side}` as JointId, 0.18);
 
-    // Ankle & Foot
     const ankleNode = this.jointNodes.get(`ankle_${side}` as JointId)!;
     const ankleJoint = new THREE.Mesh(new THREE.SphereGeometry(0.07, 12, 12), this.jointMaterial);
     ankleNode.add(ankleJoint);
@@ -505,7 +559,7 @@ export class Dummy13Rig {
       this.handleMaterial
     );
     handle.userData = { isJointHandle: true, jointId };
-    handle.renderOrder = 9999; // Always render on top of meshes
+    handle.renderOrder = 9999;
     node.add(handle);
     this.hitHandles.set(jointId, handle);
   }
@@ -516,12 +570,20 @@ export class Dummy13Rig {
     });
   }
 
-  public setJointRotation(jointId: JointId, quaternion: THREE.Quaternion): void {
+  public setJointRotation(jointId: JointId, quaternion: THREE.Quaternion, updateTarget: boolean = true): void {
     const node = this.jointNodes.get(jointId);
     const def = JOINT_DEFINITIONS[jointId];
     if (node && def) {
       const clamped = clampJointRotation(quaternion, def.constraints);
       node.quaternion.copy(clamped);
+      if (updateTarget) {
+        const target = this.targetRotations.get(jointId);
+        if (target) {
+          target.copy(clamped);
+        }
+        const vel = this.jointAngularVelocity.get(jointId);
+        if (vel) vel.set(0, 0, 0);
+      }
     }
   }
 
@@ -546,8 +608,6 @@ export class Dummy13Rig {
   }
 
   public setJointPosition(jointId: JointId, position: THREE.Vector3): void {
-    // Only the root pelvis core can be translated in world space;
-    // all child joints remain fixed in their parent socket positions.
     if (jointId !== 'pelvis' && jointId !== 'root') {
       return;
     }
@@ -586,138 +646,135 @@ export class Dummy13Rig {
     }
   }
 
-  public updateTheme(theme: MannequinTheme): void {
-    this.currentTheme = theme;
-    this.armorMaterial.color.set(theme.armorColor);
-    this.armorMaterial.roughness = theme.roughness;
-    this.armorMaterial.metalness = theme.metalness;
-
-    this.frameMaterial.color.set(theme.frameColor);
-    this.jointMaterial.color.set(theme.jointColor);
-    this.visorMaterial.color.set(theme.accentColor);
-    this.visorMaterial.emissive.set(theme.accentColor);
-  }
-
-  public resetPose(): void {
-    Object.values(JOINT_DEFINITIONS).forEach((def) => {
-      const node = this.jointNodes.get(def.id);
-      if (node) {
-        node.quaternion.identity();
-        node.position.set(...def.defaultOffset);
-      }
-    });
-  }
-
-  public mirrorPose(fromSide: 'left' | 'right'): void {
-    const sidePairs: [JointId, JointId][] = [
-      ['clavicle_l', 'clavicle_r'],
-      ['shoulder_l', 'shoulder_r'],
-      ['elbow_l', 'elbow_r'],
-      ['wrist_l', 'wrist_r'],
-      ['hand_l', 'hand_r'],
-      ['hip_l', 'hip_r'],
-      ['knee_l', 'knee_r'],
-      ['ankle_l', 'ankle_r'],
-      ['foot_l', 'foot_r']
-    ];
-
-    sidePairs.forEach(([lId, rId]) => {
-      const srcId = fromSide === 'left' ? lId : rId;
-      const dstId = fromSide === 'left' ? rId : lId;
-      const srcNode = this.jointNodes.get(srcId);
-      const dstNode = this.jointNodes.get(dstId);
-      if (srcNode && dstNode) {
-        const q = srcNode.quaternion.clone();
-        // Invert X/Z components for bilateral mirror
-        dstNode.quaternion.set(q.x, -q.y, -q.z, q.w);
-      }
-    });
-  }
-
-  public getLowestY(): number {
-    let lowest = Infinity;
-    const tempBox = new THREE.Box3();
-    const handleSet = new Set(this.hitHandles.values());
-
-    this.rootGroup.traverse((child) => {
-      if (child instanceof THREE.Mesh && !handleSet.has(child) && child.geometry) {
-        tempBox.setFromObject(child);
-        if (tempBox.min.y < lowest) {
-          lowest = tempBox.min.y;
+  public applyPose(pose: { joints?: Record<string, { rotation?: THREE.Quaternion | { x: number; y: number; z: number; w: number }; position?: { x: number; y: number; z: number } }> }, updateTargets: boolean = true): void {
+    if (!pose || !pose.joints) return;
+    Object.entries(pose.joints).forEach(([jointId, jointData]) => {
+      const id = jointId as JointId;
+      if (jointData.rotation) {
+        let quat: THREE.Quaternion;
+        if (jointData.rotation instanceof THREE.Quaternion) {
+          quat = jointData.rotation;
+        } else {
+          const r = jointData.rotation as any;
+          quat = new THREE.Quaternion(r._x ?? r.x ?? 0, r._y ?? r.y ?? 0, r._z ?? r.z ?? 0, r._w ?? r.w ?? 1);
         }
+        this.setJointRotation(id, quat, updateTargets);
+      }
+      if (jointData.position && (id === 'pelvis' || id === 'root')) {
+        this.setJointPosition(id, new THREE.Vector3(jointData.position.x, jointData.position.y, jointData.position.z));
       }
     });
-    return lowest;
+    this.rootGroup.updateMatrixWorld(true);
+  }
+
+  private cacheSolidMeshes(): void {
+    this.solidMeshes = [...this.armorMeshes, ...this.frameMeshes];
   }
 
   public applyGravitySag(dt: number, excludedJoint?: JointId | null): void {
-    const gravityDir = new THREE.Vector3(0, -1, 0);
-    const parentWorldQuat = new THREE.Quaternion();
-    const invParentWorldQuat = new THREE.Quaternion();
-    const childPos = new THREE.Vector3();
-    const jointPos = new THREE.Vector3();
-    const armVec = new THREE.Vector3();
-    const torqueAxis = new THREE.Vector3();
-    const deltaQuat = new THREE.Quaternion();
-    const worldQuat = new THREE.Quaternion();
-    const jointFriction = 3.2;
+    const clampedDt = Math.min(dt, 0.066);
+    const maxSubDt = 0.016;
+    const subSteps = Math.max(1, Math.ceil(clampedDt / maxSubDt));
+    const subDt = clampedDt / subSteps;
 
-    Object.values(JOINT_DEFINITIONS).forEach((def) => {
-      if (def.id === 'root' || def.id === 'pelvis' || def.id === excludedJoint) return;
-      const node = this.jointNodes.get(def.id);
-      if (!node) return;
+    for (let step = 0; step < subSteps; step++) {
+      for (let j = 0; j < PHYSICS_JOINT_ORDER.length; j++) {
+        const id = PHYSICS_JOINT_ORDER[j];
+        if (id === excludedJoint) continue;
 
-      const stiffness = this.getJointStiffness(def.id);
-      const compliance = 1 - stiffness;
-      if (compliance <= 0.001) return;
+        const def = JOINT_DEFINITIONS[id];
+        const node = this.jointNodes.get(id);
+        if (!node || !def) continue;
 
-      const weight = def.weight ?? 1.0;
-      if (weight <= 0) return;
+        const stiffness = this.getJointStiffness(id);
+        const angVel = this.jointAngularVelocity.get(id);
+        if (!angVel) continue;
 
-      node.getWorldPosition(jointPos);
-      const centerOfMassLocal = new THREE.Vector3(0, -0.2, 0);
+        const targetQuat = this.targetRotations.get(id) || new THREE.Quaternion();
 
-      if (node.children.length > 0) {
-        const childJoint = node.children.find((c) => c.name.startsWith('joint_')) as THREE.Group | undefined;
-        if (childJoint) {
-          centerOfMassLocal.copy(childJoint.position).multiplyScalar(0.5);
-        } else if (def.id.startsWith('foot')) {
-          centerOfMassLocal.set(0, -0.04, 0.08);
-        } else if (def.id.startsWith('hand')) {
-          centerOfMassLocal.set(0, -0.1, 0);
-        } else if (def.id === 'head') {
-          centerOfMassLocal.set(0, 0.14, 0);
+        if (stiffness >= 0.999) {
+          node.quaternion.copy(targetQuat);
+          angVel.set(0, 0, 0);
+          continue;
         }
-      }
 
-      node.localToWorld(childPos.copy(centerOfMassLocal));
-      armVec.subVectors(childPos, jointPos);
-      const armLength = armVec.length();
-      if (armLength < 0.001) return;
+        const compliance = Math.max(0, 1 - stiffness);
+        const effectiveMass = SUBTREE_MASS[id] ?? (def.weight || 1.0);
 
-      armVec.normalize();
-      torqueAxis.crossVectors(armVec, gravityDir);
-      const torqueMag = torqueAxis.length();
+        _qInvCurrent.copy(node.quaternion).invert();
+        _qDiff.multiplyQuaternions(targetQuat, _qInvCurrent);
+        if (_qDiff.w < 0) {
+          _qDiff.set(-_qDiff.x, -_qDiff.y, -_qDiff.z, -_qDiff.w);
+        }
 
-      if (torqueMag > 0.001) {
-        torqueAxis.normalize();
-        const sagAngle = Math.min(torqueMag * weight * dt * jointFriction * compliance, 0.08);
-        deltaQuat.setFromAxisAngle(torqueAxis, sagAngle);
+        const halfAngle = Math.acos(THREE.MathUtils.clamp(_qDiff.w, -1, 1));
+        const diffAngle = 2 * halfAngle;
+        _springTorque.set(0, 0, 0);
+
+        if (diffAngle > 0.0001) {
+          const sinHalf = Math.sin(halfAngle);
+          if (sinHalf > 0.0001) {
+            _springTorque.set(_qDiff.x / sinHalf, _qDiff.y / sinHalf, _qDiff.z / sinHalf);
+            const springK = (stiffness * stiffness * 180.0) + (stiffness * 40.0);
+            _springTorque.multiplyScalar(diffAngle * springK);
+          }
+        }
 
         if (node.parent) {
-          node.parent.getWorldQuaternion(parentWorldQuat);
-          invParentWorldQuat.copy(parentWorldQuat).invert();
+          node.parent.getWorldQuaternion(_parentWorldQuat);
+          _invParentWorldQuat.copy(_parentWorldQuat).invert();
+          _gParent.copy(_gravityDir).applyQuaternion(_invParentWorldQuat);
         } else {
-          invParentWorldQuat.identity();
+          _gParent.copy(_gravityDir);
         }
 
-        node.getWorldQuaternion(worldQuat);
-        worldQuat.premultiply(deltaQuat);
-        const newLocalQuat = invParentWorldQuat.multiply(worldQuat);
-        const clamped = clampJointRotation(newLocalQuat, def.constraints);
-        node.quaternion.slerp(clamped, 0.85);
+        _comVec.set(0, -0.15, 0);
+        if (id.startsWith('clavicle_l')) _comVec.set(0.09, 0, 0);
+        else if (id.startsWith('clavicle_r')) _comVec.set(-0.09, 0, 0);
+        else if (id.startsWith('shoulder')) _comVec.set(0, -0.18, 0);
+        else if (id.startsWith('elbow')) _comVec.set(0, -0.16, 0);
+        else if (id.startsWith('wrist')) _comVec.set(0, -0.05, 0);
+        else if (id.startsWith('hand')) _comVec.set(0, -0.06, 0);
+        else if (id.startsWith('hip')) _comVec.set(0, -0.22, 0);
+        else if (id.startsWith('knee')) _comVec.set(0, -0.22, 0);
+        else if (id.startsWith('ankle')) _comVec.set(0, -0.04, 0.04);
+        else if (id.startsWith('foot')) _comVec.set(0, -0.02, 0.06);
+        else if (id === 'head') _comVec.set(0, 0.12, 0);
+        else if (id === 'neck') _comVec.set(0, 0.08, 0);
+        else if (id === 'spine_upper') _comVec.set(0, 0.13, 0);
+        else if (id === 'spine_lower') _comVec.set(0, 0.11, 0);
+
+        _rParent.copy(_comVec).applyQuaternion(node.quaternion);
+        _gravTorque.crossVectors(_rParent, _gParent).multiplyScalar(effectiveMass * compliance);
+
+        _totalTorque.addVectors(_springTorque, _gravTorque);
+        const momentOfInertia = Math.max(0.05, effectiveMass * 0.12);
+        angVel.addScaledVector(_totalTorque.divideScalar(momentOfInertia), subDt);
+
+        const friction = 18.0 * (0.2 + stiffness * 0.8);
+        const dampingFactor = Math.exp(-friction * subDt);
+        angVel.multiplyScalar(dampingFactor);
+
+        const speed = angVel.length();
+        if (speed > 0.0001) {
+          const sagAngle = Math.min(speed * subDt, 0.35);
+          _torqueAxis.copy(angVel).multiplyScalar(1 / speed);
+          _deltaQuat.setFromAxisAngle(_torqueAxis, sagAngle);
+          _qNext.multiplyQuaternions(_deltaQuat, node.quaternion);
+          const clamped = clampJointRotation(_qNext, def.constraints);
+          node.quaternion.copy(clamped);
+        }
       }
-    });
+    }
+  }
+
+  public getLowestY(): number {
+    _tempBox.makeEmpty();
+    this.rootGroup.updateMatrixWorld(true);
+    for (const mesh of this.solidMeshes) {
+      _tempBox.expandByObject(mesh);
+    }
+    return _tempBox.isEmpty() ? 0 : _tempBox.min.y;
   }
 
   public clampToFloor(): void {
@@ -742,8 +799,18 @@ export class Dummy13Rig {
     }
   }
 
+  public setTheme(theme: MannequinTheme): void {
+    this.currentTheme = theme;
+    this.armorMaterial.color.set(theme.armorColor);
+    this.armorMaterial.roughness = theme.roughness;
+    this.armorMaterial.metalness = theme.metalness;
+    this.frameMaterial.color.set(theme.frameColor);
+    this.jointMaterial.color.set(theme.jointColor);
+    this.visorMaterial.color.set(theme.accentColor);
+    this.visorMaterial.emissive.set(theme.accentColor);
+  }
+
   public dispose(): void {
-    // Full GPU memory leak prevention: traverse and dispose geometries and materials
     this.rootGroup.traverse((obj) => {
       if (obj instanceof THREE.Mesh) {
         if (obj.geometry) {

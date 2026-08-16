@@ -16,14 +16,15 @@ from aztec_circle.engine.scaffolder import (
 from aztec_circle.engine.project_runner import ProjectRunner, CommandResult, ServerProcess, PortInUseError
 from aztec_circle.engine.build_fixer import BuildFixAgent, FixResult, TSError
 from aztec_circle.engine.project_indexer import ProjectIndexer, ProjectIndex, FileIndex
-from aztec_circle.engine.patch_agent import PatchAgent, PatchApplicator, FilePatch, PatchResult
 from aztec_circle.engine.updater import AztecUpdater, UpdateCheckResult, UpdateExecutionResult
+from aztec_circle.engine.plan_manager import PlanManager
 
 __all__ = [
     "BudgetManager",
     "CheckpointStore",
     "ConsensusEngine",
     "AztecOrchestrator",
+    "PlanManager",
     "scaffold_project",
     "find_project_root",
     "ScaffoldResult",

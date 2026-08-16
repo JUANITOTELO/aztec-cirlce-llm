@@ -5,9 +5,11 @@ import { Toolbar } from './components/Toolbar';
 import { JointInspector } from './components/JointInspector';
 import { ThemeCustomizer } from './components/ThemeCustomizer';
 import { HelpModal } from './components/HelpModal';
+import { SavedPosesModal } from './components/SavedPosesModal';
 import { ViewportEngine } from './engine/ViewportEngine';
 import { POSE_PRESETS } from './engine/PresetLibrary';
-import { JointId, MannequinTheme, GizmoMode, TransformSpace, PoseData } from './types/dummy13';
+import { JointId, MannequinTheme, GizmoMode, TransformSpace, PoseData, SavedPoseRecord } from './types/dummy13';
+import { dbService } from './services/db';
 
 const DEFAULT_THEME: MannequinTheme = {
   name: 'Cyberpunk Neon',
@@ -29,11 +31,12 @@ export const App: React.FC = () => {
   const [gizmoSpace, setGizmoSpace] = useState<TransformSpace>('local');
   const [selectedJointId, setSelectedJointId] = useState<JointId | null>(null);
   const [selectedJointRotation, setSelectedJointRotation] = useState<THREE.Quaternion>(new THREE.Quaternion());
+  const [selectedJointStiffness, setSelectedJointStiffness] = useState<number>(0.5);
+  const [isGravityEnabled, setIsGravityEnabled] = useState<boolean>(false);
   
-  const [selectedJointStiffness, setSelectedJointStiffness] = useState<number>(0.85);
-  const [isGravityEnabled, setIsGravityEnabled] = useState<boolean>(true);
   const [isThemeModalOpen, setIsThemeModalOpen] = useState<boolean>(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState<boolean>(false);
+  const [isSavedPosesOpen, setIsSavedPosesOpen] = useState<boolean>(false);
   const [isInspectorOpen, setIsInspectorOpen] = useState<boolean>(true);
 
   const handleSelectPreset = useCallback((preset: PoseData) => {
@@ -48,13 +51,47 @@ export const App: React.FC = () => {
 
   const handleResetPose = useCallback(() => {
     if (engineRef.current) {
-      engineRef.current.rig.resetPose();
+      const rig = engineRef.current.rig as any;
+      if (typeof rig.resetPose === 'function') {
+        rig.resetPose();
+      } else {
+        const tPose = POSE_PRESETS.find((p) => p.id === 't_pose');
+        if (tPose) {
+          engineRef.current.applyPose(tPose.joints as any);
+        }
+      }
       setCurrentPoseId('t_pose');
       if (selectedJointId) {
         setSelectedJointRotation(engineRef.current.rig.getJointRotation(selectedJointId));
       }
     }
   }, [selectedJointId]);
+
+  useEffect(() => {
+    const restoreSession = async () => {
+      try {
+        const savedTheme = await dbService.getSetting<MannequinTheme>('current_theme');
+        if (savedTheme) {
+          setTheme(savedTheme);
+        }
+
+        const lastSessionPose = await dbService.getSetting<PoseData>('last_session_pose');
+        if (lastSessionPose && engineRef.current) {
+          engineRef.current.applyPose(lastSessionPose.joints as any);
+          setCurrentPoseId(lastSessionPose.id || 'restored_session');
+        }
+      } catch (err) {
+        console.error('Could not restore session from IndexedDB:', err);
+      }
+    };
+
+    const timer = setTimeout(restoreSession, 250);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    dbService.setSetting('current_theme', theme).catch(() => {});
+  }, [theme]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -108,7 +145,10 @@ export const App: React.FC = () => {
 
   const handleMirrorPose = useCallback((side: 'left' | 'right') => {
     if (engineRef.current) {
-      engineRef.current.rig.mirrorPose(side);
+      const rig = engineRef.current.rig as any;
+      if (typeof rig.mirrorPose === 'function') {
+        rig.mirrorPose(side);
+      }
       if (selectedJointId) {
         setSelectedJointRotation(engineRef.current.rig.getJointRotation(selectedJointId));
       }
@@ -180,6 +220,53 @@ export const App: React.FC = () => {
     URL.revokeObjectURL(url);
   }, []);
 
+  const handleSavePoseToDB = useCallback(async (poseName: string) => {
+    if (!engineRef.current) return;
+    const jointMap = engineRef.current.rig.jointNodes;
+    const exportedJoints: PoseData['joints'] = {};
+
+    jointMap.forEach((node, id) => {
+      const q = node.quaternion;
+      exportedJoints[id] = {
+        rotation: { x: q.x, y: q.y, z: q.z, w: q.w },
+        position: id === 'pelvis' ? { x: node.position.x, y: node.position.y, z: node.position.z } : undefined
+      };
+    });
+
+    let thumbnail: string | undefined;
+    const engine = engineRef.current as any;
+    if (typeof engine.captureScreenshot === 'function') {
+      thumbnail = engine.captureScreenshot();
+    } else if (engine.renderer && engine.scene && engine.camera) {
+      engine.renderer.render(engine.scene, engine.camera);
+      thumbnail = engine.renderer.domElement.toDataURL('image/jpeg', 0.6);
+    }
+
+    const newRecord: SavedPoseRecord = {
+      id: `idb_pose_${Date.now()}`,
+      name: poseName,
+      version: '1.0.0',
+      timestamp: Date.now(),
+      joints: exportedJoints,
+      thumbnail
+    };
+
+    await dbService.savePose(newRecord);
+    await dbService.setSetting('last_session_pose', newRecord);
+    setCurrentPoseId(newRecord.id);
+  }, []);
+
+  const handleApplySavedPose = useCallback((pose: SavedPoseRecord) => {
+    if (engineRef.current) {
+      engineRef.current.applyPose(pose.joints as any);
+      setCurrentPoseId(pose.id);
+      dbService.setSetting('last_session_pose', pose).catch(() => {});
+      if (selectedJointId) {
+        setSelectedJointRotation(engineRef.current.rig.getJointRotation(selectedJointId));
+      }
+    }
+  }, [selectedJointId]);
+
   const handleImportPose = useCallback((pose: PoseData) => {
     if (engineRef.current) {
       engineRef.current.applyPose(pose.joints as any);
@@ -226,6 +313,7 @@ export const App: React.FC = () => {
         onToggleInspector={() => setIsInspectorOpen((prev) => !prev)}
         onOpenTheme={() => setIsThemeModalOpen(true)}
         onOpenHelp={() => setIsHelpModalOpen(true)}
+        onOpenSavedPoses={() => setIsSavedPosesOpen(true)}
       />
 
       <div className="flex-1 relative overflow-hidden">
@@ -263,6 +351,13 @@ export const App: React.FC = () => {
       {isHelpModalOpen && (
         <HelpModal onClose={() => setIsHelpModalOpen(false)} />
       )}
+
+      <SavedPosesModal
+        isOpen={isSavedPosesOpen}
+        onClose={() => setIsSavedPosesOpen(false)}
+        onApplyPose={handleApplySavedPose}
+        onSaveCurrentPose={handleSavePoseToDB}
+      />
     </main>
   );
 };

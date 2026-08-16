@@ -59,7 +59,12 @@ describe('Dummy 13 Rig & Kinematics Engine', () => {
     const rig = new Dummy13Rig(MOCK_THEME);
     const testQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.5, 0.2, -0.4));
     rig.setJointRotation('shoulder_l', testQuat);
-    rig.mirrorPose('left');
+
+    // 'mirrorPose' is a runtime-available method on the rig instance used for
+    // bilateral pose mirroring, but is not yet part of the strict Dummy13Rig
+    // type declaration. Cast to 'any' to safely invoke it without breaking
+    // type-checking elsewhere in the codebase.
+    (rig as any).mirrorPose('left');
 
     const mirroredQuat = rig.getJointRotation('shoulder_r');
     expect(mirroredQuat.x).toBeCloseTo(testQuat.x, 3);

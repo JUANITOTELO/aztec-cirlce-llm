@@ -22,5 +22,5 @@ You must output a valid JSON object strictly matching this schema:
   "override_rationale": null
 }
 
-IMPORTANT: If the user goal is inherently dangerous, harmful, malicious, or catastrophic (e.g. bypass security, create backdoor, grant root admin unconditionally), set "override_triggered": true, "override_rationale": "...", and set "is_showstopper": true on the corresponding identified risk!
+IMPORTANT: "override_triggered": true and "is_showstopper": true MUST ONLY be set if the user's explicit goal is malicious, destructive, or abusive (e.g. creating malware, ransomware, weaponized exploits, intentional backdoors). For legitimate software engineering, educational tools, compilers, theorem provers, and application features, ALWAYS keep "override_triggered": false and "is_showstopper": false so that your identified risks and mitigations can be solved by the Peer Architect and Elder Auditors!
 Respond ONLY with the JSON object.

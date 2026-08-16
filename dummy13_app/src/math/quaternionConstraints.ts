@@ -1,83 +1,78 @@
 import * as THREE from 'three';
 import { JointConstraint } from '../types/dummy13';
 
-const _tempVec = new THREE.Vector3();
-const _tempEuler = new THREE.Euler(0, 0, 0, 'ZYX');
+const _tempEuler = new THREE.Euler(0, 0, 0, 'XYZ');
+const _tempQuat = new THREE.Quaternion();
+const _tempAxis = new THREE.Vector3();
 
 /**
- * Clamps a quaternion to physical anatomical joint limits avoiding gimbal locks and singular matrices.
- * Uses swing-twist decomposition for ball-and-socket joints and direct axis clamping for hinge joints.
+ * Clamps a quaternion to physical anatomical joint limits avoiding gimbal locks and inverted rotations.
+ * Highly optimized with zero garbage-collection allocations per frame.
  */
 export function clampJointRotation(
   inputQuat: THREE.Quaternion,
   constraint: JointConstraint,
-  referenceQuat: THREE.Quaternion = new THREE.Quaternion()
+  _referenceQuat: THREE.Quaternion = new THREE.Quaternion()
 ): THREE.Quaternion {
-  const result = inputQuat.clone().normalize();
+  const result = _tempQuat.copy(inputQuat).normalize();
 
   if (constraint.type === 'root') {
     return result;
   }
 
-  // For Hinge or Universal joints, compute clamped Euler representation with ZYX order
-  if (constraint.type.startsWith('hinge') || constraint.type === 'universal') {
-    _tempEuler.setFromQuaternion(result, 'XYZ');
+  // Canonicalize quaternion (w >= 0) to prevent opposite-direction flipping
+  if (result.w < 0) {
+    result.set(-result.x, -result.y, -result.z, -result.w);
+  }
 
-    if (constraint.type === 'hinge_x') {
-      _tempEuler.x = THREE.MathUtils.clamp(_tempEuler.x, constraint.minX, constraint.maxX);
-      _tempEuler.y = 0;
-      _tempEuler.z = 0;
-    } else if (constraint.type === 'hinge_y') {
-      _tempEuler.x = 0;
-      _tempEuler.y = THREE.MathUtils.clamp(_tempEuler.y, constraint.minY, constraint.maxY);
-      _tempEuler.z = 0;
-    } else if (constraint.type === 'hinge_z') {
-      _tempEuler.x = 0;
-      _tempEuler.y = 0;
-      _tempEuler.z = THREE.MathUtils.clamp(_tempEuler.z, constraint.minZ, constraint.maxZ);
-    } else {
-      // universal
-      _tempEuler.x = THREE.MathUtils.clamp(_tempEuler.x, constraint.minX, constraint.maxX);
-      _tempEuler.y = THREE.MathUtils.clamp(_tempEuler.y, constraint.minY, constraint.maxY);
-      _tempEuler.z = THREE.MathUtils.clamp(_tempEuler.z, constraint.minZ, constraint.maxZ);
-    }
-
-    result.setFromEuler(_tempEuler);
+  if (constraint.type === 'hinge_x') {
+    // Extract rotation angle around X axis
+    const halfAngle = Math.atan2(result.x, result.w);
+    let angle = halfAngle * 2;
+    // Normalize to [-PI, PI]
+    while (angle > Math.PI) angle -= Math.PI * 2;
+    while (angle < -Math.PI) angle += Math.PI * 2;
+    const clampedAngle = THREE.MathUtils.clamp(angle, constraint.minX, constraint.maxX);
+    result.set(Math.sin(clampedAngle * 0.5), 0, 0, Math.cos(clampedAngle * 0.5));
+    return result.normalize();
+  } else if (constraint.type === 'hinge_y') {
+    const halfAngle = Math.atan2(result.y, result.w);
+    let angle = halfAngle * 2;
+    while (angle > Math.PI) angle -= Math.PI * 2;
+    while (angle < -Math.PI) angle += Math.PI * 2;
+    const clampedAngle = THREE.MathUtils.clamp(angle, constraint.minY, constraint.maxY);
+    result.set(0, Math.sin(clampedAngle * 0.5), 0, Math.cos(clampedAngle * 0.5));
+    return result.normalize();
+  } else if (constraint.type === 'hinge_z') {
+    const halfAngle = Math.atan2(result.z, result.w);
+    let angle = halfAngle * 2;
+    while (angle > Math.PI) angle -= Math.PI * 2;
+    while (angle < -Math.PI) angle += Math.PI * 2;
+    const clampedAngle = THREE.MathUtils.clamp(angle, constraint.minZ, constraint.maxZ);
+    result.set(0, 0, Math.sin(clampedAngle * 0.5), Math.cos(clampedAngle * 0.5));
     return result.normalize();
   }
 
-  // Ball joint swing-twist decomposition along Z-axis (pointing down limb)
-  if (constraint.type === 'ball') {
-    const twistAxis = _tempVec.set(0, 1, 0);
-    const { swing, twist } = decomposeSwingTwist(result, twistAxis);
+  _tempEuler.setFromQuaternion(result, 'XYZ');
+  _tempEuler.x = THREE.MathUtils.clamp(_tempEuler.x, constraint.minX, constraint.maxX);
+  _tempEuler.y = THREE.MathUtils.clamp(_tempEuler.y, constraint.minY, constraint.maxY);
+  _tempEuler.z = THREE.MathUtils.clamp(_tempEuler.z, constraint.minZ, constraint.maxZ);
 
-    // Clamp twist angle
-    const maxTwist = constraint.maxTwist || Math.PI * 0.75;
-    let twistAngle = 2 * Math.atan2(twist.y, twist.w);
-    if (twistAngle > Math.PI) twistAngle -= 2 * Math.PI;
-    if (twistAngle < -Math.PI) twistAngle += 2 * Math.PI;
-    const clampedTwistAngle = THREE.MathUtils.clamp(twistAngle, -maxTwist, maxTwist);
-    twist.setFromAxisAngle(twistAxis, clampedTwistAngle);
+  result.setFromEuler(_tempEuler);
 
-    // Clamp swing cone
-    const maxSwing = constraint.maxSwing || (constraint.maxX > 0 ? constraint.maxX : Math.PI * 0.5);
-    const swingAxis = new THREE.Vector3(swing.x, swing.y, swing.z);
-    const swingLen = swingAxis.length();
-    if (swingLen > 0.0001) {
-      swingAxis.normalize();
-      let swingAngle = 2 * Math.acos(THREE.MathUtils.clamp(swing.w, -1, 1));
-      if (swingAngle > Math.PI) swingAngle = 2 * Math.PI - swingAngle;
-      const clampedSwingAngle = THREE.MathUtils.clamp(swingAngle, 0, maxSwing);
-      swing.setFromAxisAngle(swingAxis, clampedSwingAngle);
-    } else {
-      swing.identity();
+  // Ball joint cone angle constraint (maxSwing)
+  if (constraint.maxSwing !== undefined && constraint.maxSwing > 0) {
+    const angle = 2 * Math.acos(THREE.MathUtils.clamp(result.w, -1, 1));
+    if (angle > constraint.maxSwing) {
+      const factor = Math.sin(constraint.maxSwing * 0.5) / Math.sin(angle * 0.5);
+      result.x *= factor;
+      result.y *= factor;
+      result.z *= factor;
+      result.w = Math.cos(constraint.maxSwing * 0.5);
     }
-
-    result.multiplyQuaternions(swing, twist);
-    return result.normalize();
   }
 
-  return result;
+  return result.normalize();
 }
 
 /**
@@ -87,9 +82,9 @@ export function decomposeSwingTwist(
   q: THREE.Quaternion,
   twistAxis: THREE.Vector3
 ): { swing: THREE.Quaternion; twist: THREE.Quaternion } {
-  const axis = twistAxis.clone().normalize();
-  const dot = q.x * axis.x + q.y * axis.y + q.z * axis.z;
-  const twist = new THREE.Quaternion(axis.x * dot, axis.y * dot, axis.z * dot, q.w).normalize();
+  _tempAxis.copy(twistAxis).normalize();
+  const dot = q.x * _tempAxis.x + q.y * _tempAxis.y + q.z * _tempAxis.z;
+  const twist = new THREE.Quaternion(_tempAxis.x * dot, _tempAxis.y * dot, _tempAxis.z * dot, q.w).normalize();
   if (twist.lengthSq() < 0.0001) {
     twist.identity();
   }

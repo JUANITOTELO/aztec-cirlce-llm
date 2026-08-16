@@ -17,6 +17,7 @@ class SessionState:
 
     total_cost_usd: float = 0.0
     total_tokens: int = 0
+    total_cached_tokens: int = 0
     loop_count: int = 0
     budget_limit_usd: float = 1.00
     max_loops: int = 2
@@ -24,6 +25,7 @@ class SessionState:
     active_task_id: Optional[str] = None
     output_dir: str = "./aztec_output"
     primary_model: str = field(default_factory=lambda: settings.PEER_MODEL)
+    active_preset: Optional[str] = None
     active_server: Optional[Any] = None
     last_goal: Optional[str] = None
     edit_mode_enabled: bool = True
@@ -31,6 +33,10 @@ class SessionState:
 
     def __post_init__(self):
         import os
+        from aztec_circle.engine.config_manager import ConfigManager
+        ConfigManager.load_config_into_env()
+        self.primary_model = settings.PEER_MODEL
+        self.active_preset = ConfigManager.get_active_preset()
         # If launched from inside an existing project (e.g. dummy13_app or any app folder),
         # automatically target the current directory instead of looking for ./aztec_output
         if (
@@ -40,17 +46,19 @@ class SessionState:
         ):
             self.output_dir = "."
 
-    def record_run(self, cost_usd: float, tokens: int, loops: int, task_id: str):
+    def record_run(self, cost_usd: float, tokens: int, loops: int, task_id: str, cached_tokens: int = 0):
         """Accumulate usage from a completed debate run."""
         self.total_cost_usd += cost_usd
         self.total_tokens += tokens
+        self.total_cached_tokens += cached_tokens
         self.loop_count = loops
         self.active_task_id = task_id
 
-    def record_cost(self, cost_usd: float, tokens: int = 0) -> None:
+    def record_cost(self, cost_usd: float, tokens: int = 0, cached_tokens: int = 0) -> None:
         """Accumulate usage from edits, fixes, and auxiliary operations."""
         self.total_cost_usd += cost_usd
         self.total_tokens += tokens
+        self.total_cached_tokens += cached_tokens
 
     def prompt_text(self) -> str:
         """Render the dynamic prompt bar with optional vision badge."""

@@ -236,22 +236,25 @@ async def start_interactive_session() -> None:
     main_kb = KeyBindings()
 
     @main_kb.add("c-v")
-    @main_kb.add("escape", "v")
     def _handle_paste(event):
-        from aztec_circle.adapters.clipboard_utils import get_clipboard_image
-        from aztec_circle.adapters.image_utils import encode_image_to_data_uri
+        try:
+            from aztec_circle.adapters.clipboard_utils import get_clipboard_image
+            from aztec_circle.adapters.image_utils import encode_image_to_data_uri
 
-        clip_img = get_clipboard_image()
-        if clip_img:
-            try:
+            clip_img = get_clipboard_image()
+            if clip_img:
                 data_uri = encode_image_to_data_uri(clip_img)
                 state.attached_images.append(data_uri)
                 console.print(f"\n[bold green]✓ Attached clipboard image:[/bold green] [underline]{clip_img}[/underline] [dim]({len(state.attached_images)} attached)[/dim]")
                 event.app.invalidate()
-            except Exception as exc:
-                console.print(f"\n[bold red]✗ Failed to attach clipboard image:[/bold red] {exc}")
-        else:
+                return
+        except Exception:
+            pass
+
+        try:
             event.current_buffer.paste_clipboard_data(event.app.clipboard.get_data())
+        except Exception:
+            pass
 
     session: PromptSession = PromptSession(
         history=FileHistory(str(history_file)),

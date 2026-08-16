@@ -27,8 +27,8 @@ export class ViewportEngine {
   public isFloorSolid: boolean = true;
   private velocityY: number = 0;
   private readonly gravityAccel: number = -9.81;
-  private readonly bounceRestitution: number = 0.22;
-
+  private readonly bounceRestitution: number = 0.18;
+  private readonly airResistance: number = 0.45;
   // Callbacks to React UI
   public onJointSelected?: (jointId: JointId | null) => void;
   public onJointChanged?: (jointId: JointId, rotation: THREE.Quaternion) => void;
@@ -263,18 +263,22 @@ export class ViewportEngine {
   }
 
   public applyPose(poseData: Record<string, { rotation: { x: number; y: number; z: number; w: number }; position?: { x: number; y: number; z: number } }>): void {
+    this.velocityY = 0;
     Object.entries(poseData).forEach(([jointKey, val]) => {
       const jointId = jointKey as JointId;
       if (val.rotation) {
         const q = new THREE.Quaternion(val.rotation.x, val.rotation.y, val.rotation.z, val.rotation.w);
-        this.rig.setJointRotation(jointId, q);
+        this.rig.setJointRotation(jointId, q, true);
       }
       if (val.position && jointId === 'pelvis') {
         this.rig.setJointPosition(jointId, new THREE.Vector3(val.position.x, val.position.y, val.position.z));
       }
     });
+    if (this.isFloorSolid) {
+      this.rig.clampToFloor();
+    }
+    this.rig.rootGroup.updateMatrixWorld(true);
   }
-
   public toggleWireframe(): boolean {
     this.isWireframe = !this.isWireframe;
     const handleSet = new Set(this.rig.hitHandles.values());
@@ -316,41 +320,60 @@ export class ViewportEngine {
       if (this.isDisposed) return;
       this.animFrameId = requestAnimationFrame(render);
       const now = performance.now();
-      const dt = Math.min((now - lastTime) / 1000, 0.05);
+      const rawDt = (now - lastTime) / 1000;
       lastTime = now;
+      const dt = Math.min(rawDt, 0.05);
 
       const isTransforming = this.transformControls.dragging;
       const pelvis = this.rig.jointNodes.get('pelvis');
+      const activeJointId = isTransforming && this.transformControls.object
+        ? (this.transformControls.object.name.replace('joint_', '') as JointId)
+        : null;
 
-      if (!isTransforming && pelvis) {
-        this.rig.rootGroup.updateMatrixWorld(true);
-        const lowest = this.rig.getLowestY();
+      if (pelvis) {
+        // Perform 2 physics substeps for rock-solid stability and zero tunneling
+        const substeps = 2;
+        const subDt = dt / substeps;
 
-        if (this.isGravityEnabled) {
-          this.velocityY += this.gravityAccel * dt;
-          this.velocityY = Math.max(this.velocityY, -25.0);
-
-          pelvis.position.y += this.velocityY * dt;
+        for (let step = 0; step < substeps; step++) {
           this.rig.rootGroup.updateMatrixWorld(true);
 
-          const currentLowest = this.rig.getLowestY();
-          if (this.isFloorSolid && currentLowest <= 0) {
-            pelvis.position.y -= currentLowest;
+          if (this.isGravityEnabled) {
+            // 1. Joint sag dynamics
+            this.rig.applyGravitySag(subDt, activeJointId);
             this.rig.rootGroup.updateMatrixWorld(true);
 
-            if (this.velocityY < 0) {
-              this.velocityY = -this.velocityY * this.bounceRestitution;
-              if (Math.abs(this.velocityY) < 0.15) {
-                this.velocityY = 0;
+            // 2. Linear core gravity & velocity
+            if (!isTransforming || activeJointId !== 'pelvis') {
+              this.velocityY += this.gravityAccel * subDt;
+              this.velocityY *= Math.exp(-this.airResistance * subDt);
+              this.velocityY = Math.max(this.velocityY, -20.0);
+
+              pelvis.position.y += this.velocityY * subDt;
+              this.rig.rootGroup.updateMatrixWorld(true);
+
+              const currentLowest = this.rig.getLowestY();
+              if (this.isFloorSolid && currentLowest <= 0.0005) {
+                pelvis.position.y -= currentLowest;
+                this.rig.rootGroup.updateMatrixWorld(true);
+
+                if (this.velocityY < 0) {
+                  if (Math.abs(this.velocityY) < 0.25) {
+                    this.velocityY = 0;
+                  } else {
+                    this.velocityY = -this.velocityY * this.bounceRestitution;
+                  }
+                }
               }
             }
+          } else if (this.isFloorSolid && (!isTransforming || activeJointId !== 'pelvis')) {
+            const lowest = this.rig.getLowestY();
+            if (lowest < 0) {
+              pelvis.position.y -= lowest;
+              this.rig.rootGroup.updateMatrixWorld(true);
+            }
+            this.velocityY = 0;
           }
-        } else if (this.isFloorSolid) {
-          if (lowest < 0) {
-            pelvis.position.y -= lowest;
-            this.rig.rootGroup.updateMatrixWorld(true);
-          }
-          this.velocityY = 0;
         }
       }
 

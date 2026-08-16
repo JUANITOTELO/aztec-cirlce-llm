@@ -39,16 +39,30 @@ class ServerProcess:
     port: int
     url: str
     project_dir: str
+    log_file: Optional[str] = None
+    monitor_task: Optional[asyncio.Task] = None
 
     async def stop(self) -> None:
-        """Gracefully terminate dev server process."""
+        """Gracefully terminate dev server process and its process group."""
+        if self.monitor_task and not self.monitor_task.done():
+            self.monitor_task.cancel()
         if self.process.returncode is None:
             try:
-                self.process.terminate()
+                import signal
+                try:
+                    pgid = os.getpgid(self.process.pid)
+                    os.killpg(pgid, signal.SIGTERM)
+                except Exception:
+                    self.process.terminate()
                 await asyncio.wait_for(self.process.wait(), timeout=3.0)
             except Exception:
                 try:
-                    self.process.kill()
+                    import signal
+                    try:
+                        pgid = os.getpgid(self.process.pid)
+                        os.killpg(pgid, signal.SIGKILL)
+                    except Exception:
+                        self.process.kill()
                     await self.process.wait()
                 except Exception:
                     pass
@@ -74,82 +88,61 @@ class ProjectRunner:
         cwd: str,
         title: str = "Command",
     ) -> CommandResult:
-        """Run an async subprocess while streaming its output in real time."""
+        """Execute command asynchronously with streaming Rich output."""
         if self.console:
             self.console.print(f"[bold cyan]▶ {title}:[/bold cyan] [dim]{' '.join(cmd)}[/dim]")
 
-        start_time = time.monotonic()
-        stdout_lines: list[str] = []
-        stderr_lines: list[str] = []
+        start_time = time.time()
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            cwd=cwd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
 
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                *cmd,
-                cwd=cwd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
+        stdout_chunks: list[str] = []
+        stderr_chunks: list[str] = []
 
-            async def _read_stdout():
-                assert proc.stdout is not None
-                while True:
-                    line = await proc.stdout.readline()
-                    if not line:
-                        break
-                    decoded = line.decode("utf-8", errors="replace")
-                    stdout_lines.append(decoded)
+        async def _read_stream(stream, is_err=False):
+            while True:
+                line = await stream.readline()
+                if not line:
+                    break
+                decoded = line.decode("utf-8", errors="replace")
+                if is_err:
+                    stderr_chunks.append(decoded)
+                    if self.console:
+                        self.console.print(f"  [red]{decoded.rstrip()}[/red]")
+                else:
+                    stdout_chunks.append(decoded)
                     if self.console:
                         self.console.print(f"  [dim]{decoded.rstrip()}[/dim]")
 
-            async def _read_stderr():
-                assert proc.stderr is not None
-                while True:
-                    line = await proc.stderr.readline()
-                    if not line:
-                        break
-                    decoded = line.decode("utf-8", errors="replace")
-                    stderr_lines.append(decoded)
-                    if self.console:
-                        self.console.print(f"  [red]{decoded.rstrip()}[/red]")
+        await asyncio.gather(
+            _read_stream(proc.stdout, is_err=False),
+            _read_stream(proc.stderr, is_err=True),
+        )
 
-            await asyncio.gather(_read_stdout(), _read_stderr())
-            await proc.wait()
+        returncode = await proc.wait()
+        duration = time.time() - start_time
+        success = (returncode == 0)
 
-            duration = time.monotonic() - start_time
-            exit_code = proc.returncode or 0
-            success = exit_code == 0
+        if self.console:
+            if success:
+                self.console.print(f"  [bold green]✓ {title} passed ({duration:.2f}s)[/bold green]\n")
+            else:
+                self.console.print(f"  [bold red]✗ {title} failed (exit code {returncode})[/bold red]\n")
 
-            full_stdout = "".join(stdout_lines)
-            full_stderr = "".join(stderr_lines)
-
-            if self.console:
-                if success:
-                    self.console.print(f"  [bold green]✓ {title} passed[/bold green] [dim]({duration:.2f}s)[/dim]\n")
-                else:
-                    self.console.print(f"  [bold red]✗ {title} failed[/bold red] [dim](exit code {exit_code})[/dim]\n")
-
-            return CommandResult(
-                success=success,
-                stdout=full_stdout,
-                stderr=full_stderr,
-                exit_code=exit_code,
-                duration_seconds=duration,
-            )
-
-        except Exception as exc:
-            duration = time.monotonic() - start_time
-            if self.console:
-                self.console.print(f"  [bold red]✗ {title} error:[/bold red] {exc}\n")
-            return CommandResult(
-                success=False,
-                stdout="".join(stdout_lines),
-                stderr=str(exc),
-                exit_code=-1,
-                duration_seconds=duration,
-            )
+        return CommandResult(
+            success=success,
+            stdout="".join(stdout_chunks),
+            stderr="".join(stderr_chunks),
+            exit_code=returncode or 0,
+            duration_seconds=duration,
+        )
 
     async def install_dependencies(self, project_dir: str) -> CommandResult:
-        """Install dependencies based on detected project ecosystem."""
+        """Install dependencies based on detected ecosystem."""
         root = find_project_root(project_dir)
         ecosystem = detect_project_ecosystem(root)
 
@@ -160,11 +153,8 @@ class ProjectRunner:
                 title="Installing Node Dependencies (npm install)",
             )
         elif ecosystem == "python":
-            pyproj = os.path.join(root, "pyproject.toml")
-            reqs = os.path.join(root, "requirements.txt")
-            if os.path.exists(pyproj):
-                cmd = ["pip", "install", "-e", "."]
-            elif os.path.exists(reqs):
+            req_file = os.path.join(root, "requirements.txt")
+            if os.path.exists(req_file):
                 cmd = ["pip", "install", "-r", "requirements.txt"]
             else:
                 cmd = ["pip", "install", "-e", "."]
@@ -194,6 +184,9 @@ class ProjectRunner:
                 cwd=root,
                 title="Compiling Python Bytecode",
             )
+        else:
+            return CommandResult(success=True, stdout="No build step defined", stderr="", exit_code=0, duration_seconds=0.0)
+
     async def typecheck_project(self, project_dir: str) -> CommandResult:
         """Execute non-destructive TypeScript compiler check without emitting files."""
         root = find_project_root(project_dir)
@@ -241,7 +234,8 @@ class ProjectRunner:
         on_ready: Optional[Callable[[str], None]] = None,
     ) -> ServerProcess:
         """
-        Start development server daemon in background and wait for live URL.
+        Start development server daemon in background, wait for live URL,
+        and redirect background output to a log file to avoid TUI prompt pollution.
         """
         root = find_project_root(project_dir)
         ecosystem = detect_project_ecosystem(root)
@@ -250,7 +244,7 @@ class ProjectRunner:
             raise PortInUseError(f"Port {port} is already in use. Specify a different port with --port.")
 
         if ecosystem in ("vite_react", "node"):
-            cmd = ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", str(port)]
+            cmd = ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", str(port), "--clearScreen=false"]
         elif ecosystem == "python":
             cmd = ["python3", "-m", "http.server", str(port)]
         else:
@@ -259,43 +253,90 @@ class ProjectRunner:
         if self.console:
             self.console.print(f"[bold cyan]▶ Spawning Dev Server:[/bold cyan] [dim]{' '.join(cmd)}[/dim]")
 
+        log_file_path = os.path.join(root, ".aztec_server.log")
+
+        # Initialize log file
+        with open(log_file_path, "w", encoding="utf-8") as f:
+            f.write(f"--- Aztec Dev Server Started on Port {port} at {time.strftime('%Y-%m-%d %H:%M:%S')} ---\n")
+
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             cwd=root,
+            stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            start_new_session=True,
         )
 
         detected_url = f"http://localhost:{port}"
         ready_event = asyncio.Event()
+        ansi_regex = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+        url_regex = re.compile(r"(http://localhost:\d+|http://127\.0\.0\.1:\d+|http://0\.0\.0\.0:\d+)")
 
         async def _monitor_stream():
             assert proc.stdout is not None
-            url_regex = re.compile(r"(http://localhost:\d+|http://127\.0\.0\.1:\d+|http://0\.0\.0\.0:\d+)")
-            while True:
-                line = await proc.stdout.readline()
-                if not line:
-                    break
-                decoded = line.decode("utf-8", errors="replace")
-                if self.console:
-                    self.console.print(f"  [dim]{decoded.rstrip()}[/dim]")
-                match = url_regex.search(decoded)
-                if match:
-                    nonlocal detected_url
-                    detected_url = match.group(1).replace("0.0.0.0", "localhost")
-                    ready_event.set()
-                    if on_ready:
-                        on_ready(detected_url)
+            assert proc.stderr is not None
 
-        asyncio.create_task(_monitor_stream())
+            async def _drain_out():
+                while True:
+                    line = await proc.stdout.readline()
+                    if not line:
+                        break
+                    raw_text = line.decode("utf-8", errors="replace")
+                    clean_text = ansi_regex.sub("", raw_text)
 
-        # Wait up to 5 seconds for Vite/Server startup banner, otherwise default to configured URL
+                    # Write to background log file
+                    try:
+                        with open(log_file_path, "a", encoding="utf-8") as lf:
+                            lf.write(clean_text)
+                    except Exception:
+                        pass
+
+                    # During startup probe, check for URL and show initial lines
+                    if not ready_event.is_set():
+                        clean_stripped = clean_text.strip()
+                        if clean_stripped and self.console:
+                            self.console.print(f"  [dim]{clean_stripped}[/dim]")
+                        match = url_regex.search(clean_text)
+                        if match:
+                            nonlocal detected_url
+                            detected_url = match.group(1).replace("0.0.0.0", "localhost")
+                            ready_event.set()
+                            if on_ready:
+                                on_ready(detected_url)
+
+            async def _drain_err():
+                while True:
+                    line = await proc.stderr.readline()
+                    if not line:
+                        break
+                    raw_text = line.decode("utf-8", errors="replace")
+                    clean_text = ansi_regex.sub("", raw_text)
+                    try:
+                        with open(log_file_path, "a", encoding="utf-8") as lf:
+                            lf.write(f"[stderr] {clean_text}")
+                    except Exception:
+                        pass
+
+            await asyncio.gather(_drain_out(), _drain_err())
+
+        monitor_task = asyncio.create_task(_monitor_stream())
+
+        # Wait up to 5 seconds for Vite/Server startup banner
         try:
             await asyncio.wait_for(ready_event.wait(), timeout=5.0)
         except asyncio.TimeoutError:
             pass
 
         if self.console:
-            self.console.print(f"\n[bold green]🚀 Live Application Server Running at:[/bold green] [bold underline cyan]{detected_url}[/bold underline cyan]\n")
+            self.console.print(f"\n[bold green]🚀 Live Application Server Running at:[/bold green] [bold underline cyan]{detected_url}[/bold underline cyan]")
+            self.console.print(f"[dim]Background logs streaming to {log_file_path} (use /logs to inspect)[/dim]\n")
 
-        return ServerProcess(process=proc, port=port, url=detected_url, project_dir=root)
+        return ServerProcess(
+            process=proc,
+            port=port,
+            url=detected_url,
+            project_dir=root,
+            log_file=log_file_path,
+            monitor_task=monitor_task,
+        )

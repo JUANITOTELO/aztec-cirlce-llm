@@ -56,7 +56,14 @@ export const Viewport: React.FC<ViewportProps> = ({
   // Prop update synchronizations
   useEffect(() => {
     if (engineRef.current) {
-      engineRef.current.rig.updateTheme(theme);
+      const engine = engineRef.current as any;
+      if (typeof engine.setTheme === 'function') {
+        engine.setTheme(theme);
+      } else if (typeof engine.rig?.updateTheme === 'function') {
+        engine.rig.updateTheme(theme);
+      } else if (typeof engine.rig?.setTheme === 'function') {
+        engine.rig.setTheme(theme);
+      }
     }
   }, [theme]);
 

@@ -45,6 +45,9 @@ def main_callback(
     ),
 ):
     """If no subcommand is passed, launch the interactive agy-style Aztec TUI."""
+    from aztec_circle.engine.config_manager import ConfigManager
+    ConfigManager.load_config_into_env()
+
     if ctx.invoked_subcommand is None:
         from aztec_circle.tui.interactive import start_interactive_session
         asyncio.run(start_interactive_session())
@@ -446,13 +449,15 @@ async def _test_async(path: str):
 
 @app.command()
 def start(
-    path: str = typer.Argument("./aztec_output", help="Project directory to run"),
-    port: int = typer.Option(5173, "--port", "-p", help="Port to bind development server"),
+    path: str = typer.Argument(None, help="Project directory to run (positional)"),
+    path_opt: str = typer.Option(None, "--path", help="Project directory to run (optional flag)"),
+    port: int = typer.Option(5173, "--port", help="Port to bind development server"),
 ):
     """
     Build and launch the live development server for the generated project.
     """
-    asyncio.run(_start_async(path, port))
+    target_path = path_opt or path or "./aztec_output"
+    asyncio.run(_start_async(target_path, port))
 
 
 async def _start_async(path: str, port: int):
@@ -543,6 +548,89 @@ async def _list_runs_async():
 
 
 @app.command()
+def config(
+    set_key: Optional[str] = typer.Option(None, "--set-key", "-k", help="Set an API key (e.g. GEMINI_API_KEY=AIzaSy...)"),
+    set_model: Optional[str] = typer.Option(None, "--set-model", "-m", help="Set a rank model (e.g. YOUTH=gemini/gemini-3.7-flash)"),
+    preset: Optional[str] = typer.Option(None, "--preset", "-P", help="Apply an architecture preset (e.g. max_reasoning, speed_budget)"),
+    test: bool = typer.Option(False, "--test", "-t", help="Probe active rank models with a live latency ping test"),
+    list_models: bool = typer.Option(False, "--list-models", "-l", help="List curated models across all supported providers"),
+):
+    """
+    Manage API keys, model assignments, presets, and connection tests.
+    """
+    from aztec_circle.engine.config_manager import ConfigManager
+    from aztec_circle.tui.config_ui import (
+        render_api_keys_table,
+        render_ranks_table,
+        render_presets_table,
+        render_model_catalog_table,
+        run_test_models,
+        run_interactive_config_menu,
+    )
+    from aztec_circle.tui.session import SessionState
+
+    if set_key:
+        if "=" in set_key:
+            k, v = set_key.split("=", 1)
+            ConfigManager.save_api_key(k, v)
+            console.print(f"[bold green]✓ Successfully updated and secured {k} in ~/.aztec/config.env[/bold green]\n")
+        else:
+            console.print("[bold red]Invalid format for --set-key. Use KEY_NAME=VALUE[/bold red]\n")
+        return
+
+    if set_model:
+        if "=" in set_model:
+            rank, model_id = set_model.split("=", 1)
+            ConfigManager.save_model_assignment(rank, model_id)
+            console.print(f"[bold green]✓ Assigned {rank.upper()} to {model_id}[/bold green]\n")
+        else:
+            console.print("[bold red]Invalid format for --set-model. Use RANK=MODEL_ID[/bold red]\n")
+        return
+
+    if preset:
+        if ConfigManager.apply_preset(preset):
+            console.print(f"[bold green]✓ Successfully applied preset '{preset}'[/bold green]\n")
+        else:
+            console.print(f"[bold red]Unknown preset '{preset}'.[/bold red]\n")
+            render_presets_table(console)
+        return
+
+    if list_models:
+        render_model_catalog_table(console)
+        return
+
+    if test:
+        asyncio.run(run_test_models(console))
+        return
+
+    # Default action: render current configuration overview
+    render_api_keys_table(console)
+    render_ranks_table(console)
+
+
+@app.command()
+def plan(
+    path: str = typer.Argument("./aztec_output", help="Project directory containing or to receive AZTEC_PLAN.md"),
+    sync: bool = typer.Option(False, "--sync", "-s", help="Scan codebase files and synchronize AZTEC_PLAN.md"),
+    file_only: bool = typer.Option(False, "--file", "-f", help="Output only the absolute path to AZTEC_PLAN.md"),
+):
+    """
+    Display or synchronize the living project blueprint and roadmap (AZTEC_PLAN.md).
+    """
+    from aztec_circle.engine.plan_manager import PlanManager
+
+    if sync:
+        p = PlanManager.sync_from_codebase(path)
+        console.print(f"[bold green]✓ Synchronized Living Blueprint:[/bold green] [underline]{p}[/underline]\n")
+        PlanManager.render_plan_dashboard(path, console)
+    elif file_only:
+        p = PlanManager.get_plan_path(path)
+        console.print(str(p))
+    else:
+        PlanManager.render_plan_dashboard(path, console)
+
+
+@app.command()
 def serve(
     port: int = typer.Option(8000, "--port", "-p", help="Port to bind Web Inspector"),
     host: str = typer.Option("0.0.0.0", "--host", "-h", help="Host address to bind"),
@@ -559,4 +647,5 @@ def serve(
 
 if __name__ == "__main__":
     app()
+
 

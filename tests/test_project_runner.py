@@ -166,11 +166,16 @@ async def test_start_dev_server_lifecycle(tmp_path):
     mock_proc.wait = AsyncMock(return_value=0)
 
     with patch("aztec_circle.engine.project_runner.is_port_available", return_value=True), \
-         patch("asyncio.create_subprocess_exec", new_callable=AsyncMock, return_value=mock_proc):
+         patch("asyncio.create_subprocess_exec", new_callable=AsyncMock, return_value=mock_proc) as mock_exec:
 
         server_proc = await runner.start_dev_server(str(tmp_path), port=5173)
         assert server_proc.port == 5173
         assert "http://localhost:5173" in server_proc.url
+        assert server_proc.log_file is not None
+        assert os.path.exists(server_proc.log_file)
+
+        call_args = mock_exec.call_args[0]
+        assert "--clearScreen=false" in call_args
 
         # Test graceful stop
         await server_proc.stop()

@@ -24,3 +24,17 @@ def test_budget_exceeded_raises_exception():
     with pytest.raises(BudgetExceeded) as exc_info:
         bm.check()
     assert "Budget limit of $0.5000 exceeded" in str(exc_info.value)
+
+
+def test_budget_recording_with_model_pricing():
+    bm = BudgetManager(limit_usd=5.00)
+    # Sonnet 5: $2.00 / MTok input, $10.00 / MTok output, cache hit 90% off ($0.20 / MTok)
+    # 100k input (50k cached) = (50k * 2.00) + (50k * 0.20) = $0.10 + $0.01 = $0.11
+    # 10k output = 10k * 10.00 = $0.10 -> Total = $0.21
+    cost = bm.record(
+        input_tokens=100_000,
+        output_tokens=10_000,
+        cached_tokens=50_000,
+        model="anthropic/claude-sonnet-5",
+    )
+    assert round(cost, 4) == 0.2100

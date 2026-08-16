@@ -164,6 +164,10 @@ class TranscriptRenderer:
                 scaffold_res = scaffold_project(output_dir)
                 if scaffold_res.files_injected:
                     self.console.print(f"[bold green]✓ Auto-Scaffolded Project:[/bold green] Injected {len(scaffold_res.files_injected)} boilerplate configuration files: [dim]{', '.join(scaffold_res.files_injected)}[/dim]")
+
+                from aztec_circle.engine.plan_manager import PlanManager
+                plan_p = PlanManager.sync_from_codebase(output_dir)
+                self.console.print(f"[bold green]✓ Living Blueprint Generated:[/bold green] [underline]{plan_p}[/underline]")
                 self.console.print()
             else:
                 self.console.print(f"\n[dim]No files written to {output_dir}.[/dim]\n")
