@@ -159,16 +159,19 @@ class LLMProvider:
         system_prompt: str,
         user_message: str,
         model: Optional[str] = None,
+        images: Optional[List[str]] = None,
         temperature: float = 0.7,
         thinking_budget: Optional[int] = None,
         **kwargs: Any,
     ) -> LLMResponse:
         """
-        Convenience method for system + user message invocations.
+        Convenience method for system + user message invocations with optional vision images.
         """
+        from aztec_circle.adapters.image_utils import format_multimodal_content
+        formatted_content = format_multimodal_content(user_message, images=images)
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message},
+            {"role": "user", "content": formatted_content},
         ]
         return await self.complete(
             messages=messages,

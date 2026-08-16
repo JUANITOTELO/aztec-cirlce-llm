@@ -68,7 +68,7 @@ export const App: React.FC = () => {
       } else if (e.key === 'w' || e.key === 'W') {
         e.preventDefault();
         if (engineRef.current) {
-          engineRef.current.toggleWireframe();
+          engineRef.current.toggleGizmoVisibility();
         }
       }
     };

@@ -20,7 +20,7 @@ export class ViewportEngine {
   private gridHelper: THREE.GridHelper;
   private shadowPlane: THREE.Mesh;
   private isWireframe: boolean = false;
-
+  public gizmosVisible: boolean = true;
   // Callbacks to React UI (throttled/transient)
   public onJointSelected?: (jointId: JointId | null) => void;
   public onJointChanged?: (jointId: JointId, rotation: THREE.Quaternion) => void;
@@ -144,6 +144,7 @@ export class ViewportEngine {
   }
 
   private onPointerDown = (event: MouseEvent): void => {
+    if (!this.gizmosVisible) return;
     // Raycast only if not already interacting with TransformControls
     if (this.transformControls.dragging) return;
     if (event.button !== 0) return; // Left-click only
@@ -164,6 +165,7 @@ export class ViewportEngine {
   };
 
   private onPointerMove = (event: MouseEvent): void => {
+    if (!this.gizmosVisible) return;
     if (this.transformControls.dragging) return;
 
     const rect = this.renderer.domElement.getBoundingClientRect();
@@ -252,6 +254,14 @@ export class ViewportEngine {
       }
     });
     return this.isWireframe;
+  }
+
+  public toggleGizmoVisibility(): boolean {
+    this.gizmosVisible = !this.gizmosVisible;
+    this.rig.setHandlesVisible(this.gizmosVisible);
+    this.transformControls.visible = this.gizmosVisible;
+    this.transformControls.enabled = this.gizmosVisible;
+    return this.gizmosVisible;
   }
 
   public captureScreenshot(): string {

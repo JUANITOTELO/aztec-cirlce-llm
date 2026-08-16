@@ -195,10 +195,11 @@ class PatchAgent:
         self,
         instruction: str,
         project_dir: str,
+        images: Optional[List[str]] = None,
         verbose: bool = False,
     ) -> PatchResult:
         """
-        Execute precision 2-round edit conversation.
+        Execute precision 2-round edit conversation with optional vision images.
         """
         root = find_project_root(project_dir)
         index: ProjectIndex = self.indexer.build(root)
@@ -234,6 +235,7 @@ Which files must be read and edited to fulfill this instruction?"""
                 model=self.model,
                 system_prompt=round1_system,
                 user_message=round1_user,
+                images=images,
                 temperature=0.1,
             )
             bm1 = BudgetManager()
@@ -297,6 +299,7 @@ Please generate the minimal, atomic JSON patches to fulfill the instruction."""
                 model=self.model,
                 system_prompt=round2_system,
                 user_message=round2_user,
+                images=images,
                 temperature=0.1,
             )
             bm2 = BudgetManager()

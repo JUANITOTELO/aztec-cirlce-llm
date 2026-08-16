@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import re
-from typing import Optional
+from typing import List, Optional
 import typer
 from rich.console import Console
 from rich.live import Live
@@ -25,8 +25,25 @@ app = typer.Typer(
 console = Console()
 
 
+def version_callback(value: bool):
+    if value:
+        import aztec_circle
+        console.print(f"[bold cyan]Aztec Decision Circle[/bold cyan] [green]v{aztec_circle.__version__}[/green]")
+        raise typer.Exit()
+
+
 @app.callback(invoke_without_command=True)
-def main_callback(ctx: typer.Context):
+def main_callback(
+    ctx: typer.Context,
+    version: Optional[bool] = typer.Option(
+        None,
+        "--version",
+        "-V",
+        help="Show Aztec version and exit.",
+        callback=version_callback,
+        is_eager=True,
+    ),
+):
     """If no subcommand is passed, launch the interactive agy-style Aztec TUI."""
     if ctx.invoked_subcommand is None:
         from aztec_circle.tui.interactive import start_interactive_session
@@ -40,6 +57,32 @@ def interactive():
     """
     from aztec_circle.tui.interactive import start_interactive_session
     asyncio.run(start_interactive_session())
+
+
+@app.command()
+def update(
+    check_only: bool = typer.Option(False, "--check", "-c", help="Check for available updates without applying"),
+    force: bool = typer.Option(False, "--force", "-f", help="Force update even if already up to date"),
+):
+    """
+    Self-update Aztec to the latest version from the upstream repository.
+    """
+    asyncio.run(_update_async(check_only, force))
+
+
+async def _update_async(check_only: bool, force: bool):
+    from aztec_circle.engine.updater import AztecUpdater
+    updater = AztecUpdater(console=console)
+    if check_only:
+        res = updater.check_for_updates()
+        if res.has_update:
+            console.print(f"[bold yellow]Update available:[/bold yellow] {res.message}")
+            console.print("Run [bold cyan]aztec update[/bold cyan] to install.\n")
+        else:
+            console.print(f"[green]✓ {res.message}[/green] [dim](current: v{res.current_version})[/dim]\n")
+        return
+
+    await updater.perform_update(force=force)
 
 
 
@@ -122,12 +165,20 @@ def run(
         "--max-fix-loops",
         help="Max automated LLM repair iterations on build failure",
     ),
+    image: Optional[List[str]] = typer.Option(
+        None,
+        "--image",
+        "-i",
+        help="Path or URL to reference image(s) for visual design and specification",
+    ),
 ):
     """
     Launch a full multi-generational Aztec Circle debate loop.
     """
     console.print(f"[bold cyan]Initializing Aztec Circle for task:[/bold cyan] {goal}")
-    asyncio.run(_run_async(goal, budget, max_loops, fallback, auto_build, start_server, port, output_dir, max_fix_loops))
+    if image:
+        console.print(f"  [dim]Attached {len(image)} reference image(s)[/dim]")
+    asyncio.run(_run_async(goal, budget, max_loops, fallback, auto_build, start_server, port, output_dir, max_fix_loops, image))
 
 
 async def _run_async(
@@ -140,9 +191,13 @@ async def _run_async(
     port: int = 5173,
     output_dir: Optional[str] = None,
     max_fix_loops: int = 2,
+    images: Optional[List[str]] = None,
 ):
+    from aztec_circle.adapters.image_utils import parse_images_input
+    parsed_images = parse_images_input(images)
     state = CircleRunState(
         goal=goal,
+        images=parsed_images,
         budget_limit_usd=budget,
         max_loops=max_loops,
         fallback_policy=fallback,
@@ -249,23 +304,38 @@ def edit(
     auto_typecheck: bool = typer.Option(True, "--typecheck/--no-typecheck", help="Run tsc check after editing"),
     auto_fix: bool = typer.Option(True, "--fix/--no-fix", help="Automatically invoke BuildFixAgent if typecheck fails"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Display token telemetry and detailed patch operations"),
+    image: Optional[List[str]] = typer.Option(
+        None,
+        "--image",
+        "-i",
+        help="Path or URL to reference image(s) for visual edit guidance",
+    ),
 ):
     """
-    Apply an atomic targeted edit to an existing generated project.
+    Apply an atomic targeted edit to an existing generated project with optional image references.
     Uses a 2-round LLM conversation for maximum token efficiency.
     """
-    asyncio.run(_edit_async(instruction, path, auto_typecheck, auto_fix, verbose))
+    asyncio.run(_edit_async(instruction, path, auto_typecheck, auto_fix, verbose, image))
 
 
-async def _edit_async(instruction: str, path: str, auto_typecheck: bool, auto_fix: bool, verbose: bool):
+async def _edit_async(
+    instruction: str,
+    path: str,
+    auto_typecheck: bool,
+    auto_fix: bool,
+    verbose: bool,
+    images: Optional[List[str]] = None,
+):
+    from aztec_circle.adapters.image_utils import parse_images_input
     from aztec_circle.engine.patch_agent import PatchAgent
     from aztec_circle.engine.project_runner import ProjectRunner
     from aztec_circle.engine.build_fixer import BuildFixAgent
     from aztec_circle.engine.scaffolder import find_project_root
 
+    parsed_images = parse_images_input(images)
     root = find_project_root(path)
     agent = PatchAgent(console=console)
-    res = await agent.run(instruction=instruction, project_dir=root, verbose=verbose)
+    res = await agent.run(instruction=instruction, project_dir=root, images=parsed_images, verbose=verbose)
 
     if not res.success:
         console.print(f"[bold red]✗ Edit operation failed:[/bold red] {res.error_message or res.edit_summary}\n")

@@ -45,9 +45,10 @@ class PeerAgent(BaseAgent):
         youth_risks: List[YouthBrainstormOutput],
         elder_instructions: Optional[str] = None,
         loop_index: int = 0,
+        images: Optional[List[str]] = None,
     ) -> PeerDraftOutput:
         """
-        Execute drafting of architecture and code, addressing Youth risks and Elder critiques.
+        Execute drafting of architecture and code, addressing Youth risks, Elder critiques, and visual reference images.
         """
         is_revision = loop_index > 0 and bool(elder_instructions)
         template_name = "peer_drafter_loop" if is_revision else "peer_drafter"
@@ -72,7 +73,7 @@ class PeerAgent(BaseAgent):
             )
 
         user_content_parts.append(
-            "Synthesize architecture and write complete production implementation code addressing all requirements and risks."
+            "Synthesize architecture and write complete production implementation code addressing all requirements, risks, and visual reference images."
         )
         user_message = "\n".join(user_content_parts)
 
@@ -80,6 +81,7 @@ class PeerAgent(BaseAgent):
         resp = await self._invoke_llm(
             system_prompt=system_prompt,
             user_message=user_message,
+            images=images,
             temperature=0.35,
         )
 

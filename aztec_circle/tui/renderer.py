@@ -40,18 +40,20 @@ PHASE_FORMATS = {
 
 def print_welcome_banner(console: Console, state: SessionState) -> None:
     """Print the launch banner and system overview."""
+    import aztec_circle
     console.print(AZTEC_BANNER)
 
     grid = Table.grid(padding=(0, 2))
     grid.add_column(style="bold cyan", width=12)
     grid.add_column(style="white")
 
+    grid.add_row("Version", f"v{aztec_circle.__version__} [dim](type /update to check latest)[/dim]")
     grid.add_row("Youth Rank", f"{settings.YOUTH_MODEL} [dim](2 parallel agents: chaos & devil's advocate)[/dim]")
     grid.add_row("Peer Rank", f"{settings.PEER_MODEL} [dim](architecture & code synthesis)[/dim]")
     grid.add_row("Elder Rank", f"{settings.ELDER_MODEL} [dim](2 council auditors: security & structural)[/dim]")
     grid.add_row("Budget", f"${state.budget_limit_usd:.2f} max per task  |  Fallback: {state.fallback_policy.value}")
 
-    console.print(Panel(grid, title="[bold]Active Aztec Engine Configuration[/bold]", border_style="blue", expand=False))
+    console.print(Panel(grid, title=f"[bold]Active Aztec Engine v{aztec_circle.__version__}[/bold]", border_style="blue", expand=False))
     console.print("[dim]Type your goal to start a debate session, or [bold yellow]/help[/bold yellow] for commands.[/dim]\n")
 
 

@@ -308,6 +308,58 @@ async def cmd_rebuild(args: str, state: SessionState, console: Console) -> None:
     await run_debate_session(goal, state, renderer)
 
 
+async def cmd_image(args: str, state: SessionState, console: Console) -> None:
+    """Attach reference image to the active session: /image <path_or_url>"""
+    target = args.strip()
+    if not target:
+        console.print("[yellow]Usage: /image <path_or_url_to_image>[/yellow]\n")
+        return
+
+    from aztec_circle.adapters.image_utils import encode_image_to_data_uri
+    try:
+        data_uri = encode_image_to_data_uri(target)
+        state.attached_images.append(data_uri)
+        console.print(f"[bold green]✓ Attached reference image:[/bold green] [underline]{target}[/underline] (Total attached: {len(state.attached_images)})\n")
+    except Exception as exc:
+        console.print(f"[bold red]✗ Failed to attach image:[/bold red] {exc}\n")
+
+
+async def cmd_images(args: str, state: SessionState, console: Console) -> None:
+    """List all attached reference images in the active session."""
+    if not state.attached_images:
+        console.print("[dim]No reference images attached to active session. Use /image <path> to add.[/dim]\n")
+        return
+    console.print(f"[bold cyan]Attached Reference Images ({len(state.attached_images)}):[/bold cyan]")
+    for idx, img in enumerate(state.attached_images, start=1):
+        preview = img[:60] + "..." if len(img) > 60 else img
+        console.print(f"  {idx}. [dim]{preview}[/dim]")
+    console.print()
+
+
+async def cmd_clear_images(args: str, state: SessionState, console: Console) -> None:
+    """Remove all attached images from the active session."""
+    count = len(state.attached_images)
+    state.attached_images.clear()
+    console.print(f"[green]✓ Cleared {count} attached image(s) from session.[/green]\n")
+
+
+async def cmd_update(args: str, state: SessionState, console: Console) -> None:
+    """Check for and apply latest Aztec framework updates."""
+    from aztec_circle.engine.updater import AztecUpdater
+    updater = AztecUpdater(console=console)
+    check_only = "--check" in args or "-c" in args
+    if check_only:
+        res = updater.check_for_updates()
+        if res.has_update:
+            console.print(f"[bold yellow]Update available:[/bold yellow] {res.message}")
+            console.print("Run [bold cyan]/update[/bold cyan] to install.\n")
+        else:
+            console.print(f"[green]✓ {res.message}[/green] [dim](current: v{res.current_version})[/dim]\n")
+        return
+
+    await updater.perform_update()
+
+
 COMMAND_HANDLERS: Dict[str, Callable[[str, SessionState, Console], Coroutine]] = {
     "/help": cmd_help,
     "/status": cmd_status,
@@ -318,6 +370,10 @@ COMMAND_HANDLERS: Dict[str, Callable[[str, SessionState, Console], Coroutine]] =
     "/build": cmd_build,
     "/edit": cmd_edit,
     "/rebuild": cmd_rebuild,
+    "/image": cmd_image,
+    "/images": cmd_images,
+    "/clear-images": cmd_clear_images,
+    "/update": cmd_update,
     "/fix": cmd_fix,
     "/test": cmd_test,
     "/start": cmd_start,

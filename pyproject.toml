@@ -1,8 +1,8 @@
 [project]
 name = "aztec-circle-llm"
-version = "0.1.0"
+version = "0.2.0"
 description = "Production Multi-Generational LLM Debate Framework"
-readme = "aztec_circle_architecture_plan.md"
+readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
   "litellm>=1.40.0",
@@ -39,6 +39,12 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["aztec_circle*"]
+
+[tool.setuptools.package-data]
+"aztec_circle" = [
+  "prompts/*.txt",
+  "server/static/*",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

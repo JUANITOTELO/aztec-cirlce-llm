@@ -68,7 +68,7 @@ class AztecOrchestrator:
         # ── PHASE 1: Youth Brainstorming (Parallel Execution) ────────────────
         if not self.state.youth_outputs:
             await self._transition(CirclePhase.YOUTH_BRAINSTORM)
-            youth_tasks = [agent.run(self.state.goal) for agent in self.youth_agents]
+            youth_tasks = [agent.run(self.state.goal, images=self.state.images) for agent in self.youth_agents]
             youth_results = await asyncio.gather(*youth_tasks, return_exceptions=True)
 
             for res in youth_results:
@@ -122,6 +122,7 @@ class AztecOrchestrator:
                 youth_risks=self.state.youth_outputs,
                 elder_instructions=elder_instructions,
                 loop_index=self.state.loop_count,
+                images=self.state.images,
             )
             self.state.peer_history.append(draft)
             best_draft = draft
@@ -132,7 +133,7 @@ class AztecOrchestrator:
             await self._transition(CirclePhase.ELDER_AUDIT)
             self.budget.check()
 
-            elder_tasks = [agent.audit(draft, self.state.goal) for agent in self.elder_agents]
+            elder_tasks = [agent.audit(draft, self.state.goal, images=self.state.images) for agent in self.elder_agents]
             verdicts = await asyncio.gather(*elder_tasks)
 
             for v in verdicts:

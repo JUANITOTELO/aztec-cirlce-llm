@@ -27,6 +27,7 @@ class SessionState:
     active_server: Optional[Any] = None
     last_goal: Optional[str] = None
     edit_mode_enabled: bool = True
+    attached_images: List[str] = field(default_factory=list)
 
     def record_run(self, cost_usd: float, tokens: int, loops: int, task_id: str):
         """Accumulate usage from a completed debate run."""
@@ -36,6 +37,7 @@ class SessionState:
         self.active_task_id = task_id
 
     def prompt_text(self) -> str:
-        """Render the dynamic prompt bar."""
+        """Render the dynamic prompt bar with optional vision badge."""
         model_short = self.primary_model.split("/")[-1]
-        return f"[aztec ({model_short}) | ${self.total_cost_usd:.2f}] ❯ "
+        img_badge = f" | 📷 {len(self.attached_images)}" if self.attached_images else ""
+        return f"[aztec ({model_short}){img_badge} | ${self.total_cost_usd:.2f}] ❯ "

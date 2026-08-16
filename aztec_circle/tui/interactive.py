@@ -41,6 +41,7 @@ async def run_debate_session(
     """Execute a full Aztec Decision Circle debate within the interactive session."""
     run_state = CircleRunState(
         goal=goal,
+        images=list(state.attached_images),
         budget_limit_usd=state.budget_limit_usd,
         max_loops=state.max_loops,
         fallback_policy=state.fallback_policy,
@@ -49,6 +50,8 @@ async def run_debate_session(
     orchestrator = AztecOrchestrator(state=run_state, event_queue=event_queue)
 
     console.print(f"\n[bold cyan]Starting Aztec Debate for:[/bold cyan] {goal}")
+    if state.attached_images:
+        console.print(f"  [dim]Including {len(state.attached_images)} reference image(s)[/dim]")
     renderer.render_phase("YOUTH_BRAINSTORM")
 
     # Background event consumer to render events live
@@ -136,7 +139,7 @@ async def run_edit_session(
     console.print("[dim]Applying atomic line-range patch. Type /rebuild to force full regeneration.[/dim]")
 
     agent = PatchAgent(console=console)
-    res = await agent.run(instruction=instruction, project_dir=root, verbose=True)
+    res = await agent.run(instruction=instruction, project_dir=root, images=list(state.attached_images), verbose=True)
 
     if not res.success:
         console.print(f"[bold red]✗ Edit failed:[/bold red] {res.error_message or res.edit_summary}\n")

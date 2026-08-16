@@ -23,6 +23,10 @@ SLASH_COMMAND_METADATA = {
     "/start": "Launch live dev server (npm run dev) on port 5173",
     "/stop": "Stop active running background dev server",
     "/clear": "Clear the terminal screen",
+    "/image": "Attach reference image to session: /image <path_or_url>",
+    "/images": "List all attached reference images in the active session",
+    "/clear-images": "Remove all attached images from the active session",
+    "/update": "Check for and apply latest Aztec framework updates",
     "/exit": "Exit interactive Aztec session",
     "/quit": "Exit interactive Aztec session",
 }

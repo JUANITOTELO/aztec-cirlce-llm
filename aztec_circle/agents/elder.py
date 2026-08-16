@@ -42,9 +42,14 @@ class ElderAgent(BaseAgent):
             thinking_budget if thinking_budget is not None else settings.ELDER_THINKING_BUDGET
         )
 
-    async def audit(self, draft: PeerDraftOutput, original_goal: str) -> ElderVerdict:
+    async def audit(
+        self,
+        draft: PeerDraftOutput,
+        original_goal: str,
+        images: Optional[List[str]] = None,
+    ) -> ElderVerdict:
         """
-        Perform rigorous, zero-temperature audit of the peer draft.
+        Perform rigorous, zero-temperature audit of the peer draft against the goal and visual reference images.
         """
         template_name = "elder_security" if self.persona == "security_governance" else "elder_structural"
         system_prompt = render(template_name)
@@ -61,6 +66,7 @@ class ElderAgent(BaseAgent):
         resp = await self._invoke_llm(
             system_prompt=system_prompt,
             user_message=user_message,
+            images=images,
             temperature=0.0,
             thinking_budget=self.thinking_budget,
         )

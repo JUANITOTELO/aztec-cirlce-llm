@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional, Set
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import structlog
 
 from aztec_circle.domain.models import CircleRunState, FallbackPolicy
@@ -24,6 +24,7 @@ STATIC_DIR = Path(__file__).parent / "static"
 
 class TaskRunRequest(BaseModel):
     goal: str
+    images: Optional[List[str]] = Field(default_factory=list)
     budget_limit_usd: float = 1.00
     max_loops: int = 2
     fallback_policy: FallbackPolicy = FallbackPolicy.HUMAN_IN_THE_LOOP
@@ -92,8 +93,10 @@ def create_app() -> FastAPI:
 
     @app.post("/api/tasks/run")
     async def run_task(req: TaskRunRequest):
+        from aztec_circle.adapters.image_utils import parse_images_input
         state = CircleRunState(
             goal=req.goal,
+            images=parse_images_input(req.images),
             budget_limit_usd=req.budget_limit_usd,
             max_loops=req.max_loops,
             fallback_policy=req.fallback_policy,

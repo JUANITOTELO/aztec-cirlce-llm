@@ -42,9 +42,9 @@ class YouthAgent(BaseAgent):
             return 1.0
         return 0.9  # devils_advocate
 
-    async def run(self, goal: str) -> YouthBrainstormOutput:
+    async def run(self, goal: str, images: Optional[List[str]] = None) -> YouthBrainstormOutput:
         """
-        Execute Youth brainstorming / stress testing against the user goal.
+        Execute Youth brainstorming / stress testing against the user goal and optional reference images.
         """
         prompt_name = "youth_chaos" if self.persona == "chaos_brainstormer" else "youth_advocate"
         system_prompt = render(prompt_name)
@@ -53,6 +53,7 @@ class YouthAgent(BaseAgent):
         resp = await self._invoke_llm(
             system_prompt=system_prompt,
             user_message=user_message,
+            images=images,
             temperature=self.temperature,
         )
 

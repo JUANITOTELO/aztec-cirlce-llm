@@ -17,6 +17,7 @@ from aztec_circle.engine.project_runner import ProjectRunner, CommandResult, Ser
 from aztec_circle.engine.build_fixer import BuildFixAgent, FixResult, TSError
 from aztec_circle.engine.project_indexer import ProjectIndexer, ProjectIndex, FileIndex
 from aztec_circle.engine.patch_agent import PatchAgent, PatchApplicator, FilePatch, PatchResult
+from aztec_circle.engine.updater import AztecUpdater, UpdateCheckResult, UpdateExecutionResult
 
 __all__ = [
     "BudgetManager",
@@ -42,5 +43,8 @@ __all__ = [
     "PatchApplicator",
     "FilePatch",
     "PatchResult",
+    "AztecUpdater",
+    "UpdateCheckResult",
+    "UpdateExecutionResult",
 ]
 

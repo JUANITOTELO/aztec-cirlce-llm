@@ -218,7 +218,7 @@ export class Dummy13Rig {
   private selectedHandleMaterial: THREE.MeshBasicMaterial;
   private hoveredHandleMaterial: THREE.MeshBasicMaterial;
 
-  private currentTheme: MannequinTheme;
+  public currentTheme: MannequinTheme;
   private selectedJointId: JointId | null = null;
   private hoveredJointId: JointId | null = null;
 
@@ -258,29 +258,31 @@ export class Dummy13Rig {
     });
 
     this.handleMaterial = new THREE.MeshBasicMaterial({
-      color: 0x3b82f6,
+      color: 0x38bdf8,
       wireframe: true,
       transparent: true,
-      opacity: 0.35,
-      depthTest: false
+      opacity: 0.85,
+      depthTest: false,
+      depthWrite: false
     });
 
     this.selectedHandleMaterial = new THREE.MeshBasicMaterial({
       color: 0x10b981,
       wireframe: true,
       transparent: true,
-      opacity: 0.9,
-      depthTest: false
+      opacity: 0.95,
+      depthTest: false,
+      depthWrite: false
     });
 
     this.hoveredHandleMaterial = new THREE.MeshBasicMaterial({
       color: 0xf59e0b,
       wireframe: true,
       transparent: true,
-      opacity: 0.7,
-      depthTest: false
+      opacity: 0.9,
+      depthTest: false,
+      depthWrite: false
     });
-
     this.buildSkeletonHierarchy();
     this.generateDummy13Geometry();
   }
@@ -427,7 +429,7 @@ export class Dummy13Rig {
     this.attachHandle(wrNode, `wrist_${side}` as JointId, 0.12);
   }
 
-  private buildLeg(side: 'l' | 'r', dir: number): void {
+  private buildLeg(side: 'l' | 'r', _dir: number): void {
     const hipNode = this.jointNodes.get(`hip_${side}` as JointId)!;
     // Hip socket sphere
     const hipSphere = new THREE.Mesh(new THREE.SphereGeometry(0.09, 12, 12), this.jointMaterial);
@@ -469,13 +471,19 @@ export class Dummy13Rig {
 
   private attachHandle(node: THREE.Group, jointId: JointId, radius: number): void {
     const handle = new THREE.Mesh(
-      new THREE.SphereGeometry(radius, 12, 8),
+      new THREE.SphereGeometry(radius, 14, 10),
       this.handleMaterial
     );
     handle.userData = { isJointHandle: true, jointId };
-    handle.renderOrder = 999; // Always render on top for easy joint clicking
+    handle.renderOrder = 9999; // Always render on top of meshes
     node.add(handle);
     this.hitHandles.set(jointId, handle);
+  }
+
+  public setHandlesVisible(visible: boolean): void {
+    this.hitHandles.forEach((handle) => {
+      handle.visible = visible;
+    });
   }
 
   public setJointRotation(jointId: JointId, quaternion: THREE.Quaternion): void {

@@ -129,6 +129,7 @@ def _utc_now() -> datetime:
 class CircleRunState(BaseModel):
     task_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     goal: str
+    images: List[str] = Field(default_factory=list, description="Attached image paths or data URIs")
     fallback_policy: FallbackPolicy = FallbackPolicy.HUMAN_IN_THE_LOOP
     current_phase: CirclePhase = CirclePhase.IDLE
     loop_count: int = 0
