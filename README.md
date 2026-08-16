@@ -2,9 +2,10 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests: 101/101](https://img.shields.io/badge/tests-101%2F101%20passing-brightgreen.svg)]()
+[![Tests: 167/167](https://img.shields.io/badge/tests-167%2F167%20passing-brightgreen.svg)]()
 [![Code Architecture](https://img.shields.io/badge/architecture-Multi--Generational-blueviolet.svg)]()
 [![Multimodal Vision](https://img.shields.io/badge/vision-Multimodal%20LLM-orange.svg)]()
+[![Hybrid Fullstack](https://img.shields.io/badge/fullstack-PHP%20%7C%20Python%20%7C%20React%20%7C%20Lean4-success.svg)]()
 
 ```
   ██████╗ ███████╗████████╗███████╗ ██████╗ 
@@ -16,7 +17,7 @@
    Multi-Generational Adversarial LLM Debate Framework
 ```
 
-**Aztec Decision Circle** is a production-grade, multi-generational meta-tool designed to build software tools, web applications, and complex architectures through rigorous, adversarial LLM debate, automated quality gates, incremental line-range edits, and multimodal vision analysis.
+**Aztec Decision Circle** is a production-grade, multi-generational meta-tool designed to build software tools, hybrid fullstack web applications, and complex architectures through rigorous adversarial LLM debate, automated quality gates, incremental line-range edits, multimodal vision analysis, native SSE streaming, and self-healing build orchestration.
 
 ---
 
@@ -73,8 +74,8 @@ flowchart TD
     CONSENSUS -- "Flaws Found" --> REVISE["Targeted Revision Loop\n(Max Loops)"]
     REVISE --> PEER
     
-    CONSENSUS -- "Approved" --> SCAFFOLD["4. Automated Project Scaffolder\n& Build Fix Agent (Self-Healing)"]
-    SCAFFOLD --> DELIVERABLE["🏁 Production-Ready Deliverable\n(Vite Dev Server live on port 5173)"]
+    CONSENSUS -- "Approved" --> SCAFFOLD["4. Automated Project Scaffolder\n& Multi-Tier Build Fixer (Self-Healing)"]
+    SCAFFOLD --> DELIVERABLE["🏁 Production-Ready Deliverable\n(Vite Dev Server + Backend API Server)"]
 ```
 
 ### The Three Generational Ranks
@@ -89,6 +90,7 @@ flowchart TD
      - Strict Single Responsibility Principle (SRP).
      - Hard file-length limits ($\le 150$ lines per file).
      - Decoupled folder contracts (`src/atoms/`, `src/components/`, `src/hooks/`, `src/engine/`, `src/store/`, `src/utils/`, `src/types/`).
+     - Zero-config portable database adapters (dual SQLite/MySQL PDO schemas) and arbitrary-precision financial math.
 
 3. **👁️ Elder Council (Security & Governance Audit)**:
    - Independent dual-auditor council (*Security & Risk Auditor*, *Senior Structural Architect*).
@@ -99,7 +101,33 @@ flowchart TD
 
 ## 🚀 Key Capabilities
 
-### 1. 📷 Multimodal Vision & Image Support
+### 1. 🌐 Hybrid Fullstack Scaffolding & Multi-Service Dev Server
+Aztec natively understands and generates multi-tier architectures:
+- **Topology Detection**: Automatically recognizes `php_react`, `python_react`, `lean4_react`, `vite_react`, `node`, `php`, `python`, and `lean4`.
+- **Automatic Reverse Proxying**: Injects `/api` $\rightarrow$ `http://127.0.0.1:8000` into `vite.config.ts` for instant fullstack communication.
+- **Dual-Service Lifecycle (`aztec start`)**: Spawns both the Backend API server (`php -S 127.0.0.1:8000` / Python) and Frontend Vite HMR in parallel with unified logging and clean process-group teardown.
+- **Automatic Port Conflict Fallback**: Intelligently scans and binds to the next free port if `5173` or `8000` are in use.
+- **Port Manager (`aztec clean --ports`)**: Instantly frees lingering background dev servers across port ranges (`5173–5185`, `8000–8015`).
+
+---
+
+### 2. 🧪 Unified Multi-Tier Test Runner (`aztec test`)
+Run your entire stack's test suites with a single command:
+- **PHP Backend**: `php backend/test_backend.php` / `phpunit`.
+- **Frontend UI**: `vitest run` / `npm test` (with auto-provisioned `src/test/setup.ts`).
+- **Python Backend**: `pytest` / `unittest`.
+- **Formal Proofs**: `lake test` / `lake build`.
+
+---
+
+### 3. 🌊 Native Async SSE Streaming & Connection Resilience
+- **Real-Time Token Streaming**: Streams tokens continuously via Server-Sent Events (SSE) for zero lost tokens and immediate feedback.
+- **Inactivity Watchdog**: Robust 90-second chunk watchdog prevents hanging network connections.
+- **Adaptive Thinking**: Full support for Claude 3.7 / 3.5 Sonnet adaptive thinking budgets.
+
+---
+
+### 4. 📷 Multimodal Vision & Image Support
 Pass design mockups, wireframes, 3D diagrams, or screenshots directly into the debate circle or edit engine:
 
 ```bash
@@ -115,22 +143,25 @@ aztec edit "Match toolbar styling to screenshot" --paste --path ./my_app
 
 ---
 
-### 2. ⚡ Incremental Edit Engine (Precision 2-Round Patching)
+### 5. ⚡ Incremental Edit Engine (Precision 2-Round Patching)
 Update and improve existing projects with token-effective line-range modifications:
 
 ```bash
 # Surgical 2-round line patch + automatic typecheck & compiler repair
-aztec edit "Add keyboard shortcuts: R for reset, W for wireframe toggle" --path ./dummy13_app
+aztec edit "Add keyboard shortcuts: R for reset, W for wireframe toggle" --path ./cellular_automata_app
 ```
 
 - **Round 1 (File Selector)**: Analyzes project symbol index (~300 tokens) to identify only the files needing changes.
 - **Round 2 (Patch Generator)**: Generates minimal, structured JSON line replacements (`replace`, `insert_before`, `insert_after`, `create`, `delete`) with atomic rollback protection and resilient `json-repair` parsing.
 
-### 3. 🔧 Self-Healing Quality Gate & Build Runner
-Automated end-to-end build runner:
-- Automatic ecosystem detection (Vite / React / Tailwind / Node / Python).
-- Atomic, file-by-file TypeScript compiler repair (`BuildFixAgent`).
-- Integrated dev server lifecycle manager (`npm run dev` on port 5173).
+---
+
+### 6. 🗺️ Living Project Blueprint & Roadmap (`AZTEC_PLAN.md`)
+Maintains an evolving project blueprint tracking architecture decisions, module dependencies, and completed/upcoming milestones. Synchronize anytime with:
+
+```bash
+aztec plan --sync
+```
 
 ---
 
@@ -141,11 +172,13 @@ Automated end-to-end build runner:
 | `aztec` | Launch interactive TUI session (supports `Ctrl+V` image paste) | `aztec` |
 | `aztec run <goal>` | Execute full debate loop for a task (`--image`, `--paste` / `-P`) | `aztec run "Build a Kanban app" -B -S --paste` |
 | `aztec edit <instruction>`| Apply targeted line-range patch (`--image`, `--paste` / `-P`) | `aztec edit "Add dark mode toggle" -p ./app -P` |
-| `aztec config` | Manage API keys, model assignments, presets, and ping tests | `aztec config --preset max_reasoning` |
-| `aztec build <path>` | Scaffold, install deps, and build | `aztec build ./aztec_output` |
-| `aztec fix <path>` | Run self-healing compiler error repair | `aztec fix ./aztec_output` |
-| `aztec test <path>` | Execute project unit test suite | `aztec test ./aztec_output` |
-| `aztec start <path>` | Launch background development server | `aztec start ./aztec_output -p 5173` |
+| `aztec config` | Manage API keys, model assignments, presets, and ping tests | `aztec config --preset anthropic_cost_optimized` |
+| `aztec plan` | View or synchronize living roadmap (`AZTEC_PLAN.md`) | `aztec plan --sync` |
+| `aztec build <path>` | Scaffold, install deps, and build | `aztec build ./colombian_accounting_system` |
+| `aztec fix <path>` | Run self-healing multi-tier compiler error repair | `aztec fix ./colombian_accounting_system` |
+| `aztec test <path>` | Execute multi-tier project test suite (PHP, Node, Python, Lean) | `aztec test ./colombian_accounting_system` |
+| `aztec start <path>` | Launch background development server & API daemons | `aztec start ./colombian_accounting_system -p 5173` |
+| `aztec clean` | Free occupied server ports and clean temporary artifacts | `aztec clean --ports` |
 | `aztec update` | Self-update Aztec to latest version | `aztec update` |
 | `aztec list-runs` | View checkpointed SQLite run history | `aztec list-runs` |
 | `aztec serve` | Start real-time Web Inspector API | `aztec serve --port 8000` |
@@ -161,7 +194,7 @@ Inside the interactive `aztec` TUI prompt:
 | `/config` / `/setup` | **Open interactive configuration center** (API keys, models, presets, test) |
 | `/keys` | View status and securely set LLM provider API keys (`0600` permissions) |
 | `/models` | View model catalog and assign models to agent ranks (`/models catalog`) |
-| `/preset <name>` | Apply one-click architecture preset (`speed_budget`, `max_reasoning`, etc.) |
+| `/preset <name>` | Apply one-click architecture preset (`anthropic_cost_optimized`, `speed_budget`, `max_reasoning`, etc.) |
 | `/test-models` | Probe all active rank models with a live 1-token latency ping |
 | `Ctrl+V` / `Alt+V` | **Paste image directly from system clipboard** (updates prompt badge) |
 | `/paste` / `/paste-image` | Grab and attach image from system clipboard |
@@ -169,11 +202,13 @@ Inside the interactive `aztec` TUI prompt:
 | `/images` | List all attached images in the session |
 | `/clear-images` | Clear attached images |
 | `/edit <instruction>` | Apply an atomic incremental edit to active project |
+| `/plan` | View or synchronize the Living Blueprint & Roadmap |
 | `/rebuild` | Force a full generational debate to regenerate project |
 | `/fix` | Run automated build error repair on active project |
-| `/test` | Run project test suite |
-| `/start` | Launch live development server on port 5173 |
+| `/test` | Run multi-tier project test suite |
+| `/start` | Launch live development server & backend API |
 | `/stop` | Stop background development server |
+| `/clean` / `/ports` | Free occupied dev server ports (`5173–5185`, `8000–8015`) |
 | `/logs` | View background development server output logs |
 | `/update` | Check for and apply latest Aztec updates |
 | `/status` | View session spend, token usage, and active models |
