@@ -2,7 +2,7 @@
 
 > **Project Goal**: Aztec Software Project  
 > **Status**: Active / Synced with Codebase  
-> **Last Updated**: 2026-08-16 14:06:48  
+> **Last Updated**: 2026-08-16 14:45:31  
 > **Files Indexed**: 30 total source files  
 
 ---
@@ -45,6 +45,7 @@
 
 | File | Layer | Responsibility |
 | :--- | :--- | :--- |
+| `src/hooks/useCanvasPan.ts` | Hook (State/Behavior) | React state management hook for useCanvasPan |
 | `index.html` | Source | Module implementation for index |
 | `package.json` | Config / Build | Node dependencies & scripts manifest |
 | `postcss.config.js` | Source | Module implementation for postcss.config |
@@ -79,4 +80,11 @@
 ---
 
 ## 📝 Change Log & Iteration History
+- **2026-08-16 14:45:38** — Automated Self-Healing Build Fix (1 files repaired).
+- **2026-08-16 14:45:31** — Incremental Edit: "also panning feature" (Modified: src/hooks/useCanvasPan.ts, src/hooks/useCanvasInput.ts, src/components/SimulationCanvas.tsx, src/components/SimulationCanvas.tsx).
+- **2026-08-16 14:44:21** — Automated Self-Healing Build Fix (1 files repaired).
+- **2026-08-16 14:44:14** — Incremental Edit: "now, allow zooming in or out with control and wheel" (Modified: src/components/SimulationCanvas.tsx, src/components/SimulationCanvas.tsx, src/components/SimulationCanvas.tsx, src/components/SimulationCanvas.tsx).
+- **2026-08-16 14:39:22** — Incremental Edit: "Look, the cells are of the size of actual pixels they are too tiny, it must be responsive though" (Modified: src/components/SimulationCanvas.tsx, src/App.tsx).
+- **2026-08-16 14:37:17** — Incremental Edit: "make the resolution adjustable and production ready" (Modified: src/constants/config.ts, src/components/Toolbar.tsx, src/App.tsx, src/components/SimulationCanvas.tsx).
+- **2026-08-16 14:35:51** — Incremental Edit: "nothing seems to happen on the app, fix it following the plan" (Modified: src/hooks/useSimulationWorker.ts, src/components/SimulationCanvas.tsx, src/App.tsx).
 - **2026-08-16 14:06:48** — Codebase Synchronization (Indexed 30 files).

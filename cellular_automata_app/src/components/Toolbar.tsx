@@ -1,20 +1,23 @@
 import React from 'react';
-import { Play, Pause, StepForward, RotateCcw } from 'lucide-react';
+import { Play, Pause, StepForward } from 'lucide-react';
 import { Button } from '../atoms/Button';
 import { Select } from '../atoms/Select';
 import { Slider } from '../atoms/Slider';
 import { AutomataRule } from '../types/simulation';
 import { PRESETS } from '../constants/presets';
+import { RESOLUTION_OPTIONS } from '../constants/config';
 
 interface ToolbarProps {
   isPlaying: boolean;
   rule: AutomataRule;
   speed: number;
+  resolution: number;
   onPlayPause: () => void;
   onStep: () => void;
   onRuleChange: (rule: AutomataRule) => void;
   onPresetChange: (name: string) => void;
   onSpeedChange: (speed: number) => void;
+  onResolutionChange: (resolution: number) => void;
 }
 
 const RULE_OPTIONS = [
@@ -23,19 +26,19 @@ const RULE_OPTIONS = [
   { value: 'rule-110', label: 'Elementary Rule 110' },
 ];
 
-export const Toolbar: React.FC<ToolbarProps> = (
-  {
-    isPlaying,
-    rule,
-    speed,
-    onPlayPause,
-    onStep,
-    onRuleChange,
-    onPresetChange,
-    onSpeedChange
-  }
-) => {
-  const presetOptions = PRESETS[rule]?.map(p => ({ value: p.name, label: p.name })) || [];
+export const Toolbar: React.FC<ToolbarProps> = ({
+  isPlaying,
+  rule,
+  speed,
+  resolution,
+  onPlayPause,
+  onStep,
+  onRuleChange,
+  onPresetChange,
+  onSpeedChange,
+  onResolutionChange,
+}) => {
+  const presetOptions = PRESETS[rule]?.map((p) => ({ value: p.name, label: p.name })) || [];
 
   return (
     <header className="bg-gray-900/80 border-b border-gray-700 px-4 py-2 flex items-center space-x-4 z-10">
@@ -65,6 +68,15 @@ export const Toolbar: React.FC<ToolbarProps> = (
           onChange={(e) => onPresetChange(e.target.value)}
           options={[{ value: '', label: 'Select...' }, ...presetOptions]}
           value=""
+        />
+      </div>
+
+      <div className="flex items-center space-x-2">
+        <label className="text-sm text-gray-400">Resolution:</label>
+        <Select
+          value={String(resolution)}
+          onChange={(e) => onResolutionChange(parseInt(e.target.value, 10))}
+          options={RESOLUTION_OPTIONS}
         />
       </div>
 

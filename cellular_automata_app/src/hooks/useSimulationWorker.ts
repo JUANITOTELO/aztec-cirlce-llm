@@ -4,15 +4,16 @@ import { SIMULATION_DIMENSIONS } from '../constants/config';
 
 export function useSimulationWorker() {
   const workerRef = useRef<Worker | null>(null);
+  const [worker, setWorker] = useState<Worker | null>(null);
   const [metrics, setMetrics] = useState<SimulationMetrics>({ generation: 0, population: 0 });
 
   useEffect(() => {
-    // The `as any` is a workaround for Vite's worker handling
-    const worker = new Worker(new URL('../engine/worker.ts', import.meta.url), { type: 'module' });
-    workerRef.current = worker;
-    (window as any).simulationWorker = worker; // Make accessible to canvas for updates
+    const simWorker = new Worker(new URL('../engine/worker.ts', import.meta.url), { type: 'module' });
+    workerRef.current = simWorker;
+    setWorker(simWorker);
+    (window as any).simulationWorker = simWorker;
 
-    worker.postMessage({
+    simWorker.postMessage({
       type: 'init',
       width: SIMULATION_DIMENSIONS.width,
       height: SIMULATION_DIMENSIONS.height,
@@ -24,12 +25,12 @@ export function useSimulationWorker() {
       }
     };
 
-    worker.addEventListener('message', handleMessage);
+    simWorker.addEventListener('message', handleMessage);
 
-    // Mitigation for worker memory leak: terminate on unmount
     return () => {
-      worker.terminate();
+      simWorker.terminate();
       workerRef.current = null;
+      setWorker(null);
       (window as any).simulationWorker = null;
     };
   }, []);
@@ -38,5 +39,5 @@ export function useSimulationWorker() {
     workerRef.current?.postMessage(message);
   }, []);
 
-  return { postMessage, metrics };
+  return { postMessage, metrics, worker };
 }

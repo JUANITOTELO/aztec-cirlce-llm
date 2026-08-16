@@ -1,9 +1,9 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Toolbar } from './components/Toolbar';
 import { MetricsBar } from './components/MetricsBar';
 import { SimulationCanvas } from './components/SimulationCanvas';
 import { useSimulationWorker } from './hooks/useSimulationWorker';
-import { AutomataRule, Point, Preset } from './types/simulation';
+import { AutomataRule, Point } from './types/simulation';
 import { PRESETS } from './constants/presets';
 import { SIMULATION_DIMENSIONS } from './constants/config';
 
@@ -11,8 +11,16 @@ export default function App() {
   const [isPlaying, setIsPlaying] = useState(true);
   const [rule, setRule] = useState<AutomataRule>('game-of-life');
   const [speed, setSpeed] = useState(30);
+  const [resolution, setResolution] = useState(SIMULATION_DIMENSIONS.width);
 
-  const { postMessage, metrics } = useSimulationWorker();
+  const { postMessage, metrics, worker } = useSimulationWorker();
+
+  useEffect(() => {
+    const defaultPreset = PRESETS['game-of-life']?.[0];
+    if (defaultPreset) {
+      postMessage({ type: 'load-preset', preset: defaultPreset });
+    }
+  }, [postMessage]);
 
   const handlePlayPause = useCallback(() => {
     const newIsPlaying = !isPlaying;
@@ -28,12 +36,15 @@ export default function App() {
   const handleRuleChange = useCallback((newRule: AutomataRule) => {
     setRule(newRule);
     postMessage({ type: 'set-rule', rule: newRule });
+    const defaultPreset = PRESETS[newRule]?.[0];
+    if (defaultPreset) {
+      postMessage({ type: 'load-preset', preset: defaultPreset });
+    }
   }, [postMessage]);
 
   const handlePresetChange = useCallback((presetName: string) => {
     const preset = PRESETS[rule]?.find(p => p.name === presetName);
     if (preset) {
-      // Basic validation to mitigate security risk of malformed presets
       if (preset.version !== 1 || !Array.isArray(preset.pattern)) {
         console.error('Invalid preset format');
         return;
@@ -47,6 +58,18 @@ export default function App() {
     postMessage({ type: 'set-speed', speed: newSpeed });
   }, [postMessage]);
 
+  const handleResolutionChange = useCallback((newResolution: number) => {
+    setResolution(newResolution);
+    postMessage({ type: 'init', width: newResolution, height: newResolution });
+    const defaultPreset = PRESETS[rule]?.[0];
+    if (defaultPreset) {
+      postMessage({ type: 'load-preset', preset: defaultPreset });
+    }
+    if (isPlaying) {
+      postMessage({ type: 'play' });
+    }
+  }, [rule, isPlaying, postMessage]);
+
   const handleDraw = useCallback((points: Point[]) => {
     postMessage({ type: 'draw', points });
   }, [postMessage]);
@@ -57,17 +80,20 @@ export default function App() {
         isPlaying={isPlaying}
         rule={rule}
         speed={speed}
+        resolution={resolution}
         onPlayPause={handlePlayPause}
         onStep={handleStep}
         onRuleChange={handleRuleChange}
         onPresetChange={handlePresetChange}
         onSpeedChange={handleSpeedChange}
+        onResolutionChange={handleResolutionChange}
       />
-      <main className="flex-grow relative bg-gray-900">
+      <main className="flex-1 min-h-0 relative bg-gray-900">
         <SimulationCanvas
-          width={SIMULATION_DIMENSIONS.width}
-          height={SIMULATION_DIMENSIONS.height}
+          width={resolution}
+          height={resolution}
           onDraw={handleDraw}
+          worker={worker}
         />
       </main>
       <MetricsBar metrics={metrics} />

@@ -29,6 +29,7 @@ export function useCanvasInput(
     };
 
     const handlePointerDown = (e: PointerEvent) => {
+      if (e.button !== 0 || e.altKey || e.shiftKey) return;
       isDrawingRef.current = true;
       addPoint(e);
     };
