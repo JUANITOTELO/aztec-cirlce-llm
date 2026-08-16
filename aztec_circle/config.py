@@ -58,6 +58,8 @@ class Settings(BaseSettings):
     BUDGET_LIMIT_USD: float = 1.00
     ELDER_THINKING_BUDGET: int = 1024
     LLM_TIMEOUT_SECONDS: float = 60.0
+    LLM_STREAMING: bool = True
+    LLM_CHUNK_TIMEOUT_SECONDS: float = 90.0
 
     # MCP Client
     MCP_SERVER_URI: str = "http://localhost:8765"

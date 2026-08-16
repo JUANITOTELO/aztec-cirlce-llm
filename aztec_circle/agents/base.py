@@ -93,6 +93,8 @@ class BaseAgent:
         images: Optional[List[str]] = None,
         temperature: float = 0.7,
         thinking_budget: Optional[int] = None,
+        on_chunk: Optional[Any] = None,
+        stream: Optional[bool] = None,
     ) -> LLMResponse:
         from aztec_circle.adapters.image_utils import format_multimodal_content
         formatted_content = format_multimodal_content(user_message, images=images)
@@ -105,4 +107,6 @@ class BaseAgent:
             model=self.model,
             temperature=temperature,
             thinking_budget=thinking_budget,
+            on_chunk=on_chunk,
+            stream=stream,
         )
