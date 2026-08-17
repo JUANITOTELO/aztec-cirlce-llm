@@ -37,9 +37,18 @@ from aztec_circle.domain.models import (
     YouthRiskItem,
 )
 from aztec_circle.engine.budget_manager import BudgetManager
+from aztec_circle.engine.build_fixer import BuildFixAgent
 from aztec_circle.engine.consensus import ConsensusEngine
+from aztec_circle.engine.integration_enforcer import enforce_mandatory_patches
+from aztec_circle.engine.linking_engine import (
+    DependencyGraph,
+    IntegrationManifest,
+    LinkingEngine,
+    load_project_aztec_config,
+)
 from aztec_circle.engine.patch_agent import FilePatch, PatchApplicator
 from aztec_circle.engine.plan_manager import PlanManager
+from aztec_circle.engine.post_apply_verifier import PostApplyVerifier, VerificationResult
 from aztec_circle.engine.project_indexer import ProjectIndex, ProjectIndexer
 from aztec_circle.engine.project_runner import ProjectRunner
 from aztec_circle.engine.scaffolder import find_project_root
@@ -64,6 +73,7 @@ class ModularConsensusResult:
     total_cost_usd: float = 0.0
     verdict: Optional[ElderVerdict] = None
     error_message: Optional[str] = None
+    verification_passed: bool = True
 
 
 class ModularConsensusOrchestrator:
@@ -93,6 +103,11 @@ class ModularConsensusOrchestrator:
         self.events = event_queue or asyncio.Queue()
         self.consensus_engine = ConsensusEngine()
         self.indexer = ProjectIndexer()
+        self.aztec_config = load_project_aztec_config(self.root)
+        self.linking_engine = LinkingEngine(
+            config_overrides=self.aztec_config.get("entry_point_overrides", {})
+        )
+        self._integration_manifest: Optional[IntegrationManifest] = None
 
         # Model bindings
         self.youth_chaos_model = settings.get_effective_model("YOUTH_CHAOS")
@@ -108,27 +123,35 @@ class ModularConsensusOrchestrator:
             pass
 
     def _build_codebase_context(self) -> str:
-        """Extract compact, token-efficient summary of the current codebase and key types."""
+        """Extract compact, token-efficient summary of the current codebase and dynamic dependency graph."""
         index: ProjectIndex = self.indexer.build(self.root)
         index_summary = self.indexer.to_prompt_context(index)
         plan_summary = PlanManager.get_compact_plan_context(self.root) or "No prior AZTEC_PLAN.md found."
 
-        # Sample key existing schema / router files to provide clear anchor interfaces
+        # Build dynamic dependency graph and integration manifest
+        graph: DependencyGraph = self.linking_engine.build_graph(self.root)
+        extra_keys = self.aztec_config.get("extra_key_files", [])
+        self._integration_manifest = self.linking_engine.build_integration_manifest(
+            graph=graph,
+            goal=self.goal,
+            extra_key_files=extra_keys,
+        )
+        linking_context = self.linking_engine.to_prompt_context(self._integration_manifest)
+
+        # Sample key existing schema / router / coordinator files dynamically
         key_files_snippets = []
-        candidates = [
-            "src/types/store.ts",
-            "src/types/index.ts",
-            "src/types/product.ts",
-            "src/App.tsx",
-            "src/constants/mockData.ts",
-            "src/db/dexie.ts",
-            "src/modules/products/index.ts",
-            "backend/index.php",
-            "schema.sql",
-        ]
-        for rel in candidates:
+        sampled_targets: List[str] = list(
+            dict.fromkeys(
+                list(self._integration_manifest.entry_points.keys())
+                + self._integration_manifest.mandatory_patch_targets
+                + self._integration_manifest.hotspot_files
+                + extra_keys
+            )
+        )
+
+        for rel in sampled_targets[:12]:
             fp = os.path.join(self.root, rel)
-            if os.path.exists(fp):
+            if os.path.exists(fp) and os.path.isfile(fp):
                 try:
                     with open(fp, "r", encoding="utf-8", errors="replace") as f:
                         content = f.read()
@@ -139,13 +162,16 @@ class ModularConsensusOrchestrator:
                 except Exception:
                     pass
 
-        key_files_text = "\n\n".join(key_files_snippets) if key_files_snippets else ""
+        key_files_text = "\n\n".join(key_files_snippets) if key_files_snippets else "No anchor files found on disk."
 
         return f"""=== EXISTING CODEBASE BLUEPRINT ===
 {plan_summary}
 
 === EXISTING PROJECT FILE TREE ===
 {index_summary}
+
+=== DEPENDENCY GRAPH & MANDATORY INTEGRATION TARGETS ===
+{linking_context}
 
 === KEY ARCHITECTURAL ANCHORS ===
 {key_files_text}"""
@@ -300,6 +326,14 @@ Analyze this goal against the existing codebase. Identify radical opportunities,
                 f"YOUTH ADVERSARIAL RISK LOG:\n{risk_block}\n",
                 f"{codebase_context}\n",
             ]
+
+            if self._integration_manifest and self._integration_manifest.mandatory_patch_targets:
+                mandatory_str = "\n".join(f"  - {t}" for t in self._integration_manifest.mandatory_patch_targets)
+                peer_user_parts.append(
+                    f"⚠️ MANDATORY INTEGRATION DIRECTIVE:\n"
+                    f"You MUST include surgical patch entries in the 'patches' array for the relevant coordinator files:\n{mandatory_str}\n"
+                    f"Do not create isolated modules that are not wired into these existing coordinators.\n"
+                )
 
             if loop_count > 0 and elder_rework_instructions:
                 flaw_summary = "\n".join(f"  - {f}" for f in (last_verdict.critical_flaws if last_verdict else []))
@@ -512,8 +546,22 @@ Audit this modular design for integration cohesion, security, non-skeleton deliv
                     self.console.print(f"  [magenta]👁[/magenta] [bold]{auditor_label}[/bold] Score: [bold]{verd.weighted_score:.1f}/10.0[/bold] ➔ {status_badge}")
 
             # ----------------------------------------------------
-            # PHASE 4: Consensus & Arbitration
+            # PHASE 4: Linking Enforcement & Consensus Arbitration
             # ----------------------------------------------------
+            if self._integration_manifest:
+                missing_flaws = enforce_mandatory_patches(
+                    manifest=self._integration_manifest,
+                    new_files=draft.new_files,
+                    patches=draft.patches,
+                )
+                if missing_flaws:
+                    log.warning("modular_consensus.mandatory_patches_missing", count=len(missing_flaws))
+                    for verd in verdicts:
+                        verd.critical_flaws.extend(missing_flaws)
+                        verd.status = VerdictStatus.REJECTED
+                        if verd.weighted_score > 6.5:
+                            verd.weighted_score = 6.5
+
             consolidated = self.consensus_engine.arbitrate(verdicts)
             last_verdict = consolidated
 
@@ -650,7 +698,35 @@ Audit this modular design for integration cohesion, security, non-skeleton deliv
             c_res = await _run_command(c)
             executed_commands.append(c_res)
 
-        # 5. Update Living Project Blueprint (AZTEC_PLAN.md)
+        # 5. Post-Apply Verification & Self-Healing
+        verifier = PostApplyVerifier(project_root=self.root, console=self.console, runner=runner)
+        custom_verif_cmd = self.aztec_config.get("verifier_command")
+        verif_result: VerificationResult = await verifier.verify(custom_command=custom_verif_cmd)
+
+        verification_passed = verif_result.success
+        if not verif_result.success and verif_result.command_result:
+            if self.console:
+                self.console.print(f"\n[bold yellow]⚠ Post-Apply Verification found {verif_result.error_count} diagnostic issue(s). Initiating auto-healing...[/bold yellow]")
+            try:
+                fix_agent = BuildFixAgent(
+                    provider=self.provider,
+                    console=self.console,
+                    max_iterations=2,
+                )
+                fix_res = await fix_agent.fix(
+                    project_dir=self.root,
+                    initial_build_result=verif_result.command_result,
+                    runner=runner,
+                )
+                if fix_res.patches_applied:
+                    for patched_file in fix_res.patches_applied:
+                        if patched_file not in touched_files:
+                            touched_files.append(patched_file)
+                verification_passed = fix_res.success
+            except Exception as fix_err:
+                log.warning("modular_consensus.auto_healing_failed", error=str(fix_err))
+
+        # 6. Update Living Project Blueprint (AZTEC_PLAN.md)
         all_affected = list(dict.fromkeys(created_files + touched_files))
         cmd_strings = [c.command for c in executed_commands if not c.skipped]
         PlanManager.record_edit_iteration(
@@ -678,4 +754,5 @@ Audit this modular design for integration cohesion, security, non-skeleton deliv
             total_tokens_used=total_tokens,
             total_cost_usd=round(total_cost, 6),
             verdict=last_verdict,
+            verification_passed=verification_passed,
         )

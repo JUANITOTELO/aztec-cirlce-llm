@@ -1,8 +1,9 @@
 # Aztec Decision Circle (LLM) 🏛️⚡
 
+[![Version: 0.4.0](https://img.shields.io/badge/version-0.4.0-blue.svg)]()
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests: 171/171](https://img.shields.io/badge/tests-171%2F171%20passing-brightgreen.svg)]()
+[![Tests: 219/219](https://img.shields.io/badge/tests-219%2F219%20passing-brightgreen.svg)]()
 [![Code Architecture](https://img.shields.io/badge/architecture-Multi--Generational-blueviolet.svg)]()
 [![Multimodal Vision](https://img.shields.io/badge/vision-Multimodal%20LLM-orange.svg)]()
 [![Hybrid Fullstack](https://img.shields.io/badge/fullstack-PHP%20%7C%20Python%20%7C%20React%20%7C%20Lean4-success.svg)]()
@@ -17,7 +18,7 @@
    Multi-Generational Adversarial LLM Debate Framework
 ```
 
-**Aztec Decision Circle** is a production-grade, multi-generational meta-tool designed to build software tools, hybrid fullstack web applications, and complex architectures through rigorous adversarial LLM debate, automated quality gates, incremental line-range edits, multimodal vision analysis, native SSE streaming, and self-healing build orchestration.
+**Aztec Decision Circle** is a production-grade, multi-generational meta-tool designed to build software tools, hybrid fullstack web applications, and complex architectures through rigorous adversarial LLM debate, automated quality gates, incremental line-range edits, multimodal vision analysis, native SSE streaming, holistic dependency linking, and self-healing build orchestration.
 
 ---
 
@@ -59,14 +60,15 @@ flowchart TD
     GATE -- "Critical Hazard" --> HALT["🛑 Emergency Halt (Youth Override)"]
     GATE -- "Clear / Mitigated" --> PEER
     
-    subgraph PEER_RANK["2. Peer Rank (Atomic Code Synthesis)"]
-        PEER["Peer Drafter"] --> ATOMIC["Atomic File Synthesis\n(SRP, ≤ 150 lines/file)"]
+    subgraph PEER_RANK["2. Peer Rank (Contract-First Atomic Code Synthesis)"]
+        PEER["Peer Drafter"] --> LINKING["Linking Engine & Dependency Graph Mapping"]
+        LINKING --> ATOMIC["Atomic File Synthesis & Mandatory Wiring\n(SRP, ≤ 150 lines/file, Ground-Truth Types)"]
     end
     
     ATOMIC --> ELDERS
     
-    subgraph ELDER_RANK["3. Elder Council (Adversarial Audit)"]
-        ELDERS["Elder Council (Parallel)"] --> AUDIT["Security & Structural Audits"]
+    subgraph ELDER_RANK["3. Elder Council (Adversarial Audit & Contract Coherence)"]
+        ELDERS["Elder Council (Parallel)"] --> AUDIT["Security, Linking & Anti-Splintering Audits"]
     end
     
     AUDIT --> CONSENSUS{"Consensus\nThreshold >= 0.85?"}
@@ -74,7 +76,7 @@ flowchart TD
     CONSENSUS -- "Flaws Found" --> REVISE["Targeted Revision Loop\n(Max Loops)"]
     REVISE --> PEER
     
-    CONSENSUS -- "Approved" --> SCAFFOLD["4. Automated Project Scaffolder\n& Multi-Tier Build Fixer (Self-Healing)"]
+    CONSENSUS -- "Approved" --> SCAFFOLD["4. Automated Project Scaffolder\n& Multi-Tier Build & Test Fixer (Self-Healing)"]
     SCAFFOLD --> DELIVERABLE["🏁 Production-Ready Deliverable\n(Vite Dev Server + Backend API Server)"]
 ```
 
@@ -85,24 +87,38 @@ flowchart TD
    - Identifies non-obvious security risks, architectural anti-patterns, and UX traps before code is written.
    - Holds unilateral **Emergency Override** power to halt unsafe or catastrophic directives.
 
-2. **⚙️ Peer Rank (Atomic Synthesis & Engineering)**:
+2. **⚙️ Peer Rank (Atomic Synthesis & Holistic Linking)**:
    - Synthesizes robust, production-grade source code following **Atomic Design Principles**:
      - Strict Single Responsibility Principle (SRP).
      - Hard file-length limits ($\le 150$ lines per file).
-     - Decoupled folder contracts (`src/atoms/`, `src/components/`, `src/hooks/`, `src/engine/`, `src/store/`, `src/utils/`, `src/types/`).
-     - Zero-config portable database adapters (dual SQLite/MySQL PDO schemas) and arbitrary-precision financial math.
+     - **Contract-First Synthesis**: Domain types in `src/types/` are locked as ground truth before generating implementation files, preventing signature splintering across hooks and engines.
+     - **Holistic Linking Engine**: Automatically maps project import graphs and entry points (`App.tsx`, routers, store slices, seed data) and mandates integration patches so zero components are left orphaned.
 
 3. **👁️ Elder Council (Security & Governance Audit)**:
    - Independent dual-auditor council (*Security & Risk Auditor*, *Senior Structural Architect*).
-   - Evaluates code drafts with a weighted 0.0 – 1.0 scoring threshold ($\ge 0.85$ required for release).
+   - Evaluates code drafts with weighted scoring ($\ge 0.85$ required for release) across Linking Completeness, Contract Coherence, Security, UI Completeness, and Database Integrity.
    - Rejection feedback feeds directly into targeted peer revision loops.
 
 ---
 
 ## 🚀 Key Capabilities
 
-### 1. 🌐 Hybrid Fullstack Scaffolding & Multi-Service Dev Server
-Aztec natively understands and generates multi-tier architectures:
+### 1. 🔗 Holistic Linking Engine & Dependency Graph Mapping
+- **Import Graph Discovery**: Cross-ecosystem import parsing for TypeScript/JavaScript (`import`/`require`), Python (`import`/`from`), and PHP (`use`/`require_once`).
+- **Coordinator Auto-Detection**: Discovers top-level coordinators (`App.tsx`, routers, database contexts, navigation bars, mock data seeds).
+- **Mandatory Integration Enforcement**: Injects mandatory patch anchors into consensus prompts and audits drafts to guarantee every newly created component or module is actively wired into parent views.
+- **`.aztec.json` Overrides**: Configure custom entry points and integration rules per repository.
+
+---
+
+### 2. 🔧 Comprehensive Build & Test Self-Healing (`aztec fix`)
+- **Multi-Tier Error Recovery**: Diagnoses and automatically repairs syntax errors, TypeScript compile failures (`tsc --noEmit`), Vite transform issues, and broken unit test assertions (`vitest`, `jest`, `pytest`, `phpunit`).
+- **Verified Success Gates**: Never claims false-positive fixes; actively re-executes both build and test suites on each iteration loop until full correctness is verified.
+- **Fingerprint De-duplication**: Tracks recurring error signatures to prevent oscillation cycles during automated repair.
+
+---
+
+### 3. 🌐 Hybrid Fullstack Scaffolding & Multi-Service Dev Server
 - **Topology Detection**: Automatically recognizes `php_react`, `python_react`, `lean4_react`, `vite_react`, `node`, `php`, `python`, and `lean4`.
 - **Automatic Reverse Proxying**: Injects `/api` $\rightarrow$ `http://127.0.0.1:8000` into `vite.config.ts` for instant fullstack communication.
 - **Dual-Service Lifecycle (`aztec start`)**: Spawns both the Backend API server (`php -S 127.0.0.1:8000` / Python) and Frontend Vite HMR in parallel with unified logging and clean process-group teardown.
@@ -111,7 +127,7 @@ Aztec natively understands and generates multi-tier architectures:
 
 ---
 
-### 2. 🧪 Unified Multi-Tier Test Runner (`aztec test`)
+### 4. 🧪 Unified Multi-Tier Test Runner (`aztec test`)
 Run your entire stack's test suites with a single command:
 - **PHP Backend**: `php backend/test_backend.php` / `phpunit`.
 - **Frontend UI**: `vitest run` / `npm test` (with auto-provisioned `src/test/setup.ts`).
@@ -120,14 +136,14 @@ Run your entire stack's test suites with a single command:
 
 ---
 
-### 3. 🌊 Native Async SSE Streaming & Connection Resilience
+### 5. 🌊 Native Async SSE Streaming & Connection Resilience
 - **Real-Time Token Streaming**: Streams tokens continuously via Server-Sent Events (SSE) for zero lost tokens and immediate feedback.
 - **Inactivity Watchdog**: Robust 90-second chunk watchdog prevents hanging network connections.
 - **Adaptive Thinking**: Full support for Claude 3.7 / 3.5 Sonnet adaptive thinking budgets.
 
 ---
 
-### 4. 📷 Multimodal Vision & Image Support
+### 6. 📷 Multimodal Vision & Image Support
 Pass design mockups, wireframes, 3D diagrams, or screenshots directly into the debate circle or edit engine:
 
 ```bash
@@ -143,7 +159,7 @@ aztec edit "Match toolbar styling to screenshot" --paste --path ./my_app
 
 ---
 
-### 5. ⚡ Incremental Edit Engine (Precision 2-Round Patching)
+### 7. ⚡ Incremental Edit Engine (Precision 2-Round Patching)
 Update and improve existing projects with token-effective line-range modifications:
 
 ```bash
@@ -156,7 +172,7 @@ aztec edit "Add keyboard shortcuts: R for reset, W for wireframe toggle" --path 
 
 ---
 
-### 6. 🗺️ Living Project Blueprint & Roadmap (`AZTEC_PLAN.md`)
+### 8. 🗺️ Living Project Blueprint & Roadmap (`AZTEC_PLAN.md`)
 Maintains an evolving project blueprint tracking architecture decisions, module dependencies, and completed/upcoming milestones. Synchronize anytime with:
 
 ```bash

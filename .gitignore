@@ -172,3 +172,4 @@ package-lock.json
 .aztec_server.log
 aztec_runs.db
 *.db
+.aztec_images/

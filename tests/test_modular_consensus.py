@@ -72,7 +72,7 @@ async def test_modular_consensus_orchestrator_success(tmp_path):
         model="test-model",
     )
 
-    # Peer Modular Drafter response
+    # Peer Modular Drafter response (includes patches for mandatory coordinator App.tsx and store.ts)
     peer_resp = LLMResponse(
         content=json.dumps({
             "architecture_overview": "Products module with isolated state and UI manager",
@@ -88,6 +88,14 @@ async def test_modular_consensus_orchestrator_success(tmp_path):
                     "end_line": 2,
                     "replacement": "  user: string;\n  productsModuleEnabled: boolean;\n",
                     "concern": "Add products flag to RootState"
+                },
+                {
+                    "file": "src/App.tsx",
+                    "action": "replace",
+                    "start_line": 1,
+                    "end_line": 1,
+                    "replacement": "import { ProductManager } from './components/Products/ProductManager';\nexport const App = () => <div><ProductManager /></div>;\n",
+                    "concern": "Wire ProductManager into root coordinator"
                 }
             ],
             "commands": [
@@ -164,9 +172,11 @@ async def test_modular_consensus_orchestrator_success(tmp_path):
     assert (tmp_path / "src" / "components" / "Products" / "ProductManager.tsx").exists()
     assert (tmp_path / "src" / "hooks" / "useProducts.ts").exists()
 
-    # Verify patch was applied
+    # Verify patches were applied
     store_content = store_file.read_text(encoding="utf-8")
     assert "productsModuleEnabled" in store_content
+    app_content = app_file.read_text(encoding="utf-8")
+    assert "ProductManager" in app_content
 
     # Verify command was executed
     assert (tmp_path / "db_status.txt").exists()
@@ -191,7 +201,7 @@ async def test_modular_consensus_elder_rework_loop(tmp_path):
     youth1 = LLMResponse(content=json.dumps({"identified_risks": []}), prompt_tokens=20, completion_tokens=10, total_tokens=30, model="t")
     youth2 = LLMResponse(content=json.dumps({"identified_risks": []}), prompt_tokens=20, completion_tokens=10, total_tokens=30, model="t")
 
-    # Loop 0: Peer draft 1
+    # Loop 0: Peer draft 1 (missing App.tsx wiring and skeleton)
     peer_draft1 = LLMResponse(
         content=json.dumps({
             "architecture_overview": "Initial incomplete draft",
@@ -222,12 +232,21 @@ async def test_modular_consensus_elder_rework_loop(tmp_path):
         prompt_tokens=50, completion_tokens=20, total_tokens=70, model="t"
     )
 
-    # Loop 1: Peer draft 2 (reworked)
+    # Loop 1: Peer draft 2 (reworked with full module + App.tsx coordinator patch)
     peer_draft2 = LLMResponse(
         content=json.dumps({
             "architecture_overview": "Complete reworked module",
             "new_files": {"src/components/Module.tsx": "export const Mod = () => <div>Full Module</div>;\n"},
-            "patches": []
+            "patches": [
+                {
+                    "file": "src/App.tsx",
+                    "action": "replace",
+                    "start_line": 1,
+                    "end_line": 1,
+                    "replacement": "export const App = () => <div><Mod /></div>;\n",
+                    "concern": "Wire Mod into App"
+                }
+            ]
         }),
         prompt_tokens=60, completion_tokens=30, total_tokens=90, model="t"
     )
@@ -274,7 +293,7 @@ async def test_modular_consensus_skips_invalid_new_file_keys(tmp_path):
     youth1 = LLMResponse(content=json.dumps({"identified_risks": []}), prompt_tokens=20, completion_tokens=10, total_tokens=30, model="t")
     youth2 = LLMResponse(content=json.dumps({"identified_risks": []}), prompt_tokens=20, completion_tokens=10, total_tokens=30, model="t")
 
-    # Peer draft with garbage keys mixed with valid keys
+    # Peer draft with garbage keys mixed with valid keys and App.tsx patch
     peer_draft = LLMResponse(
         content=json.dumps({
             "architecture_overview": "Draft with mixed keys",
@@ -284,7 +303,16 @@ async def test_modular_consensus_skips_invalid_new_file_keys(tmp_path):
                 "payload": "invalid content",
                 "src/types/category.ts": "export interface Category { id: string; }\n",
             },
-            "patches": []
+            "patches": [
+                {
+                    "file": "src/App.tsx",
+                    "action": "replace",
+                    "start_line": 1,
+                    "end_line": 1,
+                    "replacement": "export const App = () => <div>Categories App</div>;\n",
+                    "concern": "Wire categories"
+                }
+            ]
         }),
         prompt_tokens=50, completion_tokens=20, total_tokens=70, model="t"
     )
@@ -316,4 +344,3 @@ async def test_modular_consensus_skips_invalid_new_file_keys(tmp_path):
     assert not (tmp_path / "category").exists()
     assert not (tmp_path / "color").exists()
     assert not (tmp_path / "payload").exists()
-

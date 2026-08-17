@@ -1,100 +1,91 @@
 import React, { useState } from 'react';
-import { ProductVariant, ProductVariantFormData, ProductVariantPermissions } from '../../types/productVariant';
+import { ProductVariant } from '../../types/productVariant';
 import { ProductImage } from '../../types/productMedia';
+import { VariantBadge } from '../../atoms/VariantBadge';
+import { VariantEditModal } from './VariantEditModal';
+import { ProductMediaManagerModal } from './ProductMediaManagerModal';
+import { useVariantImageTransaction } from '../../hooks/useVariantImageTransaction';
 import { formatCOP } from '../../utils/formatters';
-import { ImageGalleryUploader } from './ImageGalleryUploader';
 
 interface ProductVariantManagerProps {
   productId: string;
-  productName: string;
-  variants: ProductVariant[];
-  images: ProductImage[];
-  permissions: ProductVariantPermissions;
-  onAddVariant: (productId: string, form: ProductVariantFormData) => Promise<any>;
-  onDeleteVariant: (id: string) => Promise<void>;
-  onImagesChange: (images: ProductImage[]) => void;
-  onClose: () => void;
+  variants?: ProductVariant[];
+  images?: ProductImage[];
+  userId?: string;
+  userRole?: string;
+  productPrice?: number;
+  productCost?: number;
+  productSku?: string;
+  onVariantsUpdated?: (variants: ProductVariant[]) => void;
+  onImagesUpdated?: (images: ProductImage[]) => void;
+  canViewCost?: boolean;
 }
 
 export const ProductVariantManager: React.FC<ProductVariantManagerProps> = ({
-  productId,
-  productName,
-  variants,
-  images,
-  permissions,
-  onAddVariant,
-  onDeleteVariant,
-  onImagesChange,
-  onClose,
+  productId, variants = [], images = [], userId = 'system', userRole = 'admin', productPrice = 0, productCost = 0, productSku = '', onVariantsUpdated, onImagesUpdated, canViewCost = true,
 }) => {
-  const [form, setForm] = useState<ProductVariantFormData>({
-    sku: '', name: '', barcode: '', price: 0, cost: 0, stock: 0, minStock: 0,
-    attributes: { size: '', color: '', flavor: '' }, isDefault: false, isActive: true,
-  });
-  const [submitting, setSubmitting] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isMediaOpen, setIsMediaOpen] = useState(false);
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
+  const [activeVariantForMedia, setActiveVariantForMedia] = useState<string | undefined>(undefined);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.sku || !form.name) return;
-    setSubmitting(true);
-    await onAddVariant(productId, form);
-    setForm({
-      sku: '', name: '', barcode: '', price: 0, cost: 0, stock: 0, minStock: 0,
-      attributes: { size: '', color: '', flavor: '' }, isDefault: false, isActive: true,
-    });
-    setSubmitting(false);
-  };
+  const { saveVariant, deleteVariant, saveImage, deleteImage, reorderImages } = useVariantImageTransaction({
+    productId, userId, userRole, onVariantsChanged: onVariantsUpdated, onImagesChanged: onImagesUpdated,
+  });
+
+  const handleOpenAdd = () => { setSelectedVariant(null); setIsEditOpen(true); };
+  const handleOpenEdit = (v: ProductVariant) => { setSelectedVariant(v); setIsEditOpen(true); };
+  const handleOpenMedia = (variantId?: string) => { setActiveVariantForMedia(variantId); setIsMediaOpen(true); };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-lg max-w-2xl w-full p-5 space-y-4 max-h-[90vh] overflow-y-auto text-slate-200">
-        <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-          <div>
-            <h3 className="text-lg font-bold text-sky-400">Variaciones & Imágenes</h3>
-            <p className="text-xs text-slate-400 font-medium">{productName} (ID: {productId})</p>
-          </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white text-lg font-bold">✕</button>
+    <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 mt-4">
+      <div className="flex justify-between items-center mb-3">
+        <div className="flex items-center gap-2">
+          <h4 className="font-bold text-sm text-slate-200">Variantes y Stock ({variants.length})</h4>
+          <button onClick={() => handleOpenMedia()} className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded border border-slate-700">📷 Fotos Producto</button>
         </div>
-        <ImageGalleryUploader
-          productId={productId}
-          images={images}
-          onImagesChange={onImagesChange}
-          canUpload={permissions.canUploadImages}
-          canDelete={permissions.canDeleteImages}
-        />
-        <div className="space-y-3 pt-2">
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Variaciones Registradas</h4>
-          <div className="divide-y divide-slate-800 border border-slate-800 rounded bg-slate-950/50">
-            {variants.filter((v) => v.productId === productId).map((v) => (
-              <div key={v.id} className="p-2.5 flex items-center justify-between text-xs">
-                <div>
-                  <span className="font-bold text-sky-300 font-mono">{v.sku}</span> - {v.name}
-                  <span className="text-slate-400 ml-2 font-mono">Stock: {v.stock} | {formatCOP(v.price)}</span>
-                </div>
-                {permissions.canDeleteVariant && (
-                  <button onClick={() => onDeleteVariant(v.id)} className="text-rose-400 hover:text-rose-300 px-2 py-0.5 rounded border border-rose-800/40 bg-rose-950/40">
-                    Eliminar
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-        {permissions.canCreateVariant && (
-          <form onSubmit={handleSubmit} className="bg-slate-800/50 p-3 rounded border border-slate-700/60 space-y-2 text-xs">
-            <span className="font-semibold text-sky-300 block">+ Agregar Nueva Variación</span>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <input placeholder="SKU (ej: VAR-01)" value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className="bg-slate-900 border border-slate-700 rounded p-1.5" required />
-              <input placeholder="Nombre Variación" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="bg-slate-900 border border-slate-700 rounded p-1.5" required />
-              <input type="number" placeholder="Precio COP" value={form.price || ''} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} className="bg-slate-900 border border-slate-700 rounded p-1.5" required />
-              <input type="number" placeholder="Stock Inicial" value={form.stock || ''} onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })} className="bg-slate-900 border border-slate-700 rounded p-1.5" required />
-            </div>
-            <button type="submit" disabled={submitting} className="w-full bg-sky-600 hover:bg-sky-500 text-white font-medium py-1.5 rounded transition">
-              {submitting ? 'Guardando...' : 'Registrar Variación'}
-            </button>
-          </form>
-        )}
+        <button onClick={handleOpenAdd} className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded shadow flex items-center gap-1">+ Nueva Variante</button>
       </div>
+      {variants.length === 0 ? (
+        <p className="text-xs text-slate-500 italic py-2">Sin variantes configuradas. Este producto usa precio y stock general.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs text-left text-slate-300">
+            <thead className="bg-slate-800/80 text-slate-400 uppercase">
+              <tr>
+                <th className="p-2">SKU</th>
+                <th className="p-2">Nombre</th>
+                <th className="p-2">Precio</th>
+                {canViewCost && <th className="p-2">Costo</th>}
+                <th className="p-2">Stock</th>
+                <th className="p-2 text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800">
+              {variants.map((v) => (
+                <tr key={v.id} className="hover:bg-slate-800/40">
+                  <td className="p-2 font-mono font-bold text-emerald-400">{v.sku}</td>
+                  <td className="p-2"><VariantBadge variant={v} /></td>
+                  <td className="p-2 text-white">{v.price ? formatCOP(v.price) : 'Base'}</td>
+                  {canViewCost && <td className="p-2 text-slate-400">{v.cost ? formatCOP(v.cost) : 'Base'}</td>}
+                  <td className="p-2"><span className={`px-2 py-0.5 rounded font-bold ${v.stock <= 5 ? 'bg-amber-950 text-amber-400' : 'bg-slate-800 text-emerald-300'}`}>{v.stock}</span></td>
+                  <td className="p-2 text-right space-x-1">
+                    <button onClick={() => handleOpenMedia(v.id)} title="Gestionar Fotos" className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded">📸</button>
+                    <button onClick={() => handleOpenEdit(v)} title="Editar Variante" className="px-2 py-1 bg-indigo-900/60 hover:bg-indigo-700 text-indigo-200 rounded">✏️</button>
+                    <button onClick={() => deleteVariant(v.id)} title="Eliminar Variante" className="px-2 py-1 bg-red-950/80 hover:bg-red-800 text-red-300 rounded">🗑️</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {isEditOpen && (
+        <VariantEditModal isOpen={isEditOpen} onClose={() => setIsEditOpen(false)} onSave={(form) => saveVariant(form, (form as any).id).then(() => {})} variant={selectedVariant} productId={productId} currentUser={{ id: userId, name: userId, email: '', roleId: `role-${userRole}`, role: userRole as any, permissions: ['*'], isActive: true }} />
+      )}
+      {isMediaOpen && (
+        <ProductMediaManagerModal product={{ id: productId, name: '', sku: productSku || '', category: '', price: productPrice || 0, cost: productCost || 0, stock: 0, minStock: 0, ivaRate: 0.19 }} variants={variants} currentUser={{ id: userId, name: userId, email: '', roleId: `role-${userRole}`, role: userRole as any, permissions: ['*'], isActive: true }} onClose={() => setIsMediaOpen(false)} />
+      )}
     </div>
   );
 };

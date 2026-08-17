@@ -1,44 +1,107 @@
-import { MediaValidationError } from '../types/productMedia';
-
-const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp'];
-const MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024; // 2MB
-
-export function sanitizeFileName(name: string): string {
-  const safe = name
-    .replace(/\x00/g, '')
-    .replace(/\.\.+[\\/]/g, '')
-    .replace(/[^a-zA-Z0-9._-]/g, '_');
-  return safe.slice(0, 100);
+export interface ValidationError {
+  field: string;
+  message: string;
 }
 
-export function validateMediaFile(file: File): MediaValidationError[] {
-  const errors: MediaValidationError[] = [];
-  const safeName = sanitizeFileName(file.name);
-  const ext = safeName.substring(safeName.lastIndexOf('.')).toLowerCase();
+const ALLOWED_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'video/mp4',
+  'video/webm',
+  'audio/mpeg',
+  'audio/wav',
+]);
 
-  if (!ALLOWED_EXTENSIONS.includes(ext) || !ALLOWED_MIME_TYPES.includes(file.type)) {
+const ALLOWED_EXTENSIONS = new Set([
+  'jpg',
+  'jpeg',
+  'png',
+  'gif',
+  'webp',
+  'mp4',
+  'webm',
+  'mp3',
+  'wav',
+]);
+
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+
+/**
+ * Sanitizes a file name to prevent path traversal attacks.
+ * - Strips all directory components (handles both '/' and '\\' separators).
+ * - Removes any remaining '..' sequences.
+ * - Strips characters that are unsafe in file names.
+ */
+export function sanitizeFileName(fileName: string): string {
+  if (!fileName) {
+    return '';
+  }
+
+  // Normalize separators and take only the last path segment (the base name).
+  const segments = fileName.replace(/\\/g, '/').split('/');
+  let baseName = segments[segments.length - 1] ?? '';
+
+  // Remove any remaining parent-directory sequences.
+  while (baseName.includes('..')) {
+    baseName = baseName.replace(/\.\./g, '');
+  }
+
+  // Remove characters that are unsafe or reserved in file names.
+  baseName = baseName.replace(/[<>:"|?*\x00-\x1f]/g, '');
+
+  // Collapse leading dots to avoid hidden/relative name tricks.
+  baseName = baseName.replace(/^\.+/, '');
+
+  return baseName.trim();
+}
+
+function getExtension(fileName: string): string {
+  const idx = fileName.lastIndexOf('.');
+  if (idx === -1 || idx === fileName.length - 1) {
+    return '';
+  }
+  return fileName.slice(idx + 1).toLowerCase();
+}
+
+/**
+ * Validates a media file against an allow-list of MIME types and extensions,
+ * and enforces a maximum file size.
+ */
+export function validateMediaFile(file: File): ValidationError[] {
+  const errors: ValidationError[] = [];
+
+  const safeName = sanitizeFileName(file.name);
+  const extension = getExtension(safeName);
+
+  if (!ALLOWED_MIME_TYPES.has(file.type)) {
     errors.push({
       field: 'file',
-      message: `Formato inválido (${file.type || ext}). Permitidos: JPG, PNG, WEBP.`,
+      message: `Unsupported MIME type: ${file.type || 'unknown'}`,
+    });
+  }
+
+  if (!ALLOWED_EXTENSIONS.has(extension)) {
+    errors.push({
+      field: 'file',
+      message: `Unsupported file extension: ${extension || 'none'}`,
     });
   }
 
   if (file.size > MAX_FILE_SIZE_BYTES) {
     errors.push({
-      field: 'size',
-      message: `El archivo supera 2MB (Tamaño actual: ${(file.size / 1024 / 1024).toFixed(2)}MB).`,
+      field: 'file',
+      message: `File exceeds maximum size of ${MAX_FILE_SIZE_BYTES} bytes`,
+    });
+  }
+
+  if (file.size === 0) {
+    errors.push({
+      field: 'file',
+      message: 'File is empty',
     });
   }
 
   return errors;
-}
-
-export function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = (err) => reject(err);
-    reader.readAsDataURL(file);
-  });
 }

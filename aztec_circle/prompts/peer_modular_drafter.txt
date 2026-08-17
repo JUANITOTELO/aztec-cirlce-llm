@@ -22,14 +22,23 @@ Your role is to design, synthesize, and implement complete, production-ready new
    - `src/types/`: TypeScript interfaces and data models.
    - `backend/` or `migrations/`: Backend API routes, database schemas (`schema.sql`), and migration scripts.
 
-3. **Existing File Integration**:
-   - Use surgical line-range `patches` to update existing coordinators (`src/App.tsx`), types (`src/types/store.ts`), navigation bars, and mock seed data.
-   - Use `new_files` for all brand-new module files.
+3. **Mandatory Holistic Integration & Zero Orphaned Modules**:
+   - Review the `DEPENDENCY GRAPH & MANDATORY INTEGRATION TARGETS` provided in the context.
+   - Every new component, modal, hook, or store slice MUST be actively linked and rendered into the existing UI hierarchy.
+   - You MUST supply surgical line-range `patches` for coordinator entry points (`App.tsx`, router/navigation, store slices, database schemas, mock seed data, modals).
+   - Never leave new files disconnected or orphaned: if you create a modal or manager, wire it directly into the parent view and coordinator!
 
-4. **Zero Placeholders**:
+4. **Contract Consistency & Single Source of Truth (ANTI-SPLINTERING)**:
+   - Types in `src/types/` are the ground truth contract.
+   - All functions in `src/engine/` and hooks in `src/hooks/` MUST strictly match the exact parameter names, types, and parameter order defined in `src/types/`.
+   - Never invent multiple competing hooks or engines for the same task. Create ONE authoritative hook/engine per domain concern.
+   - Ensure all re-exports in module index files are unambiguous and have zero name collisions.
+   - For UI editors inside existing parent modals or tabs, support inline rendering (`inline?: boolean`) to prevent awkward modal-in-modal backdrop layering.
+
+5. **Zero Placeholders**:
    - Never leave skeletal placeholders like `{/* Content goes here */}`. Provide full, working, interactive implementations with rich UX, forms, filters, tables, and actions.
 
-5. **Console & Database Commands**:
+6. **Console & Database Commands**:
    - When database migrations, table creation, seed execution, or package installations are required, specify them in the `commands` array.
 
 ## Output Format
@@ -56,11 +65,5 @@ Respond ONLY with a valid JSON object strictly matching this schema:
       "stage": "pre_patch | post_patch",
       "cwd": "string | null: working directory, defaults to project root"
     }
-  ],
-  "mitigations_applied": [
-    "string: explicit mitigation applied for Youth-identified risk"
-  ],
-  "assumptions_made": [
-    "string: explicit technical assumption or invariant"
   ]
 }

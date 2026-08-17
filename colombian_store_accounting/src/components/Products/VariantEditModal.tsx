@@ -1,94 +1,194 @@
 import React, { useState, useEffect } from 'react';
-import { ProductVariant, ProductVariantFormData } from '../../types/productVariant';
-import { VariantAttributeForm } from './VariantAttributeForm';
-import { validateVariantPayload, buildNewVariant } from '../../engine/variantCrudEngine';
+import { ProductVariant } from '../../types/productVariant';
+import { UserAccount } from '../../types/store';
+import { useMediaContext } from '../../context/MediaContext';
+import { ImageDropZone } from './ImageDropZone';
+import { ImageGalleryGrid } from './ImageGalleryGrid';
+import { X, Layers, Save, Trash2, Image as ImageIcon } from 'lucide-react';
 
-interface Props {
+interface VariantEditModalProps {
   isOpen: boolean;
-  productId: string;
-  variantToEdit?: ProductVariant | null;
-  allVariants: ProductVariant[];
-  onSave: (variant: ProductVariant) => void;
   onClose: () => void;
-  disabled?: boolean;
+  onSave: (variant: ProductVariant) => void;
+  onDelete?: (variantId: string) => void;
+  variant: ProductVariant | null;
+  productId: string;
+  currentUser: UserAccount;
 }
 
-export const VariantEditModal: React.FC<Props> = ({ isOpen, productId, variantToEdit, allVariants, onSave, onClose, disabled }) => {
-  const [formData, setFormData] = useState<ProductVariantFormData>({
-    name: '', sku: '', barcode: '', price: 0, cost: 0, stock: 0, minStock: 0, isActive: true, attributes: {}
-  });
-  const [errors, setErrors] = useState<Record<string, string>>({});
+export const VariantEditModal: React.FC<VariantEditModalProps> = ({
+  isOpen,
+  onClose,
+  onSave,
+  onDelete,
+  variant,
+  productId,
+  currentUser,
+}) => {
+  const [sku, setSku] = useState('');
+  const [name, setName] = useState('');
+  const [price, setPrice] = useState(0);
+  const [cost, setCost] = useState(0);
+  const [stock, setStock] = useState(0);
+  const [activeTab, setActiveTab] = useState<'info' | 'images'>('info');
+
+  const { images, isUploading, uploadImages, deleteImage, assignImageToVariant, setPrimaryImage } = useMediaContext();
 
   useEffect(() => {
-    if (variantToEdit) {
-      setFormData({
-        name: variantToEdit.name, sku: variantToEdit.sku, barcode: variantToEdit.barcode || '',
-        price: variantToEdit.price, cost: variantToEdit.cost, stock: variantToEdit.stock, minStock: variantToEdit.minStock,
-        isActive: variantToEdit.isActive, attributes: { ...variantToEdit.attributes }
-      });
-    } else {
-      setFormData({ name: '', sku: '', barcode: '', price: 0, cost: 0, stock: 0, minStock: 0, isActive: true, attributes: {} });
+    if (variant) {
+      setSku(variant.sku);
+      setName(variant.name);
+      setPrice(variant.price);
+      setCost(variant.cost);
+      setStock(variant.stock);
     }
-    setErrors({});
-  }, [variantToEdit, isOpen]);
+  }, [variant]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !variant) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    const validation = validateVariantPayload(formData, allVariants, variantToEdit?.id);
-    if (!validation.isValid) {
-      setErrors(validation.errors);
-      return;
-    }
-    if (variantToEdit) {
-      onSave({ ...variantToEdit, ...formData, updatedAt: new Date().toISOString() });
-    } else {
-      onSave(buildNewVariant(productId, formData));
-    }
+    onSave({
+      ...variant,
+      sku,
+      name,
+      price: Number(price),
+      cost: Number(cost),
+      stock: Number(stock),
+      updatedAt: new Date().toISOString(),
+    });
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-800/40">
-          <h3 className="text-base font-bold text-slate-100">{variantToEdit ? 'Editar Variante' : 'Crear Nueva Variante'}</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-white">&times;</button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+      <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/40">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-emerald-600/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+              <Layers className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-white">Editar Variante: {variant.sku}</h3>
+              <p className="text-xs text-slate-400">ID: {variant.id}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800">
+            <X className="w-5 h-5" />
+          </button>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs text-slate-300 font-medium">Nombre *</label>
-              <input type="text" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="w-full mt-1 px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-slate-100" />
-              {errors.name && <p className="text-xs text-red-400 mt-1">{errors.name}</p>}
+
+        <div className="flex border-b border-slate-800 bg-slate-950/30 px-6 gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveTab('info')}
+            className={`py-2.5 px-3 text-xs font-semibold border-b-2 transition-colors ${
+              activeTab === 'info' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400'
+            }`}
+          >
+            Información y Precios
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('images')}
+            className={`py-2.5 px-3 text-xs font-semibold border-b-2 flex items-center gap-1.5 transition-colors ${
+              activeTab === 'images' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400'
+            }`}
+          >
+            <ImageIcon className="w-3.5 h-3.5" /> Imágenes de la Variante
+          </button>
+        </div>
+
+        <div className="p-6 overflow-y-auto flex-1">
+          {activeTab === 'info' ? (
+            <form onSubmit={handleSave} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">SKU</label>
+                  <input
+                    value={sku}
+                    onChange={(e) => setSku(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-100"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Nombre</label>
+                  <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-100"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Precio COP</label>
+                  <input
+                    type="number"
+                    value={price}
+                    onChange={(e) => setPrice(Number(e.target.value))}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-100"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Costo COP</label>
+                  <input
+                    type="number"
+                    value={cost}
+                    onChange={(e) => setCost(Number(e.target.value))}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-100"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Stock</label>
+                  <input
+                    type="number"
+                    value={stock}
+                    onChange={(e) => setStock(Number(e.target.value))}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-100"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-between items-center pt-4 border-t border-slate-800">
+                {onDelete && (
+                  <button
+                    type="button"
+                    onClick={() => { onDelete(variant.id); onClose(); }}
+                    className="text-xs text-rose-400 hover:text-rose-300 flex items-center gap-1.5"
+                  >
+                    <Trash2 className="w-4 h-4" /> Eliminar Variante
+                  </button>
+                )}
+                <div className="flex gap-2 ml-auto">
+                  <button type="button" onClick={onClose} className="px-4 py-2 text-xs text-slate-300 hover:bg-slate-800 rounded-lg">
+                    Cancelar
+                  </button>
+                  <button type="submit" className="px-4 py-2 text-xs bg-emerald-600 hover:bg-emerald-500 font-semibold text-white rounded-lg flex items-center gap-1.5">
+                    <Save className="w-4 h-4" /> Guardar Cambios
+                  </button>
+                </div>
+              </div>
+            </form>
+          ) : (
+            <div className="space-y-4">
+              <ImageDropZone
+                onFilesSelected={(files) =>
+                  uploadImages({
+                    files,
+                    productId,
+                    variantId: variant.id,
+                  })
+                }
+                isUploading={isUploading}
+              />
+              <ImageGalleryGrid
+                images={images.filter((img) => img.variantId === variant.id)}
+                onDelete={(imageId) => deleteImage(imageId)}
+                onSetPrimary={(imageId) => setPrimaryImage?.(imageId)}
+                onAssignVariant={(imageId, vId) => assignImageToVariant(imageId, vId)}
+                onMove={() => {}}
+              />
             </div>
-            <div>
-              <label className="text-xs text-slate-300 font-medium">SKU *</label>
-              <input type="text" value={formData.sku} onChange={e => setFormData({ ...formData, sku: e.target.value })} className="w-full mt-1 px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-slate-100" />
-              {errors.sku && <p className="text-xs text-red-400 mt-1">{errors.sku}</p>}
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="text-xs text-slate-300 font-medium">Precio (COP)</label>
-              <input type="number" value={formData.price} onChange={e => setFormData({ ...formData, price: Number(e.target.value) })} className="w-full mt-1 px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-slate-100" />
-            </div>
-            <div>
-              <label className="text-xs text-slate-300 font-medium">Costo (COP)</label>
-              <input type="number" value={formData.cost} onChange={e => setFormData({ ...formData, cost: Number(e.target.value) })} className="w-full mt-1 px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-slate-100" />
-            </div>
-            <div>
-              <label className="text-xs text-slate-300 font-medium">Stock Inicial</label>
-              <input type="number" value={formData.stock} onChange={e => setFormData({ ...formData, stock: Number(e.target.value) })} className="w-full mt-1 px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-slate-100" />
-            </div>
-          </div>
-          <VariantAttributeForm attributes={formData.attributes || {}} onChange={attrs => setFormData({ ...formData, attributes: attrs })} disabled={disabled} />
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
-            <button type="button" onClick={onClose} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm">Cancelar</button>
-            <button type="submit" disabled={disabled} className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-medium rounded-lg text-sm">Guardar Variante</button>
-          </div>
-        </form>
+          )}
+        </div>
       </div>
     </div>
   );

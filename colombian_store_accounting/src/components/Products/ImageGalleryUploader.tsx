@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ProductImage } from '../../types/productMedia';
-import { validateMediaFile, fileToBase64, sanitizeFileName } from '../../engine/mediaValidation';
+import { validateMediaFile, sanitizeFileName } from '../../engine/mediaValidation';
+import { compressAndOptimizeImage, MediaValidationError } from '../../engine/imageOptimizer';
 import { db } from '../../db/dexie';
 
 interface ImageGalleryUploaderProps {
@@ -34,24 +35,25 @@ export const ImageGalleryUploader: React.FC<ImageGalleryUploaderProps> = ({
     }
     setUploading(true);
     try {
-      const base64 = await fileToBase64(file);
+      const optimized = await compressAndOptimizeImage(file);
       const newImage: ProductImage = {
         id: `img-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
         productId,
         variantId,
         imageType: images.length === 0 ? 'PRIMARY' : 'GALLERY',
-        url: base64,
+        url: optimized.base64,
         altText: sanitizeFileName(file.name),
         order: images.length,
-        fileSize: file.size,
-        mimeType: file.type,
+        fileSize: optimized.sizeBytes,
+        mimeType: 'image/webp',
         createdAt: new Date().toISOString(),
       };
       const updated = [...images, newImage];
       onImagesChange(updated);
       await db.productImages.put(newImage);
-    } catch (err) {
-      setError('Error al procesar la imagen.');
+    } catch (err: any) {
+      const message = err instanceof MediaValidationError ? err.message : 'Error al procesar la imagen.';
+      setError(message);
     } finally {
       setUploading(false);
     }
@@ -79,7 +81,7 @@ export const ImageGalleryUploader: React.FC<ImageGalleryUploaderProps> = ({
       <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
         {images.map((img) => (
           <div key={img.id} className="relative group aspect-square rounded bg-slate-800 border border-slate-700 overflow-hidden">
-            <img src={img.url} alt={img.altText} className="w-full h-full object-cover" />
+            <img src={img.url} alt={img.altText} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
             {img.imageType === 'PRIMARY' && (
               <span className="absolute top-1 left-1 bg-amber-500 text-slate-950 text-[9px] font-bold px-1 rounded shadow">Principal</span>
             )}

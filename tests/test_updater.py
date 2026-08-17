@@ -20,7 +20,7 @@ runner = CliRunner()
 def test_updater_initialization_and_version():
     updater = AztecUpdater()
     assert updater.current_version == aztec_circle.__version__
-    assert updater.current_version == "0.3.0"
+    assert updater.current_version == "0.4.0"
 
 
 def test_updater_find_git_root(tmp_path):
@@ -96,7 +96,7 @@ def test_cli_version_flag():
     res = runner.invoke(app, ["--version"])
     assert res.exit_code == 0
     assert "Aztec Decision Circle" in res.stdout
-    assert "v0.3.0" in res.stdout
+    assert f"v{aztec_circle.__version__}" in res.stdout
 
 
 def test_cli_update_check_command():

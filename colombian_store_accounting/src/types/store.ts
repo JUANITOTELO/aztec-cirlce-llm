@@ -2,7 +2,11 @@
  * TypeScript Interfaces for Colombian Store & Accounting Management System
  */
 
-export type AppModule = 'pos' | 'products' | 'inventory' | 'ledger' | 'dian' | 'puc' | 'users';
+import { ProductVariant } from './productVariant';
+import { ProductImage } from './productMedia';
+
+export type AppModule = 'pos' | 'products' | 'inventory' | 'ledger' | 'dian' | 'puc' | 'users' | 'multimedia';
+
 export interface RoleItem {
   id: string;
   name: string;
@@ -18,9 +22,9 @@ export interface UserAccount {
   roleId: string;
   role?: string;
   password?: string;
+  permissions?: string[];
   isActive?: boolean;
 }
-import { ProductVariant } from './productVariant';
 
 export interface Product {
   id: string;
@@ -35,6 +39,7 @@ export interface Product {
   barcode?: string;
   imageUrl?: string;
   variants?: ProductVariant[];
+  images?: ProductImage[];
 }
 
 export interface CartItem {

@@ -260,7 +260,16 @@ async def run_modular_consensus_session(
                 if BuildFixAgent.is_recoverable(test_res.stderr + test_res.stdout):
                     console.print("[yellow]Tests failed. Triggering Build Fix Agent on test errors...[/yellow]")
                     fixer = BuildFixAgent(console=console, max_iterations=3)
-                    fix_res = await fixer.fix(root, test_res, runner=runner)
+                    fix_res = await fixer.fix(
+                        root,
+                        test_res,
+                        runner=runner,
+                        verify_fn=lambda r: runner.run_shell_command_streamed(
+                            cmd_str="npm run test -- --run",
+                            cwd=r,
+                            title="Quality Gate: Test Suite",
+                        ),
+                    )
                     state.record_cost(fix_res.total_cost_usd)
                     if not fix_res.success:
                         console.print("[bold red]Warning: Unresolved test failures remain.[/bold red]\n")

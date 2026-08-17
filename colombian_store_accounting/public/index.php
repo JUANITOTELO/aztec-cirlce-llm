@@ -9,6 +9,10 @@ use App\Container;
 use App\Router;
 use App\Controllers\AuthController;
 use App\Controllers\TransactionController;
+use App\Controllers\ProductImageController;
+use App\Controllers\ProductVariantController;
+use App\Middleware\AuthMiddleware;
+use App\Middleware\RoleMiddleware;
 
 // Initialize DI Container
 $container = new Container();
@@ -23,5 +27,13 @@ $router->post('/api/auth/logout', [AuthController::class, 'logout']);
 
 $router->post('/api/pos/sync', [TransactionController::class, 'sync']);
 
-// Dispatch Request
+// Product Variant Routes
+$router->get('/api/products/{id}/variants', [ProductVariantController::class, 'getVariants']);
+$router->post('/api/products/{id}/variants', [ProductVariantController::class, 'create']);
+$router->put('/api/products/{id}/variants/{variantId}', [ProductVariantController::class, 'update']);
+$router->delete('/api/products/{id}/variants/{variantId}', [ProductVariantController::class, 'delete']);
+
+// Product Media Routes
+$router->post('/api/products/{id}/images', [ProductImageController::class, 'upload']);
+$router->delete('/api/products/{id}/images/{imageId}', [ProductImageController::class, 'delete']);
 $router->dispatch();

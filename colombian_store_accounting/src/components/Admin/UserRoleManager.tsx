@@ -9,6 +9,7 @@ const AVAILABLE_MODULES: { id: AppModule; label: string }[] = [
   { id: 'dian', label: 'Liquidación DIAN' },
   { id: 'puc', label: 'Catálogo PUC' },
   { id: 'users', label: 'Usuarios & Roles' },
+  { id: 'multimedia', label: 'Subida de Multimedia' },
 ];
 
 interface UserRoleManagerProps {

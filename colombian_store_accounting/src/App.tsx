@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react';
-import { Product, LedgerEntry, UserAccount, RoleItem, AppModule, SaleInvoice } from './types/store';
-import { Category } from './types/category';
-import { ProductVariant } from './types/productVariant';
-import { ProductImage } from './types/productMedia';
+import type { Product, LedgerEntry, UserAccount, RoleItem, AppModule, SaleInvoice } from './types/store';
+import type { Category } from './types/category';
+import type { ProductVariant } from './types/productVariant';
+import type { ProductImage } from './types/productMedia';
 import { INITIAL_PRODUCTS, INITIAL_LEDGER_ENTRIES, MOCK_USERS, INITIAL_ROLES } from './constants/mockData';
 import { INITIAL_CATEGORIES } from './constants/mockCategories';
 import { INITIAL_VARIANTS, INITIAL_PRODUCT_IMAGES } from './constants/mockVariants';
@@ -10,6 +10,7 @@ import { usePersistentState } from './hooks/usePersistentState';
 import { useCategoryList } from './hooks/useCategoryList';
 import { reassignProductsToCategory } from './engine/categoryConstraints';
 import { ProductLedgerOrchestrator } from './engine/productLedgerOrchestrator';
+import { validateApiConfig } from './constants/api';
 import { Header } from './components/Header';
 import { LoginScreen } from './components/Auth/LoginScreen';
 import { PosTerminal } from './components/POS/PosTerminal';
@@ -20,7 +21,12 @@ import { DianTaxSettlement } from './components/Accounting/DianTaxSettlement';
 import { PucExplorer } from './components/Accounting/PucExplorer';
 import { UserRoleManager } from './components/Admin/UserRoleManager';
 
-export function App() {
+export const App = React.memo((): React.ReactElement => {
+  // Validate API configuration on app startup
+  useEffect(() => {
+    validateApiConfig();
+  }, []);
+
   const [currentUser, setCurrentUser] = usePersistentState<UserAccount | null>('aztec_current_user', MOCK_USERS[0]);
   const [users, setUsers] = usePersistentState<UserAccount[]>('aztec_users', MOCK_USERS);
   const [roles, setRoles] = usePersistentState<RoleItem[]>('aztec_roles', INITIAL_ROLES);
@@ -28,7 +34,7 @@ export function App() {
   const [products, setProducts] = usePersistentState<Product[]>('aztec_products', INITIAL_PRODUCTS);
   const [variants, setVariants] = usePersistentState<ProductVariant[]>('aztec_variants', INITIAL_VARIANTS);
   const [images, setImages] = usePersistentState<ProductImage[]>('aztec_images', INITIAL_PRODUCT_IMAGES);
-  const [persistedCategories, setPersistedCategories] = usePersistentState<Category[]>('aztec_categories', INITIAL_CATEGORIES);
+  const [persistedCategories] = usePersistentState<Category[]>('aztec_categories', INITIAL_CATEGORIES);
   const [ledgerEntries, setLedgerEntries] = usePersistentState<LedgerEntry[]>('aztec_ledger_entries', INITIAL_LEDGER_ENTRIES);
 
   const { categories, addCategory, updateCategory, deleteCategory, setCategories } = useCategoryList(
@@ -36,7 +42,7 @@ export function App() {
   );
 
   if (!currentUser) {
-    return <LoginScreen users={users} onLogin={(user) => setCurrentUser(user)} />;
+    return <LoginScreen users={users} onLogin={(user: UserAccount) => setCurrentUser(user)} />;
   }
 
   const currentRole = roles.find((r) => r.id === currentUser.roleId) || roles.find((r) => r.name?.toLowerCase() === (currentUser.role || '').toLowerCase()) || INITIAL_ROLES[0];
@@ -94,7 +100,7 @@ export function App() {
         onLogout={handleLogout}
         onResetData={handleResetData}
       />
-      <main className="flex-1 p-6 overflow-y-auto">
+      <main className="flex-1 p-4 max-w-7xl mx-auto w-full">
         {activeTab === 'pos' && (
           <PosTerminal
             products={products}
@@ -107,6 +113,10 @@ export function App() {
           <ProductManagementView
             products={products}
             setProducts={setProducts}
+            variants={variants}
+            setVariants={setVariants}
+            images={images}
+            setImages={setImages}
             categories={categories}
             onAddCategory={addCategory}
             onUpdateCategory={updateCategory}
@@ -146,6 +156,6 @@ export function App() {
       </main>
     </div>
   );
-}
+});
 
 export default App;

@@ -324,7 +324,12 @@ async def cmd_fix(args: str, state: SessionState, console: Console) -> None:
         return
 
     fixer = BuildFixAgent(console=console, max_iterations=3)
-    res = await fixer.fix(root, combined_fail, runner=runner)
+    res = await fixer.fix(
+        root,
+        combined_fail,
+        runner=runner,
+        verify_fn=lambda r: runner.verify_project_comprehensive(r, include_tests=True),
+    )
     state.record_cost(res.total_cost_usd)
     if res.success:
         console.print(f"[bold green]✓ Successfully repaired {len(res.patches_applied)} file(s) across {res.iterations} iteration(s)![/bold green]\n")

@@ -7,17 +7,20 @@ export interface ProductImage {
   imageType?: ImageType;
   url: string;
   altText?: string;
-  order?: number;
+  order: number;
   fileSize?: number;
   mimeType?: string;
   createdAt?: string;
   isPrimary?: boolean;
   fileName?: string;
+  fileHash?: string;
+  dimensions?: { width: number; height: number };
+  status?: 'pending' | 'synced' | 'error';
 }
 
-export interface MediaValidationError {
+export interface MediaValidationIssue {
   field?: string;
-  message?: string;
+  message: string;
   isValid?: boolean;
   error?: string;
 }
@@ -25,7 +28,8 @@ export interface MediaValidationError {
 export interface ImageUploadPayload {
   productId: string;
   variantId?: string | null;
-  file: File;
+  file?: File;
+  files?: File[];
   altText?: string;
   isPrimary?: boolean;
 }

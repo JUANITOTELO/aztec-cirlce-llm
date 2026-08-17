@@ -6,7 +6,8 @@ describe('Media File Validation and Sanitization', () => {
     const raw = '../../../etc/passwd.png';
     const safe = sanitizeFileName(raw);
     expect(safe).not.toContain('..');
-    expect(safe).toBe('etc_passwd.png');
+    expect(safe).not.toContain('/');
+    expect(safe).toBe('passwd.png');
   });
 
   it('rejects unapproved MIME types and extensions', () => {

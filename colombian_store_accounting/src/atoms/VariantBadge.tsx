@@ -12,6 +12,10 @@ export const VariantBadge: React.FC<VariantBadgeProps> = ({
   showStock = false,
   onClick,
 }) => {
+  if (!variant) {
+    return null;
+  }
+
   const attrSummary = Object.values(variant.attributes || {})
     .filter(Boolean)
     .join(' · ');

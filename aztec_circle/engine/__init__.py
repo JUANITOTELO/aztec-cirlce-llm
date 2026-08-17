@@ -18,6 +18,16 @@ from aztec_circle.engine.build_fixer import BuildFixAgent, FixResult, TSError
 from aztec_circle.engine.project_indexer import ProjectIndexer, ProjectIndex, FileIndex
 from aztec_circle.engine.updater import AztecUpdater, UpdateCheckResult, UpdateExecutionResult
 from aztec_circle.engine.plan_manager import PlanManager
+from aztec_circle.engine.patch_agent import PatchAgent, PatchApplicator, FilePatch, PatchResult
+from aztec_circle.engine.linking_engine import (
+    LinkingEngine,
+    DependencyGraph,
+    FileNode,
+    IntegrationManifest,
+    load_project_aztec_config,
+)
+from aztec_circle.engine.integration_enforcer import enforce_mandatory_patches
+from aztec_circle.engine.post_apply_verifier import PostApplyVerifier, VerificationResult
 
 __all__ = [
     "BudgetManager",
@@ -47,5 +57,12 @@ __all__ = [
     "AztecUpdater",
     "UpdateCheckResult",
     "UpdateExecutionResult",
+    "LinkingEngine",
+    "DependencyGraph",
+    "FileNode",
+    "IntegrationManifest",
+    "load_project_aztec_config",
+    "enforce_mandatory_patches",
+    "PostApplyVerifier",
+    "VerificationResult",
 ]
-

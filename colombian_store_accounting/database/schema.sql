@@ -32,18 +32,13 @@ CREATE TABLE IF NOT EXISTS users (
     role_id VARCHAR(64) NOT NULL,
     is_active TINYINT(1) DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (role_id) REFERENCES roles(id)
-);
-
 -- Insert Base Roles
 INSERT INTO roles (id, name, description, is_system)
 VALUES 
     ('role-admin', 'Admin', 'Acceso total y configuración de usuarios, roles y módulos del sistema', 1),
     ('role-cajero', 'Cajero', 'Acceso a facturación POS y consulta de existencias', 1),
-    ('role-contador', 'Contador', 'Acceso a libros contables, PUC, inventario y DIAN', 1)
-ON DUPLICATE KEY UPDATE 
-    description = VALUES(description),
-    is_system = VALUES(is_system);
+    ('role-contador', 'Contador', 'Acceso a libros contables, PUC, productos e inventario y DIAN', 1)
+ON DUPLICATE KEY UPDATE name = VALUES(name);
 
 -- Insert Feature Permissions
 INSERT INTO permissions (id, module, feature_key, description) VALUES
@@ -52,6 +47,7 @@ INSERT INTO permissions (id, module, feature_key, description) VALUES
     ('perm-led-all', 'ledger', 'ledger.manage', 'Consulta y registro de asientos en libro diario/mayor'),
     ('perm-dian-all', 'dian', 'dian.manage', 'Liquidación tributaria y reportes DIAN (IVA, ReteFuente, ReteICA)'),
     ('perm-puc-all', 'puc', 'puc.manage', 'Administración y consulta del catálogo de cuentas PUC'),
+    ('perm-media-manage', 'products', 'products.manage_media', 'Gestión y carga de imágenes de catálogo y variantes'),
     ('perm-usr-view', 'users', 'users.view', 'Ver lista de usuarios y roles del sistema'),
     ('perm-usr-manage', 'users', 'users.manage', 'Crear, editar, eliminar y asignar roles a usuarios'),
     ('perm-role-config', 'users', 'roles.configure_access', 'Configurar roles y matriz de accesos a módulos')

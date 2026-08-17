@@ -5,9 +5,9 @@ export function createVariantAuditEntry(
   variantId: string,
   productId: string,
   action: VariantAuditLog['action'],
-  userId: string,
-  oldVariant?: Partial<ProductVariant>,
-  newVariant?: Partial<ProductVariant>
+  userId: string = 'system',
+  oldVariant?: Partial<ProductVariant> | Record<string, any>,
+  newVariant?: Partial<ProductVariant> | Record<string, any>
 ): VariantAuditLog {
   const deltas: Record<string, { old: any; new: any }> = {};
   if (oldVariant && newVariant) {
@@ -21,19 +21,53 @@ export function createVariantAuditEntry(
     });
   }
   return {
-    id: `val-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+    id: `val-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
     variantId,
     productId,
     action,
     deltas,
-    performedBy: userId,
+    performedBy: typeof userId === 'string' ? userId : (userId as any)?.user || 'system',
+    userId: typeof userId === 'string' ? userId : (userId as any)?.user || 'system',
+    details: typeof oldVariant === 'object' && !newVariant ? JSON.stringify(oldVariant) : undefined,
+    metadata: typeof oldVariant === 'object' ? (oldVariant as Record<string, any>) : undefined,
     timestamp: new Date().toISOString(),
   };
 }
 
-export async function logVariantMutation(log: VariantAuditLog): Promise<void> {
+export async function logVariantMutation(
+  variantIdOrEntry: string | Partial<VariantAuditLog>,
+  productId?: string,
+  action?: VariantAuditLog['action'],
+  userIdOrDetails?: any,
+  oldVariant?: Partial<ProductVariant>,
+  newVariant?: Partial<ProductVariant>
+): Promise<void> {
   try {
-    await db.variantAuditLogs.add(log);
+    let entry: VariantAuditLog;
+    if (typeof variantIdOrEntry === 'object' && variantIdOrEntry !== null) {
+      entry = {
+        id: variantIdOrEntry.id || `val-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+        variantId: variantIdOrEntry.variantId || 'product_global',
+        productId: variantIdOrEntry.productId || '',
+        action: variantIdOrEntry.action || 'UPDATE',
+        deltas: variantIdOrEntry.deltas || {},
+        performedBy: variantIdOrEntry.performedBy || variantIdOrEntry.userId || 'system',
+        userId: variantIdOrEntry.userId || variantIdOrEntry.performedBy || 'system',
+        details: variantIdOrEntry.details,
+        metadata: variantIdOrEntry.metadata,
+        timestamp: variantIdOrEntry.timestamp || new Date().toISOString(),
+      };
+    } else {
+      entry = createVariantAuditEntry(
+        String(variantIdOrEntry),
+        productId || '',
+        action || 'UPDATE',
+        typeof userIdOrDetails === 'string' ? userIdOrDetails : (userIdOrDetails?.user || 'system'),
+        typeof userIdOrDetails === 'object' ? userIdOrDetails : oldVariant,
+        newVariant
+      );
+    }
+    await db.variantAuditLogs.add(entry);
   } catch (err) {
     console.warn('Failed to log variant audit to Dexie:', err);
   }

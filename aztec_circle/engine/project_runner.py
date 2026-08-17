@@ -367,6 +367,28 @@ class ProjectRunner:
             duration_seconds=tc_res.duration_seconds + build_res.duration_seconds,
         )
 
+    async def verify_project_comprehensive(
+        self,
+        project_dir: str,
+        include_tests: bool = True,
+    ) -> CommandResult:
+        """
+        Comprehensive multi-tier verification:
+        1. Runs typecheck / build verification (fast path -> build escalation).
+        2. If build is clean and include_tests is True, runs discovered test suites.
+        """
+        root = find_project_root(project_dir)
+        build_res = await self.verify_project_smart(root, force_full_build=False)
+        if not build_res.success:
+            return build_res
+
+        if include_tests:
+            test_res = await self.test_project(root)
+            if not test_res.success:
+                return test_res
+
+        return build_res
+
     async def test_project(self, project_dir: str) -> CommandResult:
         """Execute project test suites across all tiers (Frontend, Backend, Types/Proofs)."""
         root = find_project_root(project_dir)

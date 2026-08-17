@@ -11,7 +11,7 @@ import json
 import os
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Coroutine, Dict, List, Optional
 import structlog
 from rich.console import Console
 
@@ -273,9 +273,10 @@ CRITICAL INSTRUCTIONS:
         project_dir: str,
         initial_build_result: CommandResult,
         runner: Optional[ProjectRunner] = None,
+        verify_fn: Optional[Callable[[str], Coroutine[Any, Any, CommandResult]]] = None,
     ) -> FixResult:
         """
-        Execute iterative self-healing fix loop until build succeeds or max_iterations reached.
+        Execute iterative self-healing fix loop until build/tests succeed or max_iterations reached.
         Operates atomically on one failing file at a time per iteration.
         """
         runner = runner or ProjectRunner(console=self.console)
@@ -283,6 +284,12 @@ CRITICAL INSTRUCTIONS:
         current_build = initial_build_result
         all_patched: List[str] = []
         total_cost = 0.0
+
+        combined_initial = f"{initial_build_result.stdout}\n{initial_build_result.stderr}".lower()
+        is_test_error = any(
+            sig in combined_initial
+            for sig in ("fail ", "vitest", "jest", "pytest", "phpunit", "test_failure", "assertionerror", "test failed", "fails")
+        )
 
         if current_build.success:
             return FixResult(
@@ -294,7 +301,8 @@ CRITICAL INSTRUCTIONS:
             )
 
         if self.console:
-            self.console.print(f"\n[bold yellow]🔧 Initiating Aztec Build Self-Healing Engine (Max {self.max_iterations} iterations)[/bold yellow]")
+            engine_label = "Build & Test" if (is_test_error or verify_fn is not None) else "Build"
+            self.console.print(f"\n[bold yellow]🔧 Initiating Aztec {engine_label} Self-Healing Engine (Max {self.max_iterations} iterations)[/bold yellow]")
 
         for loop in range(1, self.max_iterations + 1):
             combined_log = f"{current_build.stderr}\n{current_build.stdout}"
@@ -436,14 +444,19 @@ Please output the complete, corrected code for {clean_path}."""
                     self.console.print("  [yellow]No files were patched in this iteration.[/yellow]")
                 break
 
+            check_label = "build & test" if (is_test_error or verify_fn is not None) else "build"
             if self.console:
-                self.console.print("  [cyan]Re-running build verification...[/cyan]")
+                self.console.print(f"  [cyan]Re-running {check_label} verification...[/cyan]")
 
-            # Re-run build to verify
-            current_build = await runner.build_project(root)
+            # Re-run build / test verification
+            if verify_fn is not None:
+                current_build = await verify_fn(root)
+            else:
+                current_build = await runner.verify_project_comprehensive(root, include_tests=is_test_error)
+
             if current_build.success:
                 if self.console:
-                    self.console.print(f"  [bold green]🎉 Build healed successfully in iteration {loop}![/bold green]\n")
+                    self.console.print(f"  [bold green]🎉 {check_label.capitalize()} healed successfully in iteration {loop}![/bold green]\n")
                 from aztec_circle.engine.plan_manager import PlanManager
                 PlanManager.record_fix_iteration(output_dir=root, fixed_files=all_patched)
                 return FixResult(

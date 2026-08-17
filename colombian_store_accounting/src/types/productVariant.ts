@@ -27,10 +27,10 @@ export interface ProductVariantFormData {
   sku: string;
   name: string;
   barcode?: string;
-  price: number;
-  cost: number;
-  stock: number;
-  minStock: number;
+  price?: number;
+  cost?: number;
+  stock?: number;
+  minStock?: number;
   attributes?: VariantAttributes;
   isDefault?: boolean;
   isActive?: boolean;
@@ -40,11 +40,13 @@ export interface VariantAuditLog {
   id: string;
   variantId?: string;
   productId: string;
-  action: 'CREATED' | 'UPDATED' | 'DELETED' | 'STOCK_ADJUSTED' | 'CREATE' | 'UPDATE' | 'DELETE';
+  action: 'CREATED' | 'UPDATED' | 'DELETED' | 'STOCK_ADJUSTED' | 'CREATE' | 'UPDATE' | 'DELETE' | 'IMAGE_UPLOAD' | 'IMAGE_DELETE' | 'IMAGE_ASSIGN_VARIANT';
   deltas?: Record<string, { old: any; new: any }>;
   changes?: any;
   performedBy?: string;
   userId?: string;
+  details?: string;
+  metadata?: Record<string, any>;
   timestamp: string;
 }
 

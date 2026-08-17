@@ -72,7 +72,7 @@ class PatchApplicator:
 
         # 1. Capture backups of all affected files
         for patch in patches:
-            clean_rel = patch.file.lstrip("/\\").replace("\\", "/")
+            clean_rel = str(patch.file).lstrip("/\\").replace("\\", "/")
             full_path = os.path.join(root, clean_rel)
             if clean_rel not in backups:
                 if os.path.exists(full_path):
@@ -84,7 +84,7 @@ class PatchApplicator:
         # 2. Group patches by file
         patches_by_file: Dict[str, List[FilePatch]] = {}
         for p in patches:
-            clean_rel = p.file.lstrip("/\\").replace("\\", "/")
+            clean_rel = str(p.file).lstrip("/\\").replace("\\", "/")
             patches_by_file.setdefault(clean_rel, []).append(p)
 
         try:
@@ -283,9 +283,20 @@ Which files must be read and edited to fulfill this instruction?"""
         valid_files_to_read = []
 
         for rel_file in files_to_read:
-            clean_rel = rel_file.lstrip("/\\").replace("\\", "/")
+            if isinstance(rel_file, int):
+                if 1 <= rel_file <= len(index.file_indices):
+                    clean_rel = index.file_indices[rel_file - 1].rel_path
+                else:
+                    continue
+            else:
+                val_str = str(rel_file).strip()
+                if val_str.isdigit() and 1 <= int(val_str) <= len(index.file_indices):
+                    clean_rel = index.file_indices[int(val_str) - 1].rel_path
+                else:
+                    clean_rel = val_str.lstrip("/\\").replace("\\", "/")
+
             full_path = os.path.join(root, clean_rel)
-            if os.path.exists(full_path):
+            if os.path.exists(full_path) and clean_rel not in valid_files_to_read:
                 valid_files_to_read.append(clean_rel)
                 try:
                     with open(full_path, "r", encoding="utf-8", errors="replace") as fh:
@@ -340,18 +351,34 @@ Please generate the minimal, atomic JSON patches and any required console/databa
             raw_patches = r2_data.get("patches", [])
             raw_commands = r2_data.get("commands", [])
 
+            def _resolve_patch_file(raw_val: Any) -> str:
+                if isinstance(raw_val, int):
+                    if 1 <= raw_val <= len(valid_files_to_read):
+                        return valid_files_to_read[raw_val - 1]
+                    elif 1 <= raw_val <= len(index.file_indices):
+                        return index.file_indices[raw_val - 1].rel_path
+                val_str = str(raw_val).strip()
+                if val_str.isdigit():
+                    num = int(val_str)
+                    if 1 <= num <= len(valid_files_to_read):
+                        return valid_files_to_read[num - 1]
+                    elif 1 <= num <= len(index.file_indices):
+                        return index.file_indices[num - 1].rel_path
+                return val_str.lstrip("/\\").replace("\\", "/")
+
             # Parse patches
             patches: List[FilePatch] = []
             for p in raw_patches:
                 if isinstance(p, dict) and "file" in p:
+                    resolved_file = _resolve_patch_file(p["file"])
                     patches.append(
                         FilePatch(
-                            file=p["file"],
-                            action=p.get("action", "replace"),
+                            file=resolved_file,
+                            action=str(p.get("action", "replace")),
                             start_line=p.get("start_line"),
                             end_line=p.get("end_line"),
                             replacement=p.get("replacement"),
-                            concern=p.get("concern", "Code edit"),
+                            concern=str(p.get("concern", "Code edit")),
                         )
                     )
 
@@ -359,14 +386,15 @@ Please generate the minimal, atomic JSON patches and any required console/databa
                 items = r2_data.get("items", []) if isinstance(r2_data, dict) else (r2_data if isinstance(r2_data, list) else [])
                 for p in items:
                     if isinstance(p, dict) and "file" in p:
+                        resolved_file = _resolve_patch_file(p["file"])
                         patches.append(
                             FilePatch(
-                                file=p["file"],
-                                action=p.get("action", "replace"),
+                                file=resolved_file,
+                                action=str(p.get("action", "replace")),
                                 start_line=p.get("start_line"),
                                 end_line=p.get("end_line"),
                                 replacement=p.get("replacement"),
-                                concern=p.get("concern", "Code edit"),
+                                concern=str(p.get("concern", "Code edit")),
                             )
                         )
 

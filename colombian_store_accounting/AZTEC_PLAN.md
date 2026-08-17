@@ -2,7 +2,7 @@
 
 > **Project Goal**: Aztec Software Project  
 > **Status**: Active / Synced with Codebase  
-> **Last Updated**: 2026-08-16 21:29:20  
+> **Last Updated**: 2026-08-16 23:34:55  
 > **Files Indexed**: 15 total source files  
 
 ---
@@ -45,6 +45,35 @@
 
 | File | Layer | Responsibility |
 | :--- | :--- | :--- |
+| `src/engine/exifRemover.ts` | Engine (Domain Logic) | Pure mathematical & domain algorithms for exifRemover |
+| `src/hooks/useImageUploadQueue.ts` | Hook (State/Behavior) | React state management hook for useImageUploadQueue |
+| `.env.production` | Source | Module implementation for .env |
+| `.env.example` | Source | Module implementation for .env |
+| `src/constants/api.ts` | Constants (Config) | Static configuration constants for api |
+| `src/test/productUnifiedModal.integration.test.ts` | Test Suite | Unit tests for productUnifiedModal.integration |
+| `backend/src/Controllers/ProductVariantController.php` | Source | Module implementation for ProductVariantController |
+| `backend/src/Middleware/RoleMiddleware.php` | Source | Module implementation for RoleMiddleware |
+| `backend/src/Middleware/AuthMiddleware.php` | Source | Module implementation for AuthMiddleware |
+| `src/components/Products/ProductUnifiedModal.tsx` | Component (Composite) | Composite panel for ProductUnifiedModal |
+| `src/components/Products/ProductFormGeneral.tsx` | Component (Composite) | Composite panel for ProductFormGeneral |
+| `src/components/Products/ProductFormTabs.tsx` | Component (Composite) | Composite panel for ProductFormTabs |
+| `src/hooks/useImageSync.ts` | Hook (State/Behavior) | React state management hook for useImageSync |
+| `src/hooks/useVariantSync.ts` | Hook (State/Behavior) | React state management hook for useVariantSync |
+| `sql/schema.sql` | Source | Module implementation for schema |
+| `public/index.php` | Source | Module implementation for index |
+| `src/test/mediaContextIntegration.test.ts` | Test Suite | Unit tests for mediaContextIntegration |
+| `src/Controllers/ProductImageController.php` | Source | Module implementation for ProductImageController |
+| `src/components/Products/ProductMediaCoordinator.tsx` | Component (Composite) | Composite panel for ProductMediaCoordinator |
+| `src/components/Products/ImageGalleryGrid.tsx` | Component (Composite) | Composite panel for ImageGalleryGrid |
+| `src/components/Products/VariantImageLinker.tsx` | Component (Composite) | Composite panel for VariantImageLinker |
+| `src/components/Products/ImageDropZone.tsx` | Component (Composite) | Composite panel for ImageDropZone |
+| `src/hooks/useMediaOrchestrator.ts` | Hook (State/Behavior) | React state management hook for useMediaOrchestrator |
+| `src/context/MediaContext.tsx` | Source | Module implementation for MediaContext |
+| `src/test/variantImageCrud.test.ts` | Test Suite | Unit tests for variantImageCrud |
+| `src/hooks/useVariantImageTransaction.ts` | Hook (State/Behavior) | React state management hook for useVariantImageTransaction |
+| `src/engine/variantImageValidation.ts` | Engine (Domain Logic) | Pure mathematical & domain algorithms for variantImageValidation |
+| `src/engine/imageOptimizer.ts` | Engine (Domain Logic) | Pure mathematical & domain algorithms for imageOptimizer |
+| `src/constants/imageOptimization.ts` | Constants (Config) | Static configuration constants for imageOptimization |
 | `src/utils/formatters.ts` | Utils (Pure Helpers) | Module implementation for formatters |
 | `src/test/dexieMigration.test.ts` | Test Suite | Unit tests for dexieMigration |
 | `src/test/variantCrudEngine.test.ts` | Test Suite | Unit tests for variantCrudEngine |
@@ -132,6 +161,1162 @@
 ---
 
 ## 📝 Change Log & Iteration History
+- **2026-08-16 23:35:29** — Automated Self-Healing Build Fix (2 files repaired).
+- **2026-08-16 23:35:22** — Automated Self-Healing Build Fix (2 files repaired).
+- **2026-08-16 23:34:55** — Incremental Edit: "Module Consensus: the images aren't being rendered correctly, so fix the entire life cycle of uploading and managing images holistically" (Modified: src/hooks/useImageUploadQueue.ts, src/engine/exifRemover.ts, src/db/dexie.ts, src/components/Products/ImageGalleryUploader.tsx; Executed: npm install exifr).
+- **2026-08-16 23:34:55** — Automated Self-Healing Build Fix (2 files repaired).
+- **2026-08-16 23:21:24** — Automated Self-Healing Build Fix (6 files repaired).
+- **2026-08-16 23:20:22** — Incremental Edit: "the images aren't being rendered correctly" (Modified: src/engine/imageOptimizer.ts, src/components/Products/ImageGalleryUploader.tsx, src/components/Products/ImageGalleryGrid.tsx, src/components/Products/ImageGalleryGrid.tsx).
+- **2026-08-16 23:18:25** — Incremental Edit: "the uploaded images do not load because of a wrong img tag?" (Modified: src/components/Products/ImageGalleryGrid.tsx).
+- **2026-08-16 23:16:43** — Automated Self-Healing Build Fix (2 files repaired).
+- **2026-08-16 23:16:29** — Incremental Edit: "Fix the whole cylce of uploading and updating an image." (Modified: src/engine/imageOptimizer.ts, src/engine/mediaValidation.ts, src/components/Products/ImageDropZone.tsx, src/components/Products/ImageGalleryUploader.tsx, src/hooks/useProductImageCrud.ts).
+- **2026-08-16 23:14:05** — Automated Self-Healing Build Fix (4 files repaired).
+- **2026-08-16 23:13:32** — Incremental Edit: "nothing appears, we should bring all the photos to the frontend so we know theres something chunk-WALXKXZM.js?v=c08e5248:21580 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+useMediaOrchestrator.ts:121 [Media] Duplicate image detected: daniel-mcgarry-stellarsea-fisherman-dredger-vi-006.jpg
+(anonymous) @ useMediaOrchestrator.ts:121
+await in (anonymous)
+(anonymous) @ ProductMediaManagerModal.tsx:40
+(anonymous) @ ImageDropZone.tsx:31
+(anonymous) @ ImageDropZone.tsx:62
+callCallback2 @ chunk-WALXKXZM.js?v=c08e5248:3674
+invokeGuardedCallbackDev @ chunk-WALXKXZM.js?v=c08e5248:3699
+invokeGuardedCallback @ chunk-WALXKXZM.js?v=c08e5248:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-WALXKXZM.js?v=c08e5248:3736
+executeDispatch @ chunk-WALXKXZM.js?v=c08e5248:7016
+processDispatchQueueItemsInOrder @ chunk-WALXKXZM.js?v=c08e5248:7036
+processDispatchQueue @ chunk-WALXKXZM.js?v=c08e5248:7045
+dispatchEventsForPlugins @ chunk-WALXKXZM.js?v=c08e5248:7053
+(anonymous) @ chunk-WALXKXZM.js?v=c08e5248:7177
+batchedUpdates$1 @ chunk-WALXKXZM.js?v=c08e5248:18941
+batchedUpdates @ chunk-WALXKXZM.js?v=c08e5248:3579
+dispatchEventForPluginEventSystem @ chunk-WALXKXZM.js?v=c08e5248:7176
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-WALXKXZM.js?v=c08e5248:5478
+dispatchEvent @ chunk-WALXKXZM.js?v=c08e5248:5472
+dispatchDiscreteEvent @ chunk-WALXKXZM.js?v=c08e5248:5449" (Modified: src/hooks/useMediaOrchestrator.ts, src/hooks/useMediaOrchestrator.ts, src/hooks/useMediaOrchestrator.ts, src/components/Products/ProductMediaCoordinator.tsx).
+- **2026-08-16 23:10:02** — Incremental Edit: "chunk-WALXKXZM.js?v=c08e5248:21580 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+ImageGalleryGrid.tsx:106 Uncaught TypeError: Cannot read properties of undefined (reading 'length')
+    at ImageGalleryGrid.tsx:106:25
+    at Array.map (<anonymous>)
+    at ImageGalleryGrid (ImageGalleryGrid.tsx:39:23
+    at renderWithHooks (chunk-WALXKXZM.js?v=c08e5248:11568:26)
+    at updateFunctionComponent (chunk-WALXKXZM.js?v=c08e5248:14602:28)
+    at beginWork (chunk-WALXKXZM.js?v=c08e5248:15944:22)
+    at HTMLUnknownElement.callCallback2 (chunk-WALXKXZM.js?v=c08e5248:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-WALXKXZM.js?v=c08e5248:3699:24)
+    at invokeGuardedCallback (chunk-WALXKXZM.js?v=c08e5248:3733:39)
+    at beginWork$1 (chunk-WALXKXZM.js?v=c08e5248:19793:15)
+(anonymous) @ ImageGalleryGrid.tsx:106
+(anonymous) @ ImageGalleryGrid.tsx:39
+renderWithHooks @ chunk-WALXKXZM.js?v=c08e5248:11568
+updateFunctionComponent @ chunk-WALXKXZM.js?v=c08e5248:14602
+beginWork @ chunk-WALXKXZM.js?v=c08e5248:15944
+callCallback2 @ chunk-WALXKXZM.js?v=c08e5248:3674
+invokeGuardedCallbackDev @ chunk-WALXKXZM.js?v=c08e5248:3699
+invokeGuardedCallback @ chunk-WALXKXZM.js?v=c08e5248:3733
+beginWork$1 @ chunk-WALXKXZM.js?v=c08e5248:19793
+performUnitOfWork @ chunk-WALXKXZM.js?v=c08e5248:19226
+workLoopSync @ chunk-WALXKXZM.js?v=c08e5248:19165
+renderRootSync @ chunk-WALXKXZM.js?v=c08e5248:19144
+performConcurrentWorkOnRoot @ chunk-WALXKXZM.js?v=c08e5248:18706
+workLoop @ chunk-WALXKXZM.js?v=c08e5248:197
+flushWork @ chunk-WALXKXZM.js?v=c08e5248:176
+performWorkUntilDeadline @ chunk-WALXKXZM.js?v=c08e5248:384
+postMessage
+schedulePerformWorkUntilDeadline @ chunk-WALXKXZM.js?v=c08e5248:407
+requestHostCallback @ chunk-WALXKXZM.js?v=c08e5248:418
+unstable_scheduleCallback @ chunk-WALXKXZM.js?v=c08e5248:330
+scheduleCallback$1 @ chunk-WALXKXZM.js?v=c08e5248:19854
+ensureRootIsScheduled @ chunk-WALXKXZM.js?v=c08e5248:18680
+scheduleUpdateOnFiber @ chunk-WALXKXZM.js?v=c08e5248:18590
+dispatchSetState @ chunk-WALXKXZM.js?v=c08e5248:12423
+safeSetState @ useMediaOrchestrator.ts:44
+(anonymous) @ useMediaOrchestrator.ts:71
+await in (anonymous)
+(anonymous) @ useMediaOrchestrator.ts:153
+await in (anonymous)
+(anonymous) @ ProductMediaManagerModal.tsx:40
+(anonymous) @ ImageDropZone.tsx:31
+(anonymous) @ ImageDropZone.tsx:62
+callCallback2 @ chunk-WALXKXZM.js?v=c08e5248:3674
+invokeGuardedCallbackDev @ chunk-WALXKXZM.js?v=c08e5248:3699
+invokeGuardedCallback @ chunk-WALXKXZM.js?v=c08e5248:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-WALXKXZM.js?v=c08e5248:3736
+executeDispatch @ chunk-WALXKXZM.js?v=c08e5248:7016
+processDispatchQueueItemsInOrder @ chunk-WALXKXZM.js?v=c08e5248:7036
+processDispatchQueue @ chunk-WALXKXZM.js?v=c08e5248:7045
+dispatchEventsForPlugins @ chunk-WALXKXZM.js?v=c08e5248:7053
+(anonymous) @ chunk-WALXKXZM.js?v=c08e5248:7177
+batchedUpdates$1 @ chunk-WALXKXZM.js?v=c08e5248:18941
+batchedUpdates @ chunk-WALXKXZM.js?v=c08e5248:3579
+dispatchEventForPluginEventSystem @ chunk-WALXKXZM.js?v=c08e5248:7176
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-WALXKXZM.js?v=c08e5248:5478
+dispatchEvent @ chunk-WALXKXZM.js?v=c08e5248:5472
+dispatchDiscreteEvent @ chunk-WALXKXZM.js?v=c08e5248:5449
+ImageGalleryGrid.tsx:106 Uncaught TypeError: Cannot read properties of undefined (reading 'length')
+    at ImageGalleryGrid.tsx:106:25
+    at Array.map (<anonymous>)
+    at ImageGalleryGrid (ImageGalleryGrid.tsx:39:23
+    at renderWithHooks (chunk-WALXKXZM.js?v=c08e5248:11568:26)
+    at updateFunctionComponent (chunk-WALXKXZM.js?v=c08e5248:14602:28)
+    at beginWork (chunk-WALXKXZM.js?v=c08e5248:15944:22)
+    at HTMLUnknownElement.callCallback2 (chunk-WALXKXZM.js?v=c08e5248:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-WALXKXZM.js?v=c08e5248:3699:24)
+    at invokeGuardedCallback (chunk-WALXKXZM.js?v=c08e5248:3733:39)
+    at beginWork$1 (chunk-WALXKXZM.js?v=c08e5248:19793:15)
+(anonymous) @ ImageGalleryGrid.tsx:106
+(anonymous) @ ImageGalleryGrid.tsx:39
+renderWithHooks @ chunk-WALXKXZM.js?v=c08e5248:11568
+updateFunctionComponent @ chunk-WALXKXZM.js?v=c08e5248:14602
+beginWork @ chunk-WALXKXZM.js?v=c08e5248:15944
+callCallback2 @ chunk-WALXKXZM.js?v=c08e5248:3674
+invokeGuardedCallbackDev @ chunk-WALXKXZM.js?v=c08e5248:3699
+invokeGuardedCallback @ chunk-WALXKXZM.js?v=c08e5248:3733
+beginWork$1 @ chunk-WALXKXZM.js?v=c08e5248:19793
+performUnitOfWork @ chunk-WALXKXZM.js?v=c08e5248:19226
+workLoopSync @ chunk-WALXKXZM.js?v=c08e5248:19165
+renderRootSync @ chunk-WALXKXZM.js?v=c08e5248:19144
+recoverFromConcurrentError @ chunk-WALXKXZM.js?v=c08e5248:18764
+performConcurrentWorkOnRoot @ chunk-WALXKXZM.js?v=c08e5248:18712
+workLoop @ chunk-WALXKXZM.js?v=c08e5248:197
+flushWork @ chunk-WALXKXZM.js?v=c08e5248:176
+performWorkUntilDeadline @ chunk-WALXKXZM.js?v=c08e5248:384
+postMessage
+schedulePerformWorkUntilDeadline @ chunk-WALXKXZM.js?v=c08e5248:407
+requestHostCallback @ chunk-WALXKXZM.js?v=c08e5248:418
+unstable_scheduleCallback @ chunk-WALXKXZM.js?v=c08e5248:330
+scheduleCallback$1 @ chunk-WALXKXZM.js?v=c08e5248:19854
+ensureRootIsScheduled @ chunk-WALXKXZM.js?v=c08e5248:18680
+scheduleUpdateOnFiber @ chunk-WALXKXZM.js?v=c08e5248:18590
+dispatchSetState @ chunk-WALXKXZM.js?v=c08e5248:12423
+safeSetState @ useMediaOrchestrator.ts:44
+(anonymous) @ useMediaOrchestrator.ts:71
+await in (anonymous)
+(anonymous) @ useMediaOrchestrator.ts:153
+await in (anonymous)
+(anonymous) @ ProductMediaManagerModal.tsx:40
+(anonymous) @ ImageDropZone.tsx:31
+(anonymous) @ ImageDropZone.tsx:62
+callCallback2 @ chunk-WALXKXZM.js?v=c08e5248:3674
+invokeGuardedCallbackDev @ chunk-WALXKXZM.js?v=c08e5248:3699
+invokeGuardedCallback @ chunk-WALXKXZM.js?v=c08e5248:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-WALXKXZM.js?v=c08e5248:3736
+executeDispatch @ chunk-WALXKXZM.js?v=c08e5248:7016
+processDispatchQueueItemsInOrder @ chunk-WALXKXZM.js?v=c08e5248:7036
+processDispatchQueue @ chunk-WALXKXZM.js?v=c08e5248:7045
+dispatchEventsForPlugins @ chunk-WALXKXZM.js?v=c08e5248:7053
+(anonymous) @ chunk-WALXKXZM.js?v=c08e5248:7177
+batchedUpdates$1 @ chunk-WALXKXZM.js?v=c08e5248:18941
+batchedUpdates @ chunk-WALXKXZM.js?v=c08e5248:3579
+dispatchEventForPluginEventSystem @ chunk-WALXKXZM.js?v=c08e5248:7176
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-WALXKXZM.js?v=c08e5248:5478
+dispatchEvent @ chunk-WALXKXZM.js?v=c08e5248:5472
+dispatchDiscreteEvent @ chunk-WALXKXZM.js?v=c08e5248:5449
+chunk-WALXKXZM.js?v=c08e5248:14052 The above error occurred in the <ImageGalleryGrid> component:
+
+    at ImageGalleryGrid (http://localhost:5173/src/components/Products/ImageGalleryGrid.tsx:19:3)
+    at div
+    at div
+    at div
+    at ProductMediaManagerModal (http://localhost:5173/src/components/Products/ProductMediaManagerModal.tsx?t=1786939679865:24:3)
+    at MediaProvider (http://localhost:5173/src/context/MediaContext.tsx?t=1786939679865:51:3)
+    at ProductMediaCoordinator (http://localhost:5173/src/components/Products/ProductMediaCoordinator.tsx?t=1786939679865:32:3)
+    at div
+    at div
+    at div
+    at MediaProvider (http://localhost:5173/src/context/MediaContext.tsx?t=1786939679865:51:3)
+    at div
+    at ProductUnifiedModal (http://localhost:5173/src/components/Products/ProductUnifiedModal.tsx?t=1786939679865:26:3)
+    at div
+    at ProductManagementView (http://localhost:5173/src/components/Products/ProductManagementView.tsx?t=1786939679865:29:3)
+    at main
+    at div
+    at App (http://localhost:5173/src/App.tsx?t=1786939691413:38:3)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+logCapturedError @ chunk-WALXKXZM.js?v=c08e5248:14052
+update.callback @ chunk-WALXKXZM.js?v=c08e5248:14072
+callCallback @ chunk-WALXKXZM.js?v=c08e5248:11268
+commitUpdateQueue @ chunk-WALXKXZM.js?v=c08e5248:11285
+commitLayoutEffectOnFiber @ chunk-WALXKXZM.js?v=c08e5248:17115
+commitLayoutMountEffects_complete @ chunk-WALXKXZM.js?v=c08e5248:18008
+commitLayoutEffects_begin @ chunk-WALXKXZM.js?v=c08e5248:17997
+commitLayoutEffects @ chunk-WALXKXZM.js?v=c08e5248:17948
+commitRootImpl @ chunk-WALXKXZM.js?v=c08e5248:19381
+commitRoot @ chunk-WALXKXZM.js?v=c08e5248:19305
+finishConcurrentRender @ chunk-WALXKXZM.js?v=c08e5248:18788
+performConcurrentWorkOnRoot @ chunk-WALXKXZM.js?v=c08e5248:18746
+workLoop @ chunk-WALXKXZM.js?v=c08e5248:197
+flushWork @ chunk-WALXKXZM.js?v=c08e5248:176
+performWorkUntilDeadline @ chunk-WALXKXZM.js?v=c08e5248:384
+postMessage
+schedulePerformWorkUntilDeadline @ chunk-WALXKXZM.js?v=c08e5248:407
+requestHostCallback @ chunk-WALXKXZM.js?v=c08e5248:418
+unstable_scheduleCallback @ chunk-WALXKXZM.js?v=c08e5248:330
+scheduleCallback$1 @ chunk-WALXKXZM.js?v=c08e5248:19854
+ensureRootIsScheduled @ chunk-WALXKXZM.js?v=c08e5248:18680
+scheduleUpdateOnFiber @ chunk-WALXKXZM.js?v=c08e5248:18590
+dispatchSetState @ chunk-WALXKXZM.js?v=c08e5248:12423
+safeSetState @ useMediaOrchestrator.ts:44
+(anonymous) @ useMediaOrchestrator.ts:71
+await in (anonymous)
+(anonymous) @ useMediaOrchestrator.ts:153
+await in (anonymous)
+(anonymous) @ ProductMediaManagerModal.tsx:40
+(anonymous) @ ImageDropZone.tsx:31
+(anonymous) @ ImageDropZone.tsx:62
+callCallback2 @ chunk-WALXKXZM.js?v=c08e5248:3674
+invokeGuardedCallbackDev @ chunk-WALXKXZM.js?v=c08e5248:3699
+invokeGuardedCallback @ chunk-WALXKXZM.js?v=c08e5248:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-WALXKXZM.js?v=c08e5248:3736
+executeDispatch @ chunk-WALXKXZM.js?v=c08e5248:7016
+processDispatchQueueItemsInOrder @ chunk-WALXKXZM.js?v=c08e5248:7036
+processDispatchQueue @ chunk-WALXKXZM.js?v=c08e5248:7045
+dispatchEventsForPlugins @ chunk-WALXKXZM.js?v=c08e5248:7053
+(anonymous) @ chunk-WALXKXZM.js?v=c08e5248:7177
+batchedUpdates$1 @ chunk-WALXKXZM.js?v=c08e5248:18941
+batchedUpdates @ chunk-WALXKXZM.js?v=c08e5248:3579
+dispatchEventForPluginEventSystem @ chunk-WALXKXZM.js?v=c08e5248:7176
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-WALXKXZM.js?v=c08e5248:5478
+dispatchEvent @ chunk-WALXKXZM.js?v=c08e5248:5472
+dispatchDiscreteEvent @ chunk-WALXKXZM.js?v=c08e5248:5449
+chunk-WALXKXZM.js?v=c08e5248:19441 Uncaught TypeError: Cannot read properties of undefined (reading 'length')
+    at ImageGalleryGrid.tsx:106:25
+    at Array.map (<anonymous>)
+    at ImageGalleryGrid (ImageGalleryGrid.tsx:39:23
+    at renderWithHooks (chunk-WALXKXZM.js?v=c08e5248:11568:26)
+    at updateFunctionComponent (chunk-WALXKXZM.js?v=c08e5248:14602:28)
+    at beginWork (chunk-WALXKXZM.js?v=c08e5248:15944:22)
+    at beginWork$1 (chunk-WALXKXZM.js?v=c08e5248:19781:22)
+    at performUnitOfWork (chunk-WALXKXZM.js?v=c08e5248:19226:20)
+    at workLoopSync (chunk-WALXKXZM.js?v=c08e5248:19165:13)
+    at renderRootSync (chunk-WALXKXZM.js?v=c08e5248:19144:15)
+(anonymous) @ ImageGalleryGrid.tsx:106
+(anonymous) @ ImageGalleryGrid.tsx:39
+renderWithHooks @ chunk-WALXKXZM.js?v=c08e5248:11568
+updateFunctionComponent @ chunk-WALXKXZM.js?v=c08e5248:14602
+beginWork @ chunk-WALXKXZM.js?v=c08e5248:15944
+beginWork$1 @ chunk-WALXKXZM.js?v=c08e5248:19781
+performUnitOfWork @ chunk-WALXKXZM.js?v=c08e5248:19226
+workLoopSync @ chunk-WALXKXZM.js?v=c08e5248:19165
+renderRootSync @ chunk-WALXKXZM.js?v=c08e5248:19144
+recoverFromConcurrentError @ chunk-WALXKXZM.js?v=c08e5248:18764
+performConcurrentWorkOnRoot @ chunk-WALXKXZM.js?v=c08e5248:18712
+workLoop @ chunk-WALXKXZM.js?v=c08e5248:197
+flushWork @ chunk-WALXKXZM.js?v=c08e5248:176
+performWorkUntilDeadline @ chunk-WALXKXZM.js?v=c08e5248:384
+postMessage
+schedulePerformWorkUntilDeadline @ chunk-WALXKXZM.js?v=c08e5248:407
+requestHostCallback @ chunk-WALXKXZM.js?v=c08e5248:418
+unstable_scheduleCallback @ chunk-WALXKXZM.js?v=c08e5248:330
+scheduleCallback$1 @ chunk-WALXKXZM.js?v=c08e5248:19854
+ensureRootIsScheduled @ chunk-WALXKXZM.js?v=c08e5248:18680
+scheduleUpdateOnFiber @ chunk-WALXKXZM.js?v=c08e5248:18590
+dispatchSetState @ chunk-WALXKXZM.js?v=c08e5248:12423
+safeSetState @ useMediaOrchestrator.ts:44
+(anonymous) @ useMediaOrchestrator.ts:71
+await in (anonymous)
+(anonymous) @ useMediaOrchestrator.ts:153
+await in (anonymous)
+(anonymous) @ ProductMediaManagerModal.tsx:40
+(anonymous) @ ImageDropZone.tsx:31
+(anonymous) @ ImageDropZone.tsx:62
+callCallback2 @ chunk-WALXKXZM.js?v=c08e5248:3674
+invokeGuardedCallbackDev @ chunk-WALXKXZM.js?v=c08e5248:3699
+invokeGuardedCallback @ chunk-WALXKXZM.js?v=c08e5248:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-WALXKXZM.js?v=c08e5248:3736
+executeDispatch @ chunk-WALXKXZM.js?v=c08e5248:7016
+processDispatchQueueItemsInOrder @ chunk-WALXKXZM.js?v=c08e5248:7036
+processDispatchQueue @ chunk-WALXKXZM.js?v=c08e5248:7045
+dispatchEventsForPlugins @ chunk-WALXKXZM.js?v=c08e5248:7053
+(anonymous) @ chunk-WALXKXZM.js?v=c08e5248:7177
+batchedUpdates$1 @ chunk-WALXKXZM.js?v=c08e5248:18941
+batchedUpdates @ chunk-WALXKXZM.js?v=c08e5248:3579
+dispatchEventForPluginEventSystem @ chunk-WALXKXZM.js?v=c08e5248:7176
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-WALXKXZM.js?v=c08e5248:5478
+dispatchEvent @ chunk-WALXKXZM.js?v=c08e5248:5472
+dispatchDiscreteEvent @ chunk-WALXKXZM.js?v=c08e5248:5449" (Modified: src/components/Products/ImageGalleryGrid.tsx, src/components/Products/ImageGalleryGrid.tsx, src/components/Products/ImageGalleryGrid.tsx, src/components/Products/ImageGalleryGrid.tsx, src/components/Products/ImageGalleryGrid.tsx, src/components/Products/ImageGalleryGrid.tsx, src/components/Products/ImageGalleryGrid.tsx, src/components/Products/ImageGalleryGrid.tsx, src/components/Products/ProductMediaManagerModal.tsx).
+- **2026-08-16 23:08:13** — Automated Self-Healing Build Fix (2 files repaired).
+- **2026-08-16 23:07:59** — Incremental Edit: "we get this when uploading multimedia even though we have active it in the roles panel: No tiene permisos para subir imágenes" (Modified: src/hooks/useMediaOrchestrator.ts).
+- **2026-08-16 23:05:25** — Automated Self-Healing Build Fix (4 files repaired).
+- **2026-08-16 23:04:47** — Incremental Edit: "Also add the toggle permision for uploading multimedia here, given that rightnow we get an error No tiene permisos para subir imágenes." (Modified: src/types/permissions.ts, src/types/permissions.ts, src/components/Admin/UserRoleManager.tsx).
+- **2026-08-16 23:02:28** — Incremental Edit: "chunk-WALXKXZM.js?v=c08e5248:21580 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+api.ts:5 Uncaught ReferenceError: process is not defined
+    at api.ts:5:29
+(anonymous) @ api.ts:5" (Modified: src/constants/api.ts, src/utils/apiClient.ts, .env.example).
+- **2026-08-16 23:02:07** — Automated Self-Healing Build Fix (2 files repaired).
+- **2026-08-16 23:00:55** — Automated Self-Healing Build Fix (4 files repaired).
+- **2026-08-16 23:00:00** — Automated Self-Healing Build Fix (2 files repaired).
+- **2026-08-16 22:59:46** — Incremental Edit: "make this actually functional and production ready" (Modified: src/utils/apiClient.ts, src/db/dexie.ts, src/constants/api.ts, src/hooks/useMediaOrchestrator.ts, src/hooks/useMediaOrchestrator.ts, src/hooks/useMediaOrchestrator.ts, src/hooks/useMediaOrchestrator.ts, src/hooks/useMediaOrchestrator.ts, src/hooks/useMediaOrchestrator.ts, src/hooks/useMediaOrchestrator.ts, src/App.tsx, src/App.tsx, vite.config.ts, package.json, .env.example, .env.production; Executed: npm install, npm run type-check, npm run test, npm run build).
+- **2026-08-16 22:56:28** — Incremental Edit: "fix this error chunk-WALXKXZM.js?v=c08e5248:21580 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+variantAuditLogger.ts:36 Unhandled rejection: DataError: Failed to execute 'add' on 'IDBObjectStore': Evaluating the object store's key path did not yield a value.
+ DataError: Failed to execute 'add' on 'IDBObjectStore': Evaluating the object store's key path did not yield a value.
+globalError @ dexie.js?v=c08e5248:1136
+(anonymous) @ dexie.js?v=c08e5248:904
+finalizePhysicalTick @ dexie.js?v=c08e5248:903
+callListener @ dexie.js?v=c08e5248:839
+endMicroTickScope @ dexie.js?v=c08e5248:893
+_trans @ dexie.js?v=c08e5248:1224
+add @ dexie.js?v=c08e5248:1340
+(anonymous) @ variantAuditLogger.ts:36
+(anonymous) @ useMediaOrchestrator.ts:116
+await in (anonymous)
+(anonymous) @ ProductMediaManagerModal.tsx:40
+(anonymous) @ ImageDropZone.tsx:31
+(anonymous) @ ImageDropZone.tsx:62
+callCallback2 @ chunk-WALXKXZM.js?v=c08e5248:3674
+invokeGuardedCallbackDev @ chunk-WALXKXZM.js?v=c08e5248:3699
+invokeGuardedCallback @ chunk-WALXKXZM.js?v=c08e5248:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-WALXKXZM.js?v=c08e5248:3736
+executeDispatch @ chunk-WALXKXZM.js?v=c08e5248:7016
+processDispatchQueueItemsInOrder @ chunk-WALXKXZM.js?v=c08e5248:7036
+processDispatchQueue @ chunk-WALXKXZM.js?v=c08e5248:7045
+dispatchEventsForPlugins @ chunk-WALXKXZM.js?v=c08e5248:7053
+(anonymous) @ chunk-WALXKXZM.js?v=c08e5248:7177
+batchedUpdates$1 @ chunk-WALXKXZM.js?v=c08e5248:18941
+batchedUpdates @ chunk-WALXKXZM.js?v=c08e5248:3579
+dispatchEventForPluginEventSystem @ chunk-WALXKXZM.js?v=c08e5248:7176
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-WALXKXZM.js?v=c08e5248:5478
+dispatchEvent @ chunk-WALXKXZM.js?v=c08e5248:5472
+dispatchDiscreteEvent @ chunk-WALXKXZM.js?v=c08e5248:5449
+variantAuditLogger.ts:36 Unhandled rejection: DataError: Failed to execute 'add' on 'IDBObjectStore': Evaluating the object store's key path did not yield a value.
+ DataError: Failed to execute 'add' on 'IDBObjectStore': Evaluating the object store's key path did not yield a value.
+globalError @ dexie.js?v=c08e5248:1136
+(anonymous) @ dexie.js?v=c08e5248:904
+finalizePhysicalTick @ dexie.js?v=c08e5248:903
+(anonymous) @ dexie.js?v=c08e5248:803
+endMicroTickScope @ dexie.js?v=c08e5248:893
+physicalTick @ dexie.js?v=c08e5248:876
+Promise.then
+(anonymous) @ dexie.js?v=c08e5248:504
+asap @ dexie.js?v=c08e5248:518
+propagateAllListeners @ dexie.js?v=c08e5248:801
+handleRejection @ dexie.js?v=c08e5248:787
+propagateToListener @ dexie.js?v=c08e5248:814
+(anonymous) @ dexie.js?v=c08e5248:582
+executePromiseTask @ dexie.js?v=c08e5248:749
+DexiePromise @ dexie.js?v=c08e5248:573
+then @ dexie.js?v=c08e5248:581
+add @ dexie.js?v=c08e5248:1342
+(anonymous) @ variantAuditLogger.ts:36
+(anonymous) @ useMediaOrchestrator.ts:116
+await in (anonymous)
+(anonymous) @ ProductMediaManagerModal.tsx:40
+(anonymous) @ ImageDropZone.tsx:31
+(anonymous) @ ImageDropZone.tsx:62
+callCallback2 @ chunk-WALXKXZM.js?v=c08e5248:3674
+invokeGuardedCallbackDev @ chunk-WALXKXZM.js?v=c08e5248:3699
+invokeGuardedCallback @ chunk-WALXKXZM.js?v=c08e5248:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-WALXKXZM.js?v=c08e5248:3736
+executeDispatch @ chunk-WALXKXZM.js?v=c08e5248:7016
+processDispatchQueueItemsInOrder @ chunk-WALXKXZM.js?v=c08e5248:7036
+processDispatchQueue @ chunk-WALXKXZM.js?v=c08e5248:7045
+dispatchEventsForPlugins @ chunk-WALXKXZM.js?v=c08e5248:7053
+(anonymous) @ chunk-WALXKXZM.js?v=c08e5248:7177
+batchedUpdates$1 @ chunk-WALXKXZM.js?v=c08e5248:18941
+batchedUpdates @ chunk-WALXKXZM.js?v=c08e5248:3579
+dispatchEventForPluginEventSystem @ chunk-WALXKXZM.js?v=c08e5248:7176
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-WALXKXZM.js?v=c08e5248:5478
+dispatchEvent @ chunk-WALXKXZM.js?v=c08e5248:5472
+dispatchDiscreteEvent @ chunk-WALXKXZM.js?v=c08e5248:5449
+variantAuditLogger.ts:38 Failed to log variant audit to Dexie: DexieError2 {_e: Error
+    at getErrorWithStack (http://localhost:5173/node_modules/.vite/deps/dexie.js?v=c08e5248:2…, name: 'DataError', message: "Failed to execute 'add' on 'IDBObjectStore': Evalu…he object store's key path did not yield a value.", inner: DataError: Failed to execute 'add' on 'IDBObjectStore': Evaluating the object store's key path did …, _promise: DexiePromise, …}
+(anonymous) @ variantAuditLogger.ts:38
+await in (anonymous)
+(anonymous) @ useMediaOrchestrator.ts:116
+await in (anonymous)
+(anonymous) @ ProductMediaManagerModal.tsx:40
+(anonymous) @ ImageDropZone.tsx:31
+(anonymous) @ ImageDropZone.tsx:62
+callCallback2 @ chunk-WALXKXZM.js?v=c08e5248:3674
+invokeGuardedCallbackDev @ chunk-WALXKXZM.js?v=c08e5248:3699
+invokeGuardedCallback @ chunk-WALXKXZM.js?v=c08e5248:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-WALXKXZM.js?v=c08e5248:3736
+executeDispatch @ chunk-WALXKXZM.js?v=c08e5248:7016
+processDispatchQueueItemsInOrder @ chunk-WALXKXZM.js?v=c08e5248:7036
+processDispatchQueue @ chunk-WALXKXZM.js?v=c08e5248:7045
+dispatchEventsForPlugins @ chunk-WALXKXZM.js?v=c08e5248:7053
+(anonymous) @ chunk-WALXKXZM.js?v=c08e5248:7177
+batchedUpdates$1 @ chunk-WALXKXZM.js?v=c08e5248:18941
+batchedUpdates @ chunk-WALXKXZM.js?v=c08e5248:3579
+dispatchEventForPluginEventSystem @ chunk-WALXKXZM.js?v=c08e5248:7176
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-WALXKXZM.js?v=c08e5248:5478
+dispatchEvent @ chunk-WALXKXZM.js?v=c08e5248:5472
+dispatchDiscreteEvent @ chunk-WALXKXZM.js?v=c08e5248:5449" (Modified: src/engine/variantAuditLogger.ts, src/hooks/useMediaOrchestrator.ts, src/hooks/useMediaOrchestrator.ts, src/hooks/useMediaOrchestrator.ts).
+- **2026-08-16 22:53:09** — Incremental Edit: "chunk-WALXKXZM.js?v=c08e5248:21580 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+VariantBadge.tsx:15 Uncaught TypeError: Cannot read properties of undefined (reading 'attributes')
+    at VariantBadge (VariantBadge.tsx:15:45)
+    at renderWithHooks (chunk-WALXKXZM.js?v=c08e5248:11568:26)
+    at mountIndeterminateComponent (chunk-WALXKXZM.js?v=c08e5248:14946:21)
+    at beginWork (chunk-WALXKXZM.js?v=c08e5248:15934:22)
+    at HTMLUnknownElement.callCallback2 (chunk-WALXKXZM.js?v=c08e5248:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-WALXKXZM.js?v=c08e5248:3699:24)
+    at invokeGuardedCallback (chunk-WALXKXZM.js?v=c08e5248:3733:39)
+    at beginWork$1 (chunk-WALXKXZM.js?v=c08e5248:19793:15)
+    at performUnitOfWork (chunk-WALXKXZM.js?v=c08e5248:19226:20)
+    at workLoopSync (chunk-WALXKXZM.js?v=c08e5248:19165:13)
+VariantBadge.tsx:15 Uncaught TypeError: Cannot read properties of undefined (reading 'attributes')
+    at VariantBadge (VariantBadge.tsx:15:45)
+    at renderWithHooks (chunk-WALXKXZM.js?v=c08e5248:11568:26)
+    at mountIndeterminateComponent (chunk-WALXKXZM.js?v=c08e5248:14946:21)
+    at beginWork (chunk-WALXKXZM.js?v=c08e5248:15934:22)
+    at HTMLUnknownElement.callCallback2 (chunk-WALXKXZM.js?v=c08e5248:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-WALXKXZM.js?v=c08e5248:3699:24)
+    at invokeGuardedCallback (chunk-WALXKXZM.js?v=c08e5248:3733:39)
+    at beginWork$1 (chunk-WALXKXZM.js?v=c08e5248:19793:15)
+    at performUnitOfWork (chunk-WALXKXZM.js?v=c08e5248:19226:20)
+    at workLoopSync (chunk-WALXKXZM.js?v=c08e5248:19165:13)
+VariantBadge.tsx:15 Uncaught TypeError: Cannot read properties of undefined (reading 'attributes')
+    at VariantBadge (VariantBadge.tsx:15:45)
+    at renderWithHooks (chunk-WALXKXZM.js?v=c08e5248:11568:26)
+    at mountIndeterminateComponent (chunk-WALXKXZM.js?v=c08e5248:14946:21)
+    at beginWork (chunk-WALXKXZM.js?v=c08e5248:15934:22)
+    at HTMLUnknownElement.callCallback2 (chunk-WALXKXZM.js?v=c08e5248:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-WALXKXZM.js?v=c08e5248:3699:24)
+    at invokeGuardedCallback (chunk-WALXKXZM.js?v=c08e5248:3733:39)
+    at beginWork$1 (chunk-WALXKXZM.js?v=c08e5248:19793:15)
+    at performUnitOfWork (chunk-WALXKXZM.js?v=c08e5248:19226:20)
+    at workLoopSync (chunk-WALXKXZM.js?v=c08e5248:19165:13)
+VariantBadge.tsx:15 Uncaught TypeError: Cannot read properties of undefined (reading 'attributes')
+    at VariantBadge (VariantBadge.tsx:15:45)
+    at renderWithHooks (chunk-WALXKXZM.js?v=c08e5248:11568:26)
+    at mountIndeterminateComponent (chunk-WALXKXZM.js?v=c08e5248:14946:21)
+    at beginWork (chunk-WALXKXZM.js?v=c08e5248:15934:22)
+    at HTMLUnknownElement.callCallback2 (chunk-WALXKXZM.js?v=c08e5248:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-WALXKXZM.js?v=c08e5248:3699:24)
+    at invokeGuardedCallback (chunk-WALXKXZM.js?v=c08e5248:3733:39)
+    at beginWork$1 (chunk-WALXKXZM.js?v=c08e5248:19793:15)
+    at performUnitOfWork (chunk-WALXKXZM.js?v=c08e5248:19226:20)
+    at workLoopSync (chunk-WALXKXZM.js?v=c08e5248:19165:13)
+chunk-WALXKXZM.js?v=c08e5248:14052 The above error occurred in the <VariantBadge> component:
+
+    at VariantBadge (http://localhost:5173/src/atoms/VariantBadge.tsx:18:3)
+    at td
+    at tr
+    at tbody
+    at table
+    at div
+    at div
+    at ProductVariantManager (http://localhost:5173/src/components/Products/ProductVariantManager.tsx:25:3)
+    at div
+    at div
+    at div
+    at MediaProvider (http://localhost:5173/src/context/MediaContext.tsx:51:3)
+    at div
+    at ProductUnifiedModal (http://localhost:5173/src/components/Products/ProductUnifiedModal.tsx:26:3)
+    at div
+    at ProductManagementView (http://localhost:5173/src/components/Products/ProductManagementView.tsx:29:3)
+    at main
+    at div
+    at App (http://localhost:5173/src/App.tsx:36:41)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+logCapturedError @ chunk-WALXKXZM.js?v=c08e5248:14052
+chunk-WALXKXZM.js?v=c08e5248:14052 The above error occurred in the <VariantBadge> component:
+
+    at VariantBadge (http://localhost:5173/src/atoms/VariantBadge.tsx:18:3)
+    at td
+    at tr
+    at tbody
+    at table
+    at div
+    at div
+    at ProductVariantManager (http://localhost:5173/src/components/Products/ProductVariantManager.tsx:25:3)
+    at div
+    at div
+    at div
+    at MediaProvider (http://localhost:5173/src/context/MediaContext.tsx:51:3)
+    at div
+    at ProductUnifiedModal (http://localhost:5173/src/components/Products/ProductUnifiedModal.tsx:26:3)
+    at div
+    at ProductManagementView (http://localhost:5173/src/components/Products/ProductManagementView.tsx:29:3)
+    at main
+    at div
+    at App (http://localhost:5173/src/App.tsx:36:41)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+logCapturedError @ chunk-WALXKXZM.js?v=c08e5248:14052
+chunk-WALXKXZM.js?v=c08e5248:9145 Uncaught TypeError: Cannot read properties of undefined (reading 'attributes')
+    at VariantBadge (VariantBadge.tsx:15:45)
+    at renderWithHooks (chunk-WALXKXZM.js?v=c08e5248:11568:26)
+    at mountIndeterminateComponent (chunk-WALXKXZM.js?v=c08e5248:14946:21)
+    at beginWork (chunk-WALXKXZM.js?v=c08e5248:15934:22)
+    at beginWork$1 (chunk-WALXKXZM.js?v=c08e5248:19781:22)
+    at performUnitOfWork (chunk-WALXKXZM.js?v=c08e5248:19226:20)
+    at workLoopSync (chunk-WALXKXZM.js?v=c08e5248:19165:13)
+    at renderRootSync (chunk-WALXKXZM.js?v=c08e5248:19144:15)
+    at recoverFromConcurrentError (chunk-WALXKXZM.js?v=c08e5248:18764:28)
+    at performSyncWorkOnRoot (chunk-WALXKXZM.js?v=c08e5248:18907:28)" (Modified: src/atoms/VariantBadge.tsx, src/components/Products/ProductVariantManager.tsx).
+- **2026-08-16 22:41:29** — Automated Self-Healing Build Fix (2 files repaired).
+- **2026-08-16 22:41:22** — Incremental Edit: "chunk-WALXKXZM.js?v=c08e5248:21580 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+ProductVariantManager.tsx:87 Uncaught ReferenceError: productSku is not defined
+    at ProductVariantManager (ProductVariantManager.tsx:87:76
+    at renderWithHooks (chunk-WALXKXZM.js?v=c08e5248:11568:26)
+    at updateFunctionComponent (chunk-WALXKXZM.js?v=c08e5248:14602:28)
+    at beginWork (chunk-WALXKXZM.js?v=c08e5248:15944:22)
+    at HTMLUnknownElement.callCallback2 (chunk-WALXKXZM.js?v=c08e5248:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-WALXKXZM.js?v=c08e5248:3699:24)
+    at invokeGuardedCallback (chunk-WALXKXZM.js?v=c08e5248:3733:39)
+    at beginWork$1 (chunk-WALXKXZM.js?v=c08e5248:19793:15)
+    at performUnitOfWork (chunk-WALXKXZM.js?v=c08e5248:19226:20)
+    at workLoopSync (chunk-WALXKXZM.js?v=c08e5248:19165:13)
+(anonymous) @ ProductVariantManager.tsx:87
+renderWithHooks @ chunk-WALXKXZM.js?v=c08e5248:11568
+updateFunctionComponent @ chunk-WALXKXZM.js?v=c08e5248:14602
+beginWork @ chunk-WALXKXZM.js?v=c08e5248:15944
+callCallback2 @ chunk-WALXKXZM.js?v=c08e5248:3674
+invokeGuardedCallbackDev @ chunk-WALXKXZM.js?v=c08e5248:3699
+invokeGuardedCallback @ chunk-WALXKXZM.js?v=c08e5248:3733
+beginWork$1 @ chunk-WALXKXZM.js?v=c08e5248:19793
+performUnitOfWork @ chunk-WALXKXZM.js?v=c08e5248:19226
+workLoopSync @ chunk-WALXKXZM.js?v=c08e5248:19165
+renderRootSync @ chunk-WALXKXZM.js?v=c08e5248:19144
+performSyncWorkOnRoot @ chunk-WALXKXZM.js?v=c08e5248:18902
+flushSyncCallbacks @ chunk-WALXKXZM.js?v=c08e5248:9135
+(anonymous) @ chunk-WALXKXZM.js?v=c08e5248:18655
+ProductVariantManager.tsx:87 Uncaught ReferenceError: productSku is not defined
+    at ProductVariantManager (ProductVariantManager.tsx:87:76
+    at renderWithHooks (chunk-WALXKXZM.js?v=c08e5248:11568:26)
+    at updateFunctionComponent (chunk-WALXKXZM.js?v=c08e5248:14602:28)
+    at beginWork (chunk-WALXKXZM.js?v=c08e5248:15944:22)
+    at HTMLUnknownElement.callCallback2 (chunk-WALXKXZM.js?v=c08e5248:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-WALXKXZM.js?v=c08e5248:3699:24)
+    at invokeGuardedCallback (chunk-WALXKXZM.js?v=c08e5248:3733:39)
+    at beginWork$1 (chunk-WALXKXZM.js?v=c08e5248:19793:15)
+    at performUnitOfWork (chunk-WALXKXZM.js?v=c08e5248:19226:20)
+    at workLoopSync (chunk-WALXKXZM.js?v=c08e5248:19165:13)
+(anonymous) @ ProductVariantManager.tsx:87
+renderWithHooks @ chunk-WALXKXZM.js?v=c08e5248:11568
+updateFunctionComponent @ chunk-WALXKXZM.js?v=c08e5248:14602
+beginWork @ chunk-WALXKXZM.js?v=c08e5248:15944
+callCallback2 @ chunk-WALXKXZM.js?v=c08e5248:3674
+invokeGuardedCallbackDev @ chunk-WALXKXZM.js?v=c08e5248:3699
+invokeGuardedCallback @ chunk-WALXKXZM.js?v=c08e5248:3733
+beginWork$1 @ chunk-WALXKXZM.js?v=c08e5248:19793
+performUnitOfWork @ chunk-WALXKXZM.js?v=c08e5248:19226
+workLoopSync @ chunk-WALXKXZM.js?v=c08e5248:19165
+renderRootSync @ chunk-WALXKXZM.js?v=c08e5248:19144
+recoverFromConcurrentError @ chunk-WALXKXZM.js?v=c08e5248:18764
+performSyncWorkOnRoot @ chunk-WALXKXZM.js?v=c08e5248:18907
+flushSyncCallbacks @ chunk-WALXKXZM.js?v=c08e5248:9135
+(anonymous) @ chunk-WALXKXZM.js?v=c08e5248:18655
+chunk-WALXKXZM.js?v=c08e5248:14052 The above error occurred in the <ProductVariantManager> component:
+
+    at ProductVariantManager (http://localhost:5173/src/components/Products/ProductVariantManager.tsx?t=1786938022580:25:3)
+    at div
+    at div
+    at div
+    at MediaProvider (http://localhost:5173/src/context/MediaContext.tsx?t=1786938022580:42:3)
+    at div
+    at ProductUnifiedModal (http://localhost:5173/src/components/Products/ProductUnifiedModal.tsx?t=1786938022580:26:3)
+    at div
+    at ProductManagementView (http://localhost:5173/src/components/Products/ProductManagementView.tsx?t=1786938022580:29:3)
+    at main
+    at div
+    at App (http://localhost:5173/src/App.tsx?t=1786938022580:36:41)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+logCapturedError @ chunk-WALXKXZM.js?v=c08e5248:14052
+update.callback @ chunk-WALXKXZM.js?v=c08e5248:14072
+callCallback @ chunk-WALXKXZM.js?v=c08e5248:11268
+commitUpdateQueue @ chunk-WALXKXZM.js?v=c08e5248:11285
+commitLayoutEffectOnFiber @ chunk-WALXKXZM.js?v=c08e5248:17115
+commitLayoutMountEffects_complete @ chunk-WALXKXZM.js?v=c08e5248:18008
+commitLayoutEffects_begin @ chunk-WALXKXZM.js?v=c08e5248:17997
+commitLayoutEffects @ chunk-WALXKXZM.js?v=c08e5248:17948
+commitRootImpl @ chunk-WALXKXZM.js?v=c08e5248:19381
+commitRoot @ chunk-WALXKXZM.js?v=c08e5248:19305
+performSyncWorkOnRoot @ chunk-WALXKXZM.js?v=c08e5248:18923
+flushSyncCallbacks @ chunk-WALXKXZM.js?v=c08e5248:9135
+(anonymous) @ chunk-WALXKXZM.js?v=c08e5248:18655
+chunk-WALXKXZM.js?v=c08e5248:9145 Uncaught ReferenceError: productSku is not defined
+    at ProductVariantManager (ProductVariantManager.tsx:87:76
+    at renderWithHooks (chunk-WALXKXZM.js?v=c08e5248:11568:26)
+    at updateFunctionComponent (chunk-WALXKXZM.js?v=c08e5248:14602:28)
+    at beginWork (chunk-WALXKXZM.js?v=c08e5248:15944:22)
+    at beginWork$1 (chunk-WALXKXZM.js?v=c08e5248:19781:22)
+    at performUnitOfWork (chunk-WALXKXZM.js?v=c08e5248:19226:20)
+    at workLoopSync (chunk-WALXKXZM.js?v=c08e5248:19165:13)
+    at renderRootSync (chunk-WALXKXZM.js?v=c08e5248:19144:15)
+    at recoverFromConcurrentError (chunk-WALXKXZM.js?v=c08e5248:18764:28)
+    at performSyncWorkOnRoot (chunk-WALXKXZM.js?v=c08e5248:18907:28)
+(anonymous) @ ProductVariantManager.tsx:87
+renderWithHooks @ chunk-WALXKXZM.js?v=c08e5248:11568
+updateFunctionComponent @ chunk-WALXKXZM.js?v=c08e5248:14602
+beginWork @ chunk-WALXKXZM.js?v=c08e5248:15944
+beginWork$1 @ chunk-WALXKXZM.js?v=c08e5248:19781
+performUnitOfWork @ chunk-WALXKXZM.js?v=c08e5248:19226
+workLoopSync @ chunk-WALXKXZM.js?v=c08e5248:19165
+renderRootSync @ chunk-WALXKXZM.js?v=c08e5248:19144
+recoverFromConcurrentError @ chunk-WALXKXZM.js?v=c08e5248:18764
+performSyncWorkOnRoot @ chunk-WALXKXZM.js?v=c08e5248:18907
+flushSyncCallbacks @ chunk-WALXKXZM.js?v=c08e5248:9135
+(anonymous) @ chunk-WALXKXZM.js?v=c08e5248:18655" (Modified: src/components/Products/ProductVariantManager.tsx, src/components/Products/ProductUnifiedModal.tsx).
+- **2026-08-16 22:40:33** — Automated Self-Healing Build Fix (4 files repaired).
+- **2026-08-16 22:40:01** — Incremental Edit: "when uploading images nothing happens and nothing is saved" (Modified: src/hooks/useMediaOrchestrator.ts, src/hooks/useMediaOrchestrator.ts, src/hooks/useMediaOrchestrator.ts, src/components/Products/ImageDropZone.tsx).
+- **2026-08-16 22:38:33** — Automated Self-Healing Build Fix (2 files repaired).
+- **2026-08-16 22:37:24** — Incremental Edit: "the close buttons don't close the modal" (Modified: src/components/Products/ProductMediaCoordinator.tsx, src/components/Products/ProductMediaCoordinator.tsx, src/components/Products/ProductMediaManagerModal.tsx).
+- **2026-08-16 22:36:36** — Incremental Edit: "chunk-WALXKXZM.js?v=c08e5248:21580 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+MediaContext.tsx:46 Uncaught Error: useMediaContext must be used within a MediaProvider
+    at useMediaContext (MediaContext.tsx:46:11
+    at VariantEditModal (VariantEditModal.tsx:35:101
+    at renderWithHooks (chunk-WALXKXZM.js?v=c08e5248:11568:26)
+    at mountIndeterminateComponent (chunk-WALXKXZM.js?v=c08e5248:14946:21)
+    at beginWork (chunk-WALXKXZM.js?v=c08e5248:15934:22)
+    at HTMLUnknownElement.callCallback2 (chunk-WALXKXZM.js?v=c08e5248:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-WALXKXZM.js?v=c08e5248:3699:24)
+    at invokeGuardedCallback (chunk-WALXKXZM.js?v=c08e5248:3733:39)
+    at beginWork$1 (chunk-WALXKXZM.js?v=c08e5248:19793:15)
+    at performUnitOfWork (chunk-WALXKXZM.js?v=c08e5248:19226:20)
+(anonymous) @ MediaContext.tsx:46
+(anonymous) @ VariantEditModal.tsx:35
+renderWithHooks @ chunk-WALXKXZM.js?v=c08e5248:11568
+mountIndeterminateComponent @ chunk-WALXKXZM.js?v=c08e5248:14946
+beginWork @ chunk-WALXKXZM.js?v=c08e5248:15934
+callCallback2 @ chunk-WALXKXZM.js?v=c08e5248:3674
+invokeGuardedCallbackDev @ chunk-WALXKXZM.js?v=c08e5248:3699
+invokeGuardedCallback @ chunk-WALXKXZM.js?v=c08e5248:3733
+beginWork$1 @ chunk-WALXKXZM.js?v=c08e5248:19793
+performUnitOfWork @ chunk-WALXKXZM.js?v=c08e5248:19226
+workLoopSync @ chunk-WALXKXZM.js?v=c08e5248:19165
+renderRootSync @ chunk-WALXKXZM.js?v=c08e5248:19144
+performSyncWorkOnRoot @ chunk-WALXKXZM.js?v=c08e5248:18902
+flushSyncCallbacks @ chunk-WALXKXZM.js?v=c08e5248:9135
+(anonymous) @ chunk-WALXKXZM.js?v=c08e5248:18655
+MediaContext.tsx:46 Uncaught Error: useMediaContext must be used within a MediaProvider
+    at useMediaContext (MediaContext.tsx:46:11
+    at ProductMediaManagerModal (ProductMediaManagerModal.tsx:36:7
+    at renderWithHooks (chunk-WALXKXZM.js?v=c08e5248:11568:26)
+    at mountIndeterminateComponent (chunk-WALXKXZM.js?v=c08e5248:14946:21)
+    at beginWork (chunk-WALXKXZM.js?v=c08e5248:15934:22)
+    at HTMLUnknownElement.callCallback2 (chunk-WALXKXZM.js?v=c08e5248:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-WALXKXZM.js?v=c08e5248:3699:24)
+    at invokeGuardedCallback (chunk-WALXKXZM.js?v=c08e5248:3733:39)
+    at beginWork$1 (chunk-WALXKXZM.js?v=c08e5248:19793:15)
+    at performUnitOfWork (chunk-WALXKXZM.js?v=c08e5248:19226:20)
+(anonymous) @ MediaContext.tsx:46
+(anonymous) @ ProductMediaManagerModal.tsx:36
+renderWithHooks @ chunk-WALXKXZM.js?v=c08e5248:11568
+mountIndeterminateComponent @ chunk-WALXKXZM.js?v=c08e5248:14946
+beginWork @ chunk-WALXKXZM.js?v=c08e5248:15934
+callCallback2 @ chunk-WALXKXZM.js?v=c08e5248:3674
+invokeGuardedCallbackDev @ chunk-WALXKXZM.js?v=c08e5248:3699
+invokeGuardedCallback @ chunk-WALXKXZM.js?v=c08e5248:3733
+beginWork$1 @ chunk-WALXKXZM.js?v=c08e5248:19793
+performUnitOfWork @ chunk-WALXKXZM.js?v=c08e5248:19226
+workLoopSync @ chunk-WALXKXZM.js?v=c08e5248:19165
+renderRootSync @ chunk-WALXKXZM.js?v=c08e5248:19144
+performSyncWorkOnRoot @ chunk-WALXKXZM.js?v=c08e5248:18902
+flushSyncCallbacks @ chunk-WALXKXZM.js?v=c08e5248:9135
+(anonymous) @ chunk-WALXKXZM.js?v=c08e5248:18655
+MediaContext.tsx:46 Uncaught Error: useMediaContext must be used within a MediaProvider
+    at useMediaContext (MediaContext.tsx:46:11
+    at VariantEditModal (VariantEditModal.tsx:35:101
+    at renderWithHooks (chunk-WALXKXZM.js?v=c08e5248:11568:26)
+    at mountIndeterminateComponent (chunk-WALXKXZM.js?v=c08e5248:14946:21)
+    at beginWork (chunk-WALXKXZM.js?v=c08e5248:15934:22)
+    at HTMLUnknownElement.callCallback2 (chunk-WALXKXZM.js?v=c08e5248:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-WALXKXZM.js?v=c08e5248:3699:24)
+    at invokeGuardedCallback (chunk-WALXKXZM.js?v=c08e5248:3733:39)
+    at beginWork$1 (chunk-WALXKXZM.js?v=c08e5248:19793:15)
+    at performUnitOfWork (chunk-WALXKXZM.js?v=c08e5248:19226:20)
+(anonymous) @ MediaContext.tsx:46
+(anonymous) @ VariantEditModal.tsx:35
+renderWithHooks @ chunk-WALXKXZM.js?v=c08e5248:11568
+mountIndeterminateComponent @ chunk-WALXKXZM.js?v=c08e5248:14946
+beginWork @ chunk-WALXKXZM.js?v=c08e5248:15934
+callCallback2 @ chunk-WALXKXZM.js?v=c08e5248:3674
+invokeGuardedCallbackDev @ chunk-WALXKXZM.js?v=c08e5248:3699
+invokeGuardedCallback @ chunk-WALXKXZM.js?v=c08e5248:3733
+beginWork$1 @ chunk-WALXKXZM.js?v=c08e5248:19793
+performUnitOfWork @ chunk-WALXKXZM.js?v=c08e5248:19226
+workLoopSync @ chunk-WALXKXZM.js?v=c08e5248:19165
+renderRootSync @ chunk-WALXKXZM.js?v=c08e5248:19144
+recoverFromConcurrentError @ chunk-WALXKXZM.js?v=c08e5248:18764
+performSyncWorkOnRoot @ chunk-WALXKXZM.js?v=c08e5248:18907
+flushSyncCallbacks @ chunk-WALXKXZM.js?v=c08e5248:9135
+(anonymous) @ chunk-WALXKXZM.js?v=c08e5248:18655
+MediaContext.tsx:46 Uncaught Error: useMediaContext must be used within a MediaProvider
+    at useMediaContext (MediaContext.tsx:46:11
+    at ProductMediaManagerModal (ProductMediaManagerModal.tsx:36:7
+    at renderWithHooks (chunk-WALXKXZM.js?v=c08e5248:11568:26)
+    at mountIndeterminateComponent (chunk-WALXKXZM.js?v=c08e5248:14946:21)
+    at beginWork (chunk-WALXKXZM.js?v=c08e5248:15934:22)
+    at HTMLUnknownElement.callCallback2 (chunk-WALXKXZM.js?v=c08e5248:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-WALXKXZM.js?v=c08e5248:3699:24)
+    at invokeGuardedCallback (chunk-WALXKXZM.js?v=c08e5248:3733:39)
+    at beginWork$1 (chunk-WALXKXZM.js?v=c08e5248:19793:15)
+    at performUnitOfWork (chunk-WALXKXZM.js?v=c08e5248:19226:20)
+(anonymous) @ MediaContext.tsx:46
+(anonymous) @ ProductMediaManagerModal.tsx:36
+renderWithHooks @ chunk-WALXKXZM.js?v=c08e5248:11568
+mountIndeterminateComponent @ chunk-WALXKXZM.js?v=c08e5248:14946
+beginWork @ chunk-WALXKXZM.js?v=c08e5248:15934
+callCallback2 @ chunk-WALXKXZM.js?v=c08e5248:3674
+invokeGuardedCallbackDev @ chunk-WALXKXZM.js?v=c08e5248:3699
+invokeGuardedCallback @ chunk-WALXKXZM.js?v=c08e5248:3733
+beginWork$1 @ chunk-WALXKXZM.js?v=c08e5248:19793
+performUnitOfWork @ chunk-WALXKXZM.js?v=c08e5248:19226
+workLoopSync @ chunk-WALXKXZM.js?v=c08e5248:19165
+renderRootSync @ chunk-WALXKXZM.js?v=c08e5248:19144
+recoverFromConcurrentError @ chunk-WALXKXZM.js?v=c08e5248:18764
+performSyncWorkOnRoot @ chunk-WALXKXZM.js?v=c08e5248:18907
+flushSyncCallbacks @ chunk-WALXKXZM.js?v=c08e5248:9135
+(anonymous) @ chunk-WALXKXZM.js?v=c08e5248:18655
+chunk-WALXKXZM.js?v=c08e5248:14052 The above error occurred in the <VariantEditModal> component:
+
+    at VariantEditModal (http://localhost:5173/src/components/Products/VariantEditModal.tsx?t=1786937686522:24:3)
+    at div
+    at ProductVariantManager (http://localhost:5173/src/components/Products/ProductVariantManager.tsx?t=1786937763524:25:3)
+    at div
+    at div
+    at div
+    at div
+    at ProductUnifiedModal (http://localhost:5173/src/components/Products/ProductUnifiedModal.tsx?t=1786937738137:25:3)
+    at div
+    at ProductManagementView (http://localhost:5173/src/components/Products/ProductManagementView.tsx?t=1786937699424:29:3)
+    at main
+    at div
+    at App (http://localhost:5173/src/App.tsx?t=1786937699424:36:41)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+logCapturedError @ chunk-WALXKXZM.js?v=c08e5248:14052
+update.callback @ chunk-WALXKXZM.js?v=c08e5248:14072
+callCallback @ chunk-WALXKXZM.js?v=c08e5248:11268
+commitUpdateQueue @ chunk-WALXKXZM.js?v=c08e5248:11285
+commitLayoutEffectOnFiber @ chunk-WALXKXZM.js?v=c08e5248:17115
+commitLayoutMountEffects_complete @ chunk-WALXKXZM.js?v=c08e5248:18008
+commitLayoutEffects_begin @ chunk-WALXKXZM.js?v=c08e5248:17997
+commitLayoutEffects @ chunk-WALXKXZM.js?v=c08e5248:17948
+commitRootImpl @ chunk-WALXKXZM.js?v=c08e5248:19381
+commitRoot @ chunk-WALXKXZM.js?v=c08e5248:19305
+performSyncWorkOnRoot @ chunk-WALXKXZM.js?v=c08e5248:18923
+flushSyncCallbacks @ chunk-WALXKXZM.js?v=c08e5248:9135
+(anonymous) @ chunk-WALXKXZM.js?v=c08e5248:18655
+chunk-WALXKXZM.js?v=c08e5248:14052 The above error occurred in the <ProductMediaManagerModal> component:
+
+    at ProductMediaManagerModal (http://localhost:5173/src/components/Products/ProductMediaManagerModal.tsx?t=1786937686522:24:3)
+    at div
+    at ProductVariantManager (http://localhost:5173/src/components/Products/ProductVariantManager.tsx?t=1786937763524:25:3)
+    at div
+    at div
+    at div
+    at div
+    at ProductUnifiedModal (http://localhost:5173/src/components/Products/ProductUnifiedModal.tsx?t=1786937738137:25:3)
+    at div
+    at ProductManagementView (http://localhost:5173/src/components/Products/ProductManagementView.tsx?t=1786937699424:29:3)
+    at main
+    at div
+    at App (http://localhost:5173/src/App.tsx?t=1786937699424:36:41)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+logCapturedError @ chunk-WALXKXZM.js?v=c08e5248:14052
+update.callback @ chunk-WALXKXZM.js?v=c08e5248:14072
+callCallback @ chunk-WALXKXZM.js?v=c08e5248:11268
+commitUpdateQueue @ chunk-WALXKXZM.js?v=c08e5248:11285
+commitLayoutEffectOnFiber @ chunk-WALXKXZM.js?v=c08e5248:17115
+commitLayoutMountEffects_complete @ chunk-WALXKXZM.js?v=c08e5248:18008
+commitLayoutEffects_begin @ chunk-WALXKXZM.js?v=c08e5248:17997
+commitLayoutEffects @ chunk-WALXKXZM.js?v=c08e5248:17948
+commitRootImpl @ chunk-WALXKXZM.js?v=c08e5248:19381
+commitRoot @ chunk-WALXKXZM.js?v=c08e5248:19305
+performSyncWorkOnRoot @ chunk-WALXKXZM.js?v=c08e5248:18923
+flushSyncCallbacks @ chunk-WALXKXZM.js?v=c08e5248:9135
+(anonymous) @ chunk-WALXKXZM.js?v=c08e5248:18655
+chunk-WALXKXZM.js?v=c08e5248:9145 Uncaught Error: useMediaContext must be used within a MediaProvider
+    at useMediaContext (MediaContext.tsx:46:11
+    at VariantEditModal (VariantEditModal.tsx:35:101
+    at renderWithHooks (chunk-WALXKXZM.js?v=c08e5248:11568:26)
+    at mountIndeterminateComponent (chunk-WALXKXZM.js?v=c08e5248:14946:21)
+    at beginWork (chunk-WALXKXZM.js?v=c08e5248:15934:22)
+    at beginWork$1 (chunk-WALXKXZM.js?v=c08e5248:19781:22)
+    at performUnitOfWork (chunk-WALXKXZM.js?v=c08e5248:19226:20)
+    at workLoopSync (chunk-WALXKXZM.js?v=c08e5248:19165:13)
+    at renderRootSync (chunk-WALXKXZM.js?v=c08e5248:19144:15)
+    at recoverFromConcurrentError (chunk-WALXKXZM.js?v=c08e5248:18764:28)
+(anonymous) @ MediaContext.tsx:46
+(anonymous) @ VariantEditModal.tsx:35
+renderWithHooks @ chunk-WALXKXZM.js?v=c08e5248:11568
+mountIndeterminateComponent @ chunk-WALXKXZM.js?v=c08e5248:14946
+beginWork @ chunk-WALXKXZM.js?v=c08e5248:15934
+beginWork$1 @ chunk-WALXKXZM.js?v=c08e5248:19781
+performUnitOfWork @ chunk-WALXKXZM.js?v=c08e5248:19226
+workLoopSync @ chunk-WALXKXZM.js?v=c08e5248:19165
+renderRootSync @ chunk-WALXKXZM.js?v=c08e5248:19144
+recoverFromConcurrentError @ chunk-WALXKXZM.js?v=c08e5248:18764
+performSyncWorkOnRoot @ chunk-WALXKXZM.js?v=c08e5248:18907
+flushSyncCallbacks @ chunk-WALXKXZM.js?v=c08e5248:9135
+(anonymous) @ chunk-WALXKXZM.js?v=c08e5248:18655" (Modified: src/context/MediaContext.tsx, src/components/Products/ProductUnifiedModal.tsx, src/components/Products/ProductUnifiedModal.tsx, src/components/Products/ProductVariantManager.tsx).
+- **2026-08-16 22:36:03** — Incremental Edit: "chunk-WALXKXZM.js?v=c08e5248:21580 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+ProductVariantManager.tsx:82 Uncaught ReferenceError: isEditOpen is not defined
+    at ProductVariantManager (ProductVariantManager.tsx:82:33
+    at renderWithHooks (chunk-WALXKXZM.js?v=c08e5248:11568:26)
+    at mountIndeterminateComponent (chunk-WALXKXZM.js?v=c08e5248:14946:21)
+    at beginWork (chunk-WALXKXZM.js?v=c08e5248:15934:22)
+    at HTMLUnknownElement.callCallback2 (chunk-WALXKXZM.js?v=c08e5248:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-WALXKXZM.js?v=c08e5248:3699:24)
+    at invokeGuardedCallback (chunk-WALXKXZM.js?v=c08e5248:3733:39)
+    at beginWork$1 (chunk-WALXKXZM.js?v=c08e5248:19793:15)
+    at performUnitOfWork (chunk-WALXKXZM.js?v=c08e5248:19226:20)
+    at workLoopSync (chunk-WALXKXZM.js?v=c08e5248:19165:13)
+(anonymous) @ ProductVariantManager.tsx:82
+renderWithHooks @ chunk-WALXKXZM.js?v=c08e5248:11568
+mountIndeterminateComponent @ chunk-WALXKXZM.js?v=c08e5248:14946
+beginWork @ chunk-WALXKXZM.js?v=c08e5248:15934
+callCallback2 @ chunk-WALXKXZM.js?v=c08e5248:3674
+invokeGuardedCallbackDev @ chunk-WALXKXZM.js?v=c08e5248:3699
+invokeGuardedCallback @ chunk-WALXKXZM.js?v=c08e5248:3733
+beginWork$1 @ chunk-WALXKXZM.js?v=c08e5248:19793
+performUnitOfWork @ chunk-WALXKXZM.js?v=c08e5248:19226
+workLoopSync @ chunk-WALXKXZM.js?v=c08e5248:19165
+renderRootSync @ chunk-WALXKXZM.js?v=c08e5248:19144
+performSyncWorkOnRoot @ chunk-WALXKXZM.js?v=c08e5248:18902
+flushSyncCallbacks @ chunk-WALXKXZM.js?v=c08e5248:9135
+(anonymous) @ chunk-WALXKXZM.js?v=c08e5248:18655
+ProductVariantManager.tsx:82 Uncaught ReferenceError: isEditOpen is not defined
+    at ProductVariantManager (ProductVariantManager.tsx:82:33
+    at renderWithHooks (chunk-WALXKXZM.js?v=c08e5248:11568:26)
+    at mountIndeterminateComponent (chunk-WALXKXZM.js?v=c08e5248:14946:21)
+    at beginWork (chunk-WALXKXZM.js?v=c08e5248:15934:22)
+    at HTMLUnknownElement.callCallback2 (chunk-WALXKXZM.js?v=c08e5248:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-WALXKXZM.js?v=c08e5248:3699:24)
+    at invokeGuardedCallback (chunk-WALXKXZM.js?v=c08e5248:3733:39)
+    at beginWork$1 (chunk-WALXKXZM.js?v=c08e5248:19793:15)
+    at performUnitOfWork (chunk-WALXKXZM.js?v=c08e5248:19226:20)
+    at workLoopSync (chunk-WALXKXZM.js?v=c08e5248:19165:13)
+(anonymous) @ ProductVariantManager.tsx:82
+renderWithHooks @ chunk-WALXKXZM.js?v=c08e5248:11568
+mountIndeterminateComponent @ chunk-WALXKXZM.js?v=c08e5248:14946
+beginWork @ chunk-WALXKXZM.js?v=c08e5248:15934
+callCallback2 @ chunk-WALXKXZM.js?v=c08e5248:3674
+invokeGuardedCallbackDev @ chunk-WALXKXZM.js?v=c08e5248:3699
+invokeGuardedCallback @ chunk-WALXKXZM.js?v=c08e5248:3733
+beginWork$1 @ chunk-WALXKXZM.js?v=c08e5248:19793
+performUnitOfWork @ chunk-WALXKXZM.js?v=c08e5248:19226
+workLoopSync @ chunk-WALXKXZM.js?v=c08e5248:19165
+renderRootSync @ chunk-WALXKXZM.js?v=c08e5248:19144
+recoverFromConcurrentError @ chunk-WALXKXZM.js?v=c08e5248:18764
+performSyncWorkOnRoot @ chunk-WALXKXZM.js?v=c08e5248:18907
+flushSyncCallbacks @ chunk-WALXKXZM.js?v=c08e5248:9135
+(anonymous) @ chunk-WALXKXZM.js?v=c08e5248:18655
+chunk-WALXKXZM.js?v=c08e5248:14052 The above error occurred in the <ProductVariantManager> component:
+
+    at ProductVariantManager (http://localhost:5173/src/components/Products/ProductVariantManager.tsx?t=1786937699424:25:3)
+    at div
+    at div
+    at div
+    at div
+    at ProductUnifiedModal (http://localhost:5173/src/components/Products/ProductUnifiedModal.tsx?t=1786937738137:25:3)
+    at div
+    at ProductManagementView (http://localhost:5173/src/components/Products/ProductManagementView.tsx?t=1786937699424:29:3)
+    at main
+    at div
+    at App (http://localhost:5173/src/App.tsx?t=1786937699424:36:41)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+logCapturedError @ chunk-WALXKXZM.js?v=c08e5248:14052
+update.callback @ chunk-WALXKXZM.js?v=c08e5248:14072
+callCallback @ chunk-WALXKXZM.js?v=c08e5248:11268
+commitUpdateQueue @ chunk-WALXKXZM.js?v=c08e5248:11285
+commitLayoutEffectOnFiber @ chunk-WALXKXZM.js?v=c08e5248:17115
+commitLayoutMountEffects_complete @ chunk-WALXKXZM.js?v=c08e5248:18008
+commitLayoutEffects_begin @ chunk-WALXKXZM.js?v=c08e5248:17997
+commitLayoutEffects @ chunk-WALXKXZM.js?v=c08e5248:17948
+commitRootImpl @ chunk-WALXKXZM.js?v=c08e5248:19381
+commitRoot @ chunk-WALXKXZM.js?v=c08e5248:19305
+performSyncWorkOnRoot @ chunk-WALXKXZM.js?v=c08e5248:18923
+flushSyncCallbacks @ chunk-WALXKXZM.js?v=c08e5248:9135
+(anonymous) @ chunk-WALXKXZM.js?v=c08e5248:18655
+chunk-WALXKXZM.js?v=c08e5248:9145 Uncaught ReferenceError: isEditOpen is not defined
+    at ProductVariantManager (ProductVariantManager.tsx:82:33
+    at renderWithHooks (chunk-WALXKXZM.js?v=c08e5248:11568:26)
+    at mountIndeterminateComponent (chunk-WALXKXZM.js?v=c08e5248:14946:21)
+    at beginWork (chunk-WALXKXZM.js?v=c08e5248:15934:22)
+    at beginWork$1 (chunk-WALXKXZM.js?v=c08e5248:19781:22)
+    at performUnitOfWork (chunk-WALXKXZM.js?v=c08e5248:19226:20)
+    at workLoopSync (chunk-WALXKXZM.js?v=c08e5248:19165:13)
+    at renderRootSync (chunk-WALXKXZM.js?v=c08e5248:19144:15)
+    at recoverFromConcurrentError (chunk-WALXKXZM.js?v=c08e5248:18764:28)
+    at performSyncWorkOnRoot (chunk-WALXKXZM.js?v=c08e5248:18907:28)
+(anonymous) @ ProductVariantManager.tsx:82
+renderWithHooks @ chunk-WALXKXZM.js?v=c08e5248:11568
+mountIndeterminateComponent @ chunk-WALXKXZM.js?v=c08e5248:14946
+beginWork @ chunk-WALXKXZM.js?v=c08e5248:15934
+beginWork$1 @ chunk-WALXKXZM.js?v=c08e5248:19781
+performUnitOfWork @ chunk-WALXKXZM.js?v=c08e5248:19226
+workLoopSync @ chunk-WALXKXZM.js?v=c08e5248:19165
+renderRootSync @ chunk-WALXKXZM.js?v=c08e5248:19144
+recoverFromConcurrentError @ chunk-WALXKXZM.js?v=c08e5248:18764
+performSyncWorkOnRoot @ chunk-WALXKXZM.js?v=c08e5248:18907
+flushSyncCallbacks @ chunk-WALXKXZM.js?v=c08e5248:9135
+(anonymous) @ chunk-WALXKXZM.js?v=c08e5248:18655" (Modified: src/components/Products/ProductVariantManager.tsx).
+- **2026-08-16 22:35:48** — Automated Self-Healing Build Fix (2 files repaired).
+- **2026-08-16 22:34:59** — Incremental Edit: "chunk-WALXKXZM.js?v=c08e5248:21580 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+useVariantImageTransaction.ts:20 Uncaught TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+    at useVariantImageTransaction (useVariantImageTransaction.ts:20:33
+    at ProductVariantManager (ProductVariantManager.tsx:29:81
+    at renderWithHooks (chunk-WALXKXZM.js?v=c08e5248:11568:26)
+    at mountIndeterminateComponent (chunk-WALXKXZM.js?v=c08e5248:14946:21)
+    at beginWork (chunk-WALXKXZM.js?v=c08e5248:15934:22)
+    at HTMLUnknownElement.callCallback2 (chunk-WALXKXZM.js?v=c08e5248:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-WALXKXZM.js?v=c08e5248:3699:24)
+    at invokeGuardedCallback (chunk-WALXKXZM.js?v=c08e5248:3733:39)
+    at beginWork$1 (chunk-WALXKXZM.js?v=c08e5248:19793:15)
+    at performUnitOfWork (chunk-WALXKXZM.js?v=c08e5248:19226:20)
+(anonymous) @ useVariantImageTransaction.ts:20
+(anonymous) @ ProductVariantManager.tsx:29
+renderWithHooks @ chunk-WALXKXZM.js?v=c08e5248:11568
+mountIndeterminateComponent @ chunk-WALXKXZM.js?v=c08e5248:14946
+beginWork @ chunk-WALXKXZM.js?v=c08e5248:15934
+callCallback2 @ chunk-WALXKXZM.js?v=c08e5248:3674
+invokeGuardedCallbackDev @ chunk-WALXKXZM.js?v=c08e5248:3699
+invokeGuardedCallback @ chunk-WALXKXZM.js?v=c08e5248:3733
+beginWork$1 @ chunk-WALXKXZM.js?v=c08e5248:19793
+performUnitOfWork @ chunk-WALXKXZM.js?v=c08e5248:19226
+workLoopSync @ chunk-WALXKXZM.js?v=c08e5248:19165
+renderRootSync @ chunk-WALXKXZM.js?v=c08e5248:19144
+performSyncWorkOnRoot @ chunk-WALXKXZM.js?v=c08e5248:18902
+flushSyncCallbacks @ chunk-WALXKXZM.js?v=c08e5248:9135
+(anonymous) @ chunk-WALXKXZM.js?v=c08e5248:18655
+useVariantImageTransaction.ts:20 Uncaught TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+    at useVariantImageTransaction (useVariantImageTransaction.ts:20:33
+    at ProductVariantManager (ProductVariantManager.tsx:29:81
+    at renderWithHooks (chunk-WALXKXZM.js?v=c08e5248:11568:26)
+    at mountIndeterminateComponent (chunk-WALXKXZM.js?v=c08e5248:14946:21)
+    at beginWork (chunk-WALXKXZM.js?v=c08e5248:15934:22)
+    at HTMLUnknownElement.callCallback2 (chunk-WALXKXZM.js?v=c08e5248:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-WALXKXZM.js?v=c08e5248:3699:24)
+    at invokeGuardedCallback (chunk-WALXKXZM.js?v=c08e5248:3733:39)
+    at beginWork$1 (chunk-WALXKXZM.js?v=c08e5248:19793:15)
+    at performUnitOfWork (chunk-WALXKXZM.js?v=c08e5248:19226:20)
+(anonymous) @ useVariantImageTransaction.ts:20
+(anonymous) @ ProductVariantManager.tsx:29
+renderWithHooks @ chunk-WALXKXZM.js?v=c08e5248:11568
+mountIndeterminateComponent @ chunk-WALXKXZM.js?v=c08e5248:14946
+beginWork @ chunk-WALXKXZM.js?v=c08e5248:15934
+callCallback2 @ chunk-WALXKXZM.js?v=c08e5248:3674
+invokeGuardedCallbackDev @ chunk-WALXKXZM.js?v=c08e5248:3699
+invokeGuardedCallback @ chunk-WALXKXZM.js?v=c08e5248:3733
+beginWork$1 @ chunk-WALXKXZM.js?v=c08e5248:19793
+performUnitOfWork @ chunk-WALXKXZM.js?v=c08e5248:19226
+workLoopSync @ chunk-WALXKXZM.js?v=c08e5248:19165
+renderRootSync @ chunk-WALXKXZM.js?v=c08e5248:19144
+recoverFromConcurrentError @ chunk-WALXKXZM.js?v=c08e5248:18764
+performSyncWorkOnRoot @ chunk-WALXKXZM.js?v=c08e5248:18907
+flushSyncCallbacks @ chunk-WALXKXZM.js?v=c08e5248:9135
+(anonymous) @ chunk-WALXKXZM.js?v=c08e5248:18655
+chunk-WALXKXZM.js?v=c08e5248:14052 The above error occurred in the <ProductVariantManager> component:
+
+    at ProductVariantManager (http://localhost:5173/src/components/Products/ProductVariantManager.tsx?t=1786937578385:25:3)
+    at div
+    at div
+    at div
+    at div
+    at ProductUnifiedModal (http://localhost:5173/src/components/Products/ProductUnifiedModal.tsx?t=1786937637796:25:3)
+    at div
+    at ProductManagementView (http://localhost:5173/src/components/Products/ProductManagementView.tsx?t=1786937578385:29:3)
+    at main
+    at div
+    at App (http://localhost:5173/src/App.tsx?t=1786937578385:36:41)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+logCapturedError @ chunk-WALXKXZM.js?v=c08e5248:14052
+update.callback @ chunk-WALXKXZM.js?v=c08e5248:14072
+callCallback @ chunk-WALXKXZM.js?v=c08e5248:11268
+commitUpdateQueue @ chunk-WALXKXZM.js?v=c08e5248:11285
+commitLayoutEffectOnFiber @ chunk-WALXKXZM.js?v=c08e5248:17115
+commitLayoutMountEffects_complete @ chunk-WALXKXZM.js?v=c08e5248:18008
+commitLayoutEffects_begin @ chunk-WALXKXZM.js?v=c08e5248:17997
+commitLayoutEffects @ chunk-WALXKXZM.js?v=c08e5248:17948
+commitRootImpl @ chunk-WALXKXZM.js?v=c08e5248:19381
+commitRoot @ chunk-WALXKXZM.js?v=c08e5248:19305
+performSyncWorkOnRoot @ chunk-WALXKXZM.js?v=c08e5248:18923
+flushSyncCallbacks @ chunk-WALXKXZM.js?v=c08e5248:9135
+(anonymous) @ chunk-WALXKXZM.js?v=c08e5248:18655
+chunk-WALXKXZM.js?v=c08e5248:9145 Uncaught TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+    at useVariantImageTransaction (useVariantImageTransaction.ts:20:33
+    at ProductVariantManager (ProductVariantManager.tsx:29:81
+    at renderWithHooks (chunk-WALXKXZM.js?v=c08e5248:11568:26)
+    at mountIndeterminateComponent (chunk-WALXKXZM.js?v=c08e5248:14946:21)
+    at beginWork (chunk-WALXKXZM.js?v=c08e5248:15934:22)
+    at beginWork$1 (chunk-WALXKXZM.js?v=c08e5248:19781:22)
+    at performUnitOfWork (chunk-WALXKXZM.js?v=c08e5248:19226:20)
+    at workLoopSync (chunk-WALXKXZM.js?v=c08e5248:19165:13)
+    at renderRootSync (chunk-WALXKXZM.js?v=c08e5248:19144:15)
+    at recoverFromConcurrentError (chunk-WALXKXZM.js?v=c08e5248:18764:28)
+(anonymous) @ useVariantImageTransaction.ts:20
+(anonymous) @ ProductVariantManager.tsx:29
+renderWithHooks @ chunk-WALXKXZM.js?v=c08e5248:11568
+mountIndeterminateComponent @ chunk-WALXKXZM.js?v=c08e5248:14946
+beginWork @ chunk-WALXKXZM.js?v=c08e5248:15934
+beginWork$1 @ chunk-WALXKXZM.js?v=c08e5248:19781
+performUnitOfWork @ chunk-WALXKXZM.js?v=c08e5248:19226
+workLoopSync @ chunk-WALXKXZM.js?v=c08e5248:19165
+renderRootSync @ chunk-WALXKXZM.js?v=c08e5248:19144
+recoverFromConcurrentError @ chunk-WALXKXZM.js?v=c08e5248:18764
+performSyncWorkOnRoot @ chunk-WALXKXZM.js?v=c08e5248:18907
+flushSyncCallbacks @ chunk-WALXKXZM.js?v=c08e5248:9135
+(anonymous) @ chunk-WALXKXZM.js?v=c08e5248:18655" (Modified: src/hooks/useVariantImageTransaction.ts, src/components/Products/ProductVariantManager.tsx, src/components/Products/ProductUnifiedModal.tsx).
+- **2026-08-16 22:34:46** — Incremental Edit: "chunk-WALXKXZM.js?v=c08e5248:21580 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+useMediaOrchestrator.ts:70 Uncaught (in promise) Error: No tiene permisos para subir imágenes
+    at useMediaOrchestrator.ts:70:32
+    at handleFiles (ProductMediaManagerModal.tsx:39:11
+    at handleFiles (ImageDropZone.tsx:31:5
+    at onChange (ImageDropZone.tsx:61:28
+    at HTMLUnknownElement.callCallback2 (chunk-WALXKXZM.js?v=c08e5248:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-WALXKXZM.js?v=c08e5248:3699:24)
+    at invokeGuardedCallback (chunk-WALXKXZM.js?v=c08e5248:3733:39)
+    at invokeGuardedCallbackAndCatchFirstError (chunk-WALXKXZM.js?v=c08e5248:3736:33)
+    at executeDispatch (chunk-WALXKXZM.js?v=c08e5248:7016:11)
+    at processDispatchQueueItemsInOrder (chunk-WALXKXZM.js?v=c08e5248:7036:15)
+(anonymous) @ useMediaOrchestrator.ts:70
+(anonymous) @ ProductMediaManagerModal.tsx:39
+(anonymous) @ ImageDropZone.tsx:31
+(anonymous) @ ImageDropZone.tsx:61
+callCallback2 @ chunk-WALXKXZM.js?v=c08e5248:3674
+invokeGuardedCallbackDev @ chunk-WALXKXZM.js?v=c08e5248:3699
+invokeGuardedCallback @ chunk-WALXKXZM.js?v=c08e5248:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-WALXKXZM.js?v=c08e5248:3736
+executeDispatch @ chunk-WALXKXZM.js?v=c08e5248:7016
+processDispatchQueueItemsInOrder @ chunk-WALXKXZM.js?v=c08e5248:7036
+processDispatchQueue @ chunk-WALXKXZM.js?v=c08e5248:7045
+dispatchEventsForPlugins @ chunk-WALXKXZM.js?v=c08e5248:7053
+(anonymous) @ chunk-WALXKXZM.js?v=c08e5248:7177
+batchedUpdates$1 @ chunk-WALXKXZM.js?v=c08e5248:18941
+batchedUpdates @ chunk-WALXKXZM.js?v=c08e5248:3579
+dispatchEventForPluginEventSystem @ chunk-WALXKXZM.js?v=c08e5248:7176
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-WALXKXZM.js?v=c08e5248:5478
+dispatchEvent @ chunk-WALXKXZM.js?v=c08e5248:5472
+dispatchDiscreteEvent @ chunk-WALXKXZM.js?v=c08e5248:5449" (Modified: src/types/permissions.ts, src/components/Products/ProductMediaManagerModal.tsx).
+- **2026-08-16 22:34:04** — Automated Self-Healing Build Fix (2 files repaired).
+- **2026-08-16 22:33:35** — Incremental Edit: "ProductMediaCoordinator.tsx:34 Uncaught TypeError: Cannot read properties of undefined (reading 'id')
+    at ProductMediaCoordinator (ProductMediaCoordinator.tsx:34:39
+    at renderWithHooks (chunk-WALXKXZM.js?v=c08e5248:11568:26)
+    at mountIndeterminateComponent (chunk-WALXKXZM.js?v=c08e5248:14946:21)
+    at beginWork (chunk-WALXKXZM.js?v=c08e5248:15934:22)
+    at HTMLUnknownElement.callCallback2 (chunk-WALXKXZM.js?v=c08e5248:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-WALXKXZM.js?v=c08e5248:3699:24)
+    at invokeGuardedCallback (chunk-WALXKXZM.js?v=c08e5248:3733:39)
+    at beginWork$1 (chunk-WALXKXZM.js?v=c08e5248:19793:15)
+    at performUnitOfWork (chunk-WALXKXZM.js?v=c08e5248:19226:20)
+    at workLoopSync (chunk-WALXKXZM.js?v=c08e5248:19165:13)
+(anonymous) @ ProductMediaCoordinator.tsx:34
+renderWithHooks @ chunk-WALXKXZM.js?v=c08e5248:11568
+mountIndeterminateComponent @ chunk-WALXKXZM.js?v=c08e5248:14946
+beginWork @ chunk-WALXKXZM.js?v=c08e5248:15934
+callCallback2 @ chunk-WALXKXZM.js?v=c08e5248:3674
+invokeGuardedCallbackDev @ chunk-WALXKXZM.js?v=c08e5248:3699
+invokeGuardedCallback @ chunk-WALXKXZM.js?v=c08e5248:3733
+beginWork$1 @ chunk-WALXKXZM.js?v=c08e5248:19793
+performUnitOfWork @ chunk-WALXKXZM.js?v=c08e5248:19226
+workLoopSync @ chunk-WALXKXZM.js?v=c08e5248:19165
+renderRootSync @ chunk-WALXKXZM.js?v=c08e5248:19144
+performSyncWorkOnRoot @ chunk-WALXKXZM.js?v=c08e5248:18902
+flushSyncCallbacks @ chunk-WALXKXZM.js?v=c08e5248:9135
+(anonymous) @ chunk-WALXKXZM.js?v=c08e5248:18655
+ProductMediaCoordinator.tsx:34 Uncaught TypeError: Cannot read properties of undefined (reading 'id')
+    at ProductMediaCoordinator (ProductMediaCoordinator.tsx:34:39
+    at renderWithHooks (chunk-WALXKXZM.js?v=c08e5248:11568:26)
+    at mountIndeterminateComponent (chunk-WALXKXZM.js?v=c08e5248:14946:21)
+    at beginWork (chunk-WALXKXZM.js?v=c08e5248:15934:22)
+    at HTMLUnknownElement.callCallback2 (chunk-WALXKXZM.js?v=c08e5248:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-WALXKXZM.js?v=c08e5248:3699:24)
+    at invokeGuardedCallback (chunk-WALXKXZM.js?v=c08e5248:3733:39)
+    at beginWork$1 (chunk-WALXKXZM.js?v=c08e5248:19793:15)
+    at performUnitOfWork (chunk-WALXKXZM.js?v=c08e5248:19226:20)
+    at workLoopSync (chunk-WALXKXZM.js?v=c08e5248:19165:13)
+(anonymous) @ ProductMediaCoordinator.tsx:34
+renderWithHooks @ chunk-WALXKXZM.js?v=c08e5248:11568
+mountIndeterminateComponent @ chunk-WALXKXZM.js?v=c08e5248:14946
+beginWork @ chunk-WALXKXZM.js?v=c08e5248:15934
+callCallback2 @ chunk-WALXKXZM.js?v=c08e5248:3674
+invokeGuardedCallbackDev @ chunk-WALXKXZM.js?v=c08e5248:3699
+invokeGuardedCallback @ chunk-WALXKXZM.js?v=c08e5248:3733
+beginWork$1 @ chunk-WALXKXZM.js?v=c08e5248:19793
+performUnitOfWork @ chunk-WALXKXZM.js?v=c08e5248:19226
+workLoopSync @ chunk-WALXKXZM.js?v=c08e5248:19165
+renderRootSync @ chunk-WALXKXZM.js?v=c08e5248:19144
+recoverFromConcurrentError @ chunk-WALXKXZM.js?v=c08e5248:18764
+performSyncWorkOnRoot @ chunk-WALXKXZM.js?v=c08e5248:18907
+flushSyncCallbacks @ chunk-WALXKXZM.js?v=c08e5248:9135
+(anonymous) @ chunk-WALXKXZM.js?v=c08e5248:18655
+chunk-WALXKXZM.js?v=c08e5248:14052 The above error occurred in the <ProductMediaCoordinator> component:
+
+    at ProductMediaCoordinator (http://localhost:5173/src/components/Products/ProductMediaCoordinator.tsx?t=1786937578385:21:3)
+    at div
+    at div
+    at div
+    at div
+    at ProductUnifiedModal (http://localhost:5173/src/components/Products/ProductUnifiedModal.tsx?t=1786937521049:25:3)
+    at div
+    at ProductManagementView (http://localhost:5173/src/components/Products/ProductManagementView.tsx?t=1786937521049:29:3)
+    at main
+    at div
+    at App (http://localhost:5173/src/App.tsx?t=1786937521049:36:41)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+logCapturedError @ chunk-WALXKXZM.js?v=c08e5248:14052
+update.callback @ chunk-WALXKXZM.js?v=c08e5248:14072
+callCallback @ chunk-WALXKXZM.js?v=c08e5248:11268
+commitUpdateQueue @ chunk-WALXKXZM.js?v=c08e5248:11285
+commitLayoutEffectOnFiber @ chunk-WALXKXZM.js?v=c08e5248:17115
+commitLayoutMountEffects_complete @ chunk-WALXKXZM.js?v=c08e5248:18008
+commitLayoutEffects_begin @ chunk-WALXKXZM.js?v=c08e5248:17997
+commitLayoutEffects @ chunk-WALXKXZM.js?v=c08e5248:17948
+commitRootImpl @ chunk-WALXKXZM.js?v=c08e5248:19381
+commitRoot @ chunk-WALXKXZM.js?v=c08e5248:19305
+performSyncWorkOnRoot @ chunk-WALXKXZM.js?v=c08e5248:18923
+flushSyncCallbacks @ chunk-WALXKXZM.js?v=c08e5248:9135
+(anonymous) @ chunk-WALXKXZM.js?v=c08e5248:18655
+chunk-WALXKXZM.js?v=c08e5248:9145 Uncaught TypeError: Cannot read properties of undefined (reading 'id')
+    at ProductMediaCoordinator (ProductMediaCoordinator.tsx:34:39
+    at renderWithHooks (chunk-WALXKXZM.js?v=c08e5248:11568:26)
+    at mountIndeterminateComponent (chunk-WALXKXZM.js?v=c08e5248:14946:21)
+    at beginWork (chunk-WALXKXZM.js?v=c08e5248:15934:22)
+    at beginWork$1 (chunk-WALXKXZM.js?v=c08e5248:19781:22)
+    at performUnitOfWork (chunk-WALXKXZM.js?v=c08e5248:19226:20)
+    at workLoopSync (chunk-WALXKXZM.js?v=c08e5248:19165:13)
+    at renderRootSync (chunk-WALXKXZM.js?v=c08e5248:19144:15)
+    at recoverFromConcurrentError (chunk-WALXKXZM.js?v=c08e5248:18764:28)
+    at performSyncWorkOnRoot (chunk-WALXKXZM.js?v=c08e5248:18907:28)
+(anonymous) @ ProductMediaCoordinator.tsx:34
+renderWithHooks @ chunk-WALXKXZM.js?v=c08e5248:11568
+mountIndeterminateComponent @ chunk-WALXKXZM.js?v=c08e5248:14946
+beginWork @ chunk-WALXKXZM.js?v=c08e5248:15934
+beginWork$1 @ chunk-WALXKXZM.js?v=c08e5248:19781
+performUnitOfWork @ chunk-WALXKXZM.js?v=c08e5248:19226
+workLoopSync @ chunk-WALXKXZM.js?v=c08e5248:19165
+renderRootSync @ chunk-WALXKXZM.js?v=c08e5248:19144
+recoverFromConcurrentError @ chunk-WALXKXZM.js?v=c08e5248:18764
+performSyncWorkOnRoot @ chunk-WALXKXZM.js?v=c08e5248:18907
+flushSyncCallbacks @ chunk-WALXKXZM.js?v=c08e5248:9135
+(anonymous) @ chunk-WALXKXZM.js?v=c08e5248:18655" (Modified: src/components/Products/ProductMediaCoordinator.tsx, src/components/Products/ProductUnifiedModal.tsx).
+- **2026-08-16 22:32:58** — Incremental Edit: "useMediaOrchestrator.ts:9 Uncaught SyntaxError: The requested module '/src/types/permissions.ts' does not provide an export named 'hasPermission' (at useMediaOrchestrator.ts:9:10)" (Modified: src/types/permissions.ts).
+- **2026-08-16 22:32:01** — Incremental Edit: "useMediaOrchestrator.ts:9 Uncaught SyntaxError: The requested module '/src/types/permissions.ts' does not provide an export named 'hasPermission' (at useMediaOrchestrator.ts:9:10)" (Modified: src/types/permissions.ts).
+- **2026-08-16 22:29:58** — Automated Self-Healing Build Fix (1 files repaired).
+- **2026-08-16 22:29:22** — Incremental Edit: "Module Consensus: on products the variations and images we must be able to add them and edit them all in a complete production ready fullstack CRUD way by clicking the button of the add product or the edit product. most of the files are created but they aren't linked yet." (Modified: src/hooks/useVariantSync.ts, src/hooks/useImageSync.ts, src/components/Products/ProductFormTabs.tsx, src/components/Products/ProductFormGeneral.tsx, src/components/Products/ProductUnifiedModal.tsx, backend/schema.sql, backend/src/Middleware/AuthMiddleware.php, backend/src/Middleware/RoleMiddleware.php, backend/src/Controllers/ProductVariantController.php, src/test/productUnifiedModal.integration.test.ts, src/types/store.ts, src/modules/products/index.ts, src/components/Products/ProductManagementView.tsx, src/App.tsx, public/index.php, sql/schema.sql, database/schema.sql; Executed: npm test -- --run src/test/productUnifiedModal.integration.test.ts).
+- **2026-08-16 22:29:22** — Automated Self-Healing Build Fix (3 files repaired).
+- **2026-08-16 22:22:33** — Automated Self-Healing Build Fix (1 files repaired).
+- **2026-08-16 22:16:01** — Automated Self-Healing Build Fix (1 files repaired).
+- **2026-08-16 22:13:30** — Automated Self-Healing Build Fix (1 files repaired).
+- **2026-08-16 22:13:07** — Automated Self-Healing Build Fix (1 files repaired).
+- **2026-08-16 22:12:47** — Automated Self-Healing Build Fix (1 files repaired).
+- **2026-08-16 22:12:25** — Automated Self-Healing Build Fix (1 files repaired).
+- **2026-08-16 22:11:59** — Automated Self-Healing Build Fix (1 files repaired).
+- **2026-08-16 22:11:51** — Incremental Edit: "Module Consensus: link the files of variations and product images modals, so the solution is complete and production ready." (Modified: src/context/MediaContext.tsx, src/hooks/useMediaOrchestrator.ts, src/components/Products/ImageDropZone.tsx, src/components/Products/VariantImageLinker.tsx, src/components/Products/ImageGalleryGrid.tsx, src/components/Products/ProductMediaCoordinator.tsx, src/Controllers/ProductImageController.php, backend/schema.sql, src/test/mediaContextIntegration.test.ts, public/index.php, sql/schema.sql, database/schema.sql, src/types/permissions.ts, src/db/dexie.ts, src/components/Products/ProductMediaManagerModal.tsx, src/components/Products/VariantEditModal.tsx, src/modules/products/index.ts; Executed: npm test).
+- **2026-08-16 22:11:51** — Automated Self-Healing Build Fix (7 files repaired).
+- **2026-08-16 21:44:32** — Automated Self-Healing Build Fix (1 files repaired).
+- **2026-08-16 21:43:49** — Automated Self-Healing Build Fix (1 files repaired).
+- **2026-08-16 21:43:20** — Automated Self-Healing Build Fix (1 files repaired).
+- **2026-08-16 21:43:16** — Incremental Edit: "Module Consensus: on products the variations and images we must be able to add them and edit them all in a complete production ready fullstack CRUD way." (Modified: src/constants/imageOptimization.ts, src/engine/imageOptimizer.ts, src/engine/variantImageValidation.ts, src/hooks/useVariantImageTransaction.ts, src/components/Products/VariantEditModal.tsx, src/components/Products/ProductMediaManagerModal.tsx, src/test/variantImageCrud.test.ts, src/db/dexie.ts, src/components/Products/ProductVariantManager.tsx, src/modules/products/index.ts).
 - **2026-08-16 21:29:25** — Automated Self-Healing Build Fix (1 files repaired).
 - **2026-08-16 21:29:20** — Incremental Edit: "Module Consensus: on products the variations and images we must be able to add them and edit them all a complete production ready fullstack CRUD." (Modified: src/types/permissions.ts, src/engine/variantCrudEngine.ts, src/components/Products/VariantAttributeForm.tsx, src/components/Products/VariantEditModal.tsx, src/components/Products/ProductMediaManagerModal.tsx, src/hooks/useProductImageCrud.ts, backend/api/variants.php, backend/api/images.php, src/test/variantCrudEngine.test.ts, src/test/dexieMigration.test.ts, src/types/store.ts, src/utils/formatters.ts, src/db/dexie.ts, src/modules/products/index.ts; Executed: npm test -- --run).
 - **2026-08-16 20:58:47** — Incremental Edit: "[plugin:vite:esbuild] Transform failed with 1 error:

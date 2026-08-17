@@ -188,10 +188,102 @@ async def test_build_fix_agent_fingerprint_deduplication(tmp_path):
     runner = ProjectRunner(console=Console(record=True))
     failing_build = CommandResult(success=False, stdout="", stderr="src/App.tsx(10,1): error TS1005: ';' expected.", exit_code=1, duration_seconds=0.1)
 
-    with patch.object(runner, "build_project", new_callable=AsyncMock, return_value=failing_build):
+    with patch.object(runner, "verify_project_comprehensive", new_callable=AsyncMock, return_value=failing_build):
         fixer = BuildFixAgent(provider=mock_provider, max_iterations=3)
         res = await fixer.fix(str(tmp_path), failing_build, runner=runner)
         # Should stop without looping infinitely on duplicate fingerprint
         assert res.success is False
         assert fixer.provider.invoke.call_count <= 2
+
+
+@pytest.mark.asyncio
+async def test_build_fix_agent_re_runs_test_verification_on_test_errors(tmp_path):
+    """Verify that when the initial error is a test failure, verification re-runs tests."""
+    src = tmp_path / "src"
+    src.mkdir()
+    test_dir = src / "test"
+    test_dir.mkdir()
+    test_file = test_dir / "dexieMigration.test.ts"
+    test_file.write_text("test('migration', () => { expect(true).toBe(false); });", encoding="utf-8")
+
+    initial_fail = CommandResult(
+        success=False,
+        stdout="",
+        stderr="FAIL src/test/dexieMigration.test.ts > migration failed",
+        exit_code=1,
+        duration_seconds=0.3,
+    )
+
+    mock_llm_response = LLMResponse(
+        content=json.dumps({
+            "fixes_summary": "Fixed migration assertion",
+            "patched_files": {
+                "src/test/dexieMigration.test.ts": "test('migration', () => { expect(true).toBe(true); });"
+            }
+        }),
+        prompt_tokens=50,
+        completion_tokens=20,
+        total_tokens=70,
+        model="test",
+    )
+
+    mock_provider = MagicMock()
+    mock_provider.invoke = AsyncMock(return_value=mock_llm_response)
+
+    runner = ProjectRunner(console=Console(record=True))
+    verify_mock = AsyncMock(return_value=CommandResult(success=True, stdout="All tests passed", stderr="", exit_code=0, duration_seconds=0.5))
+
+    fixer = BuildFixAgent(provider=mock_provider, max_iterations=2)
+    res = await fixer.fix(str(tmp_path), initial_fail, runner=runner, verify_fn=verify_mock)
+
+    assert res.success is True
+    assert verify_mock.call_count == 1
+    assert "src/test/dexieMigration.test.ts" in res.patches_applied
+
+
+@pytest.mark.asyncio
+async def test_build_fix_agent_does_not_declare_success_if_tests_still_fail(tmp_path):
+    """Verify that BuildFixAgent does NOT claim success if tests are still failing after repair."""
+    src = tmp_path / "src"
+    src.mkdir()
+    test_dir = src / "test"
+    test_dir.mkdir()
+    test_file = test_dir / "dexieMigration.test.ts"
+    test_file.write_text("test('migration', () => { expect(1).toBe(2); });", encoding="utf-8")
+
+    initial_fail = CommandResult(
+        success=False,
+        stdout="",
+        stderr="FAIL src/test/dexieMigration.test.ts > assertion failed",
+        exit_code=1,
+        duration_seconds=0.3,
+    )
+
+    mock_llm_response = LLMResponse(
+        content=json.dumps({
+            "fixes_summary": "Attempted fix",
+            "patched_files": {
+                "src/test/dexieMigration.test.ts": "test('migration', () => { expect(2).toBe(3); });"
+            }
+        }),
+        prompt_tokens=50,
+        completion_tokens=20,
+        total_tokens=70,
+        model="test",
+    )
+
+    mock_provider = MagicMock()
+    mock_provider.invoke = AsyncMock(return_value=mock_llm_response)
+
+    runner = ProjectRunner(console=Console(record=True))
+    # verify_fn still reports test failure
+    verify_mock = AsyncMock(return_value=CommandResult(success=False, stdout="", stderr="FAIL src/test/dexieMigration.test.ts > still failing", exit_code=1, duration_seconds=0.5))
+
+    fixer = BuildFixAgent(provider=mock_provider, max_iterations=2)
+    res = await fixer.fix(str(tmp_path), initial_fail, runner=runner, verify_fn=verify_mock)
+
+    # Must be marked as failure!
+    assert res.success is False
+    assert verify_mock.call_count >= 1
+
 
