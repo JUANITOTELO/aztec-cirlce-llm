@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import { Product } from '../../types/store';
+import { ProductImage } from '../../types/productMedia';
 import { formatCOP } from '../../utils/formatters';
 import { Package, AlertTriangle, Search, Plus, Edit2, CheckCircle2 } from 'lucide-react';
 
 interface InventoryManagerProps {
   products: Product[];
+  images?: ProductImage[];
   onUpdateStock: (id: string, newStock: number) => void;
 }
 
-export const InventoryManager: React.FC<InventoryManagerProps> = ({ products, onUpdateStock }) => {
+export const InventoryManager: React.FC<InventoryManagerProps> = ({ products, images = [], onUpdateStock }) => {
   const [search, setSearch] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newStockVal, setNewStockVal] = useState<number>(0);
@@ -90,10 +92,32 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ products, on
               {filtered.map((product) => {
                 const isLow = product.stock <= product.minStock;
                 const isEditing = editingId === product.id;
+                const imgUrl =
+                  images.find((img) => img.productId === product.id && (img.isPrimary || img.imageType === 'PRIMARY'))?.url ||
+                  images.find((img) => img.productId === product.id)?.url ||
+                  product.image;
                 return (
                   <tr key={product.id} className="hover:bg-slate-700/30 transition">
                     <td className="p-3 font-mono font-bold text-slate-400">{product.sku}</td>
-                    <td className="p-3 font-medium text-white">{product.name}</td>
+                    <td className="p-3 font-medium text-white">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-700 overflow-hidden shrink-0 flex items-center justify-center">
+                          {imgUrl ? (
+                            <img
+                              src={imgUrl}
+                              alt={product.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <Package className="w-3.5 h-3.5 text-slate-600" />
+                          )}
+                        </div>
+                        <span>{product.name}</span>
+                      </div>
+                    </td>
                     <td className="p-3">
                       <span className="bg-slate-700 text-slate-300 px-2 py-0.5 rounded text-[11px]">
                         {product.category}

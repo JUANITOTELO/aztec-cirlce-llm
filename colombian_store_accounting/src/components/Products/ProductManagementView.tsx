@@ -140,6 +140,7 @@ export const ProductManagementView: React.FC<ProductManagementViewProps> = ({
 
       <ProductListTable
         products={filteredProducts}
+        images={images}
         categories={categories}
         onEdit={(prod) => {
           setSelectedProduct(prod);
@@ -169,7 +170,13 @@ export const ProductManagementView: React.FC<ProductManagementViewProps> = ({
             setSelectedProduct(null);
           }}
           onUpdateVariants={setVariants}
-          onUpdateImages={setImages}
+          onUpdateImages={(updatedImgs) => {
+            setImages((prev) => {
+              const map = new Map(prev.map((img) => [img.id, img]));
+              updatedImgs.forEach((img) => map.set(img.id, img));
+              return Array.from(map.values());
+            });
+          }}
         />
       )}
 

@@ -11,6 +11,7 @@ import { useCategoryList } from './hooks/useCategoryList';
 import { reassignProductsToCategory } from './engine/categoryConstraints';
 import { ProductLedgerOrchestrator } from './engine/productLedgerOrchestrator';
 import { validateApiConfig } from './constants/api';
+import { db } from './db/dexie';
 import { Header } from './components/Header';
 import { LoginScreen } from './components/Auth/LoginScreen';
 import { PosTerminal } from './components/POS/PosTerminal';
@@ -36,6 +37,37 @@ export const App = React.memo((): React.ReactElement => {
   const [images, setImages] = usePersistentState<ProductImage[]>('aztec_images', INITIAL_PRODUCT_IMAGES);
   const [persistedCategories] = usePersistentState<Category[]>('aztec_categories', INITIAL_CATEGORIES);
   const [ledgerEntries, setLedgerEntries] = usePersistentState<LedgerEntry[]>('aztec_ledger_entries', INITIAL_LEDGER_ENTRIES);
+
+  // Synchronize Dexie IndexedDB data into React state on mount and tab switch
+  useEffect(() => {
+    let isMounted = true;
+    async function syncFromDexie() {
+      try {
+        const dexieImages = await db.productImages.toArray();
+        if (dexieImages.length > 0 && isMounted) {
+          setImages((prev) => {
+            const map = new Map(prev.map((img) => [img.id, img]));
+            dexieImages.forEach((img) => map.set(img.id, img));
+            return Array.from(map.values());
+          });
+        }
+        const dexieVariants = await db.productVariants.toArray();
+        if (dexieVariants.length > 0 && isMounted) {
+          setVariants((prev) => {
+            const map = new Map(prev.map((v) => [v.id, v]));
+            dexieVariants.forEach((v) => map.set(v.id, v));
+            return Array.from(map.values());
+          });
+        }
+      } catch (err) {
+        console.warn('Dexie hydration warning:', err);
+      }
+    }
+    syncFromDexie();
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTab, setImages, setVariants]);
 
   const { categories, addCategory, updateCategory, deleteCategory, setCategories } = useCategoryList(
     persistedCategories
@@ -129,6 +161,7 @@ export const App = React.memo((): React.ReactElement => {
         {activeTab === 'inventory' && (
           <InventoryManager
             products={products}
+            images={images}
             onUpdateStock={handleUpdateStock}
           />
         )}

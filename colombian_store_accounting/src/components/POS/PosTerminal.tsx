@@ -31,11 +31,19 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
 
   const getProductImage = (productId: string, variantId?: string) => {
     if (variantId) {
-      const varImg = images.find((img) => img.variantId === variantId);
-      if (varImg) return varImg.url;
+      const varImg =
+        images.find((img) => img.variantId === variantId && (img.isPrimary || img.imageType === 'PRIMARY')) ||
+        images.find((img) => img.variantId === variantId);
+      if (varImg?.url) return varImg.url;
     }
-    const prodImg = images.find((img) => img.productId === productId);
-    return prodImg ? prodImg.url : null;
+    const primaryProdImg = images.find((img) => img.productId === productId && (img.isPrimary || img.imageType === 'PRIMARY'));
+    if (primaryProdImg?.url) return primaryProdImg.url;
+
+    const anyProdImg = images.find((img) => img.productId === productId);
+    if (anyProdImg?.url) return anyProdImg.url;
+
+    const prod = products.find((p) => p.id === productId);
+    return prod?.image || null;
   };
 
   const getProductVariants = (productId: string) => {
@@ -179,7 +187,6 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                 className="bg-slate-800/90 border border-slate-700 hover:border-emerald-500/60 rounded-xl overflow-hidden transition flex flex-col justify-between group hover:shadow-lg hover:shadow-emerald-950/20"
               >
                 <div className="cursor-pointer" onClick={() => handleProductCardClick(product)}>
-                  {/* Product Image Banner */}
                   <div className="relative w-full h-28 bg-slate-900 overflow-hidden flex items-center justify-center">
                     {imgUrl ? (
                       <img
@@ -187,13 +194,22 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({
                         alt={product.name}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         loading="lazy"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          const parent = e.currentTarget.parentElement;
+                          const fallback = parent?.querySelector('.fallback-placeholder');
+                          if (fallback) (fallback as HTMLElement).style.display = 'flex';
+                        }}
                       />
-                    ) : (
-                      <div className="flex flex-col items-center justify-center text-slate-600">
-                        <Package className="w-8 h-8 stroke-[1.5] mb-1" />
-                        <span className="text-[10px]">Sin imagen</span>
-                      </div>
-                    )}
+                    ) : null}
+                    <div
+                      className={`fallback-placeholder flex-col items-center justify-center text-slate-600 ${
+                        imgUrl ? 'hidden' : 'flex'
+                      }`}
+                    >
+                      <Package className="w-8 h-8 stroke-[1.5] mb-1" />
+                      <span className="text-[10px]">Sin imagen</span>
+                    </div>
                   </div>
 
                   <div className="p-2.5 space-y-1">

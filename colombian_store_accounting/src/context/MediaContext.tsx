@@ -42,6 +42,8 @@ export interface MediaProviderProps {
   variants?: ProductVariant[];
   user?: UserAccount;
   currentUser?: UserAccount;
+  initialImages?: ProductImage[];
+  onImagesUpdated?: (images: ProductImage[]) => void;
 }
 
 const fallbackUser: UserAccount = {
@@ -60,11 +62,15 @@ export const MediaProvider: React.FC<MediaProviderProps> = ({
   variants = [],
   user,
   currentUser,
+  initialImages,
+  onImagesUpdated,
 }) => {
   const orchestrator = useMediaOrchestrator({
     productId: productId || '',
     variants: variants || [],
     currentUser: currentUser || user || fallbackUser,
+    initialImages,
+    onImagesUpdated,
   });
 
   return (

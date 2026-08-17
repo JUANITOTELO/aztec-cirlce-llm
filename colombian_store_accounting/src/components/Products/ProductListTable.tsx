@@ -1,13 +1,15 @@
 import React from 'react';
-import { Edit2, Trash2, Sliders, History } from 'lucide-react';
+import { Edit2, Trash2, Sliders, History, Package } from 'lucide-react';
 import { Product } from '../../types/store';
 import { ProductPermissions } from '../../types/product';
+import { ProductImage } from '../../types/productMedia';
 import { Category } from '../../types/category';
 import { CategoryBadge } from '../../atoms/CategoryBadge';
 import { formatCOP, formatPercent } from '../../utils/formatters';
 
 interface ProductListTableProps {
   products: Product[];
+  images?: ProductImage[];
   permissions?: Partial<ProductPermissions>;
   categories?: Category[];
   searchQuery?: string;
@@ -19,6 +21,7 @@ interface ProductListTableProps {
 
 export function ProductListTable({
   products,
+  images = [],
   permissions = { canViewCost: true, canEditProduct: true, canAdjustStock: true, canDeleteProduct: true, canViewPricingHistory: true },
   categories = [],
   searchQuery = '',
@@ -66,11 +69,33 @@ export function ProductListTable({
           ) : (
             filteredProducts.map((p) => {
               const isLowStock = p.stock <= p.minStock;
+              const imgUrl =
+                images.find((img) => img.productId === p.id && (img.isPrimary || img.imageType === 'PRIMARY'))?.url ||
+                images.find((img) => img.productId === p.id)?.url ||
+                p.image;
               return (
                 <tr key={p.id} className="hover:bg-slate-700/40 transition-colors">
                   <td className="px-4 py-3.5">
-                    <div className="font-semibold text-white">{p.name}</div>
-                    <div className="text-xs text-slate-400 font-mono">SKU: {p.sku}</div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-slate-900 border border-slate-700/80 overflow-hidden shrink-0 flex items-center justify-center">
+                        {imgUrl ? (
+                          <img
+                            src={imgUrl}
+                            alt={p.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <Package className="w-4 h-4 text-slate-600" />
+                        )}
+                      </div>
+                      <div>
+                        <div className="font-semibold text-white">{p.name}</div>
+                        <div className="text-xs text-slate-400 font-mono">SKU: {p.sku}</div>
+                      </div>
+                    </div>
                   </td>
                   <td className="px-4 py-3.5">
                     <CategoryBadge name={p.category} color={getCategoryColor(p.category)} />

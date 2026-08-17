@@ -8,6 +8,7 @@ import { ProductFormGeneral } from './ProductFormGeneral';
 import { ProductVariantManager } from './ProductVariantManager';
 import { ProductMediaCoordinator } from './ProductMediaCoordinator';
 import { MediaProvider } from '../../context/MediaContext';
+import { db } from '../../db/dexie';
 import { X, Save } from 'lucide-react';
 
 interface ProductUnifiedModalProps {
@@ -83,7 +84,7 @@ export const ProductUnifiedModal: React.FC<ProductUnifiedModalProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const validationErrors: Record<string, string> = {};
     if (!formData.name?.trim()) validationErrors.name = 'El nombre es obligatorio';
@@ -96,13 +97,37 @@ export const ProductUnifiedModal: React.FC<ProductUnifiedModalProps> = ({
       return;
     }
 
-    onSave(formData as Product);
+    let primaryImageUrl = formData.image;
+    try {
+      const dbImgs = await db.productImages.where('productId').equals(currentProductId).toArray();
+      const primary = dbImgs.find((img) => img.isPrimary || img.imageType === 'PRIMARY') || dbImgs[0];
+      if (primary?.url) {
+        primaryImageUrl = primary.url;
+      }
+      if (onUpdateImages && dbImgs.length > 0) {
+        onUpdateImages(dbImgs);
+      }
+    } catch (err) {
+      console.warn('Could not query Dexie productImages on save:', err);
+    }
+
+    const finalProduct: Product = {
+      ...(formData as Product),
+      image: primaryImageUrl,
+    };
+
+    onSave(finalProduct);
     onClose();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
-      <MediaProvider productId={currentProductId} variants={activeVariants}>
+      <MediaProvider
+        productId={currentProductId}
+        variants={activeVariants}
+        initialImages={images}
+        onImagesUpdated={onUpdateImages}
+      >
         <div className="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden my-auto">
           <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-950/80">
             <div>

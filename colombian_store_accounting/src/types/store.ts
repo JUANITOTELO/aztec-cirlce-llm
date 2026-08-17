@@ -37,6 +37,7 @@ export interface Product {
   minStock: number;
   ivaRate: number;
   barcode?: string;
+  image?: string;
   imageUrl?: string;
   variants?: ProductVariant[];
   images?: ProductImage[];
