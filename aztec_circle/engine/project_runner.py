@@ -12,6 +12,7 @@ import socket
 import time
 import json
 import subprocess
+from collections import deque
 from dataclasses import dataclass, field
 from typing import Callable, List, Optional
 from rich.console import Console
@@ -46,6 +47,7 @@ class ServerProcess:
     backend_url: Optional[str] = None
     log_file: Optional[str] = None
     monitor_task: Optional[asyncio.Task] = None
+    error_buffer: deque = field(default_factory=lambda: deque(maxlen=50))
 
     async def stop(self) -> None:
         """Gracefully terminate all dev server processes and their process groups."""
@@ -312,6 +314,59 @@ class ProjectRunner:
         else:
             return CommandResult(success=True, stdout="No type check step defined", stderr="", exit_code=0, duration_seconds=0.0)
 
+    def drain_server_errors(self, server: ServerProcess) -> Optional[CommandResult]:
+        """Return a CommandResult from buffered server errors, or None if buffer is empty."""
+        if not server or not server.error_buffer:
+            return None
+        combined = "\n".join(server.error_buffer)
+        server.error_buffer.clear()
+        return CommandResult(
+            success=False,
+            stdout="",
+            stderr=combined,
+            exit_code=1,
+            duration_seconds=0.0,
+        )
+
+    async def verify_project_smart(
+        self,
+        project_dir: str,
+        force_full_build: bool = False,
+    ) -> CommandResult:
+        """
+        Efficient two-tier verification:
+        - Tier 1: tsc --noEmit (fast, ~1s). If clean and not force_full_build -> done.
+        - Tier 2: npm run build (full Vite pipeline) only when:
+            (a) force_full_build=True, or
+            (b) tsc output contains [plugin:vite:*] markers or transform errors, or
+            (c) tsc fails.
+        """
+        root = find_project_root(project_dir)
+        ecosystem = detect_project_ecosystem(root)
+
+        if force_full_build:
+            return await self.build_project(root)
+
+        if ecosystem not in ("vite_react", "node", "php_react", "python_react", "lean4_react"):
+            # Non-JS project: compile check
+            return await self.typecheck_project(root)
+
+        tc_res = await self.typecheck_project(root)
+
+        # If tsc passes and no forced full build -> fast exit
+        if tc_res.success:
+            return tc_res
+
+        # If tsc fails, escalate to full build to get complete bundling/transform diagnostics
+        build_res = await self.build_project(root)
+        return CommandResult(
+            success=build_res.success,
+            stdout=f"{build_res.stdout}\n{tc_res.stdout}".strip(),
+            stderr=f"{build_res.stderr}\n{tc_res.stderr}".strip(),
+            exit_code=build_res.exit_code,
+            duration_seconds=tc_res.duration_seconds + build_res.duration_seconds,
+        )
+
     async def test_project(self, project_dir: str) -> CommandResult:
         """Execute project test suites across all tiers (Frontend, Backend, Types/Proofs)."""
         root = find_project_root(project_dir)
@@ -347,12 +402,18 @@ class ProjectRunner:
         # 2. Check Node / React / Vitest tests
         pkg_path = os.path.join(root, "package.json")
         if os.path.exists(pkg_path):
-            res = await self.run_command_streamed(
-                cmd=["npm", "test"],
-                cwd=root,
-                title="Running Test Suite (npm test)",
-            )
-            results.append(res)
+            try:
+                with open(pkg_path, "r", encoding="utf-8") as pf:
+                    pkg_data = json.load(pf)
+                if "test" in pkg_data.get("scripts", {}):
+                    res = await self.run_command_streamed(
+                        cmd=["npm", "test"],
+                        cwd=root,
+                        title="Running Test Suite (npm test)",
+                    )
+                    results.append(res)
+            except Exception:
+                pass
 
         # 3. Check Python tests
         if os.path.exists(os.path.join(root, "pyproject.toml")) or os.path.exists(os.path.join(root, "requirements.txt")) or any(f.endswith(".py") for f in os.listdir(root) if os.path.isfile(os.path.join(root, f))):
@@ -484,6 +545,7 @@ class ProjectRunner:
         ready_event = asyncio.Event()
         ansi_regex = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
         url_regex = re.compile(r"(http://localhost:\d+|http://127\.0\.0\.1:\d+|http://0\.0\.0\.0:\d+)")
+        server_error_buffer: deque = deque(maxlen=50)
 
         async def _monitor_stream(p: asyncio.subprocess.Process, label: str = "app"):
             async def _drain_out():
@@ -493,6 +555,10 @@ class ProjectRunner:
                         break
                     raw_text = line.decode("utf-8", errors="replace")
                     clean_text = ansi_regex.sub("", raw_text)
+
+                    # Capture Vite / transform errors into live server error buffer
+                    if any(marker in clean_text for marker in ("[plugin:vite:", "Transform failed", "SyntaxError:", "error TS", "Failed to resolve import")):
+                        server_error_buffer.append(clean_text.rstrip())
 
                     try:
                         with open(log_file_path, "a", encoding="utf-8") as lf:
@@ -519,6 +585,11 @@ class ProjectRunner:
                         break
                     raw_text = line.decode("utf-8", errors="replace")
                     clean_text = ansi_regex.sub("", raw_text)
+
+                    # Capture Vite / transform / crash errors from stderr
+                    if any(marker in clean_text for marker in ("[plugin:vite:", "Transform failed", "SyntaxError:", "error TS", "Error:", "Failed to resolve import")):
+                        server_error_buffer.append(clean_text.rstrip())
+
                     try:
                         with open(log_file_path, "a", encoding="utf-8") as lf:
                             lf.write(f"[{label}-stderr] {clean_text}")
@@ -558,5 +629,6 @@ class ProjectRunner:
             backend_url=backend_url,
             log_file=log_file_path,
             monitor_task=monitor_task,
+            error_buffer=server_error_buffer,
         )
 

@@ -100,7 +100,7 @@ def test_scaffold_project_python(tmp_path):
 
 @pytest.mark.asyncio
 async def test_project_runner_install_and_build_node(tmp_path):
-    (tmp_path / "package.json").write_text(json.dumps({"scripts": {"build": "echo built"}}), encoding="utf-8")
+    (tmp_path / "package.json").write_text(json.dumps({"scripts": {"build": "echo built", "test": "echo test"}}), encoding="utf-8")
 
     runner = ProjectRunner()
     mock_cmd_result = CommandResult(success=True, stdout="installed", stderr="", exit_code=0, duration_seconds=0.1)
@@ -232,3 +232,48 @@ async def test_tui_slash_build_and_start_commands(tmp_path):
         handled_stop = await dispatch_slash_command("/stop", state, console)
         assert handled_stop is True
         assert state.active_server is None
+
+
+@pytest.mark.asyncio
+async def test_verify_project_smart_fast_path(tmp_path):
+    (tmp_path / "package.json").write_text("{}", encoding="utf-8")
+    runner = ProjectRunner()
+    tc_success = CommandResult(success=True, stdout="clean", stderr="", exit_code=0, duration_seconds=0.1)
+
+    with patch.object(runner, "typecheck_project", new_callable=AsyncMock, return_value=tc_success) as mock_tc, \
+         patch.object(runner, "build_project", new_callable=AsyncMock) as mock_bld:
+        res = await runner.verify_project_smart(str(tmp_path))
+        assert res.success is True
+        mock_tc.assert_called_once()
+        mock_bld.assert_not_called()  # Fast path must NOT call build_project
+
+
+@pytest.mark.asyncio
+async def test_verify_project_smart_escalates_on_fail(tmp_path):
+    (tmp_path / "package.json").write_text("{}", encoding="utf-8")
+    runner = ProjectRunner()
+    tc_fail = CommandResult(success=False, stdout="", stderr="TS error", exit_code=1, duration_seconds=0.1)
+    bld_fail = CommandResult(success=False, stdout="", stderr="[plugin:vite:react-babel] error", exit_code=1, duration_seconds=0.5)
+
+    with patch.object(runner, "typecheck_project", new_callable=AsyncMock, return_value=tc_fail) as mock_tc, \
+         patch.object(runner, "build_project", new_callable=AsyncMock, return_value=bld_fail) as mock_bld:
+        res = await runner.verify_project_smart(str(tmp_path))
+        assert res.success is False
+        mock_tc.assert_called_once()
+        mock_bld.assert_called_once()  # Must escalate to build_project
+
+
+def test_drain_server_errors():
+    runner = ProjectRunner()
+    proc = MagicMock()
+    server = ServerProcess(process=proc, port=5173, url="http://localhost:5173", project_dir="/tmp")
+    server.error_buffer.append("[plugin:vite:react-babel] syntax error")
+    
+    drained = runner.drain_server_errors(server)
+    assert drained is not None
+    assert drained.success is False
+    assert "[plugin:vite:react-babel]" in drained.stderr
+    assert len(server.error_buffer) == 0
+
+    # Draining second time returns None
+    assert runner.drain_server_errors(server) is None

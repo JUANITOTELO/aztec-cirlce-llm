@@ -244,23 +244,54 @@ HEAVY_DEPS = frozenset([
 def find_project_root(target_dir: str) -> str:
     """
     Determine canonical project root:
-    1. If target_dir contains package.json or pyproject.toml -> target_dir
-    2. Recurse up to 2 directory levels to find subfolder containing package.json or pyproject.toml
-    3. Default to target_dir.
+    1. If target_dir contains package.json -> target_dir
+    2. If target_dir contains pyproject.toml (and is not aztec_circle engine) -> target_dir
+    3. Check immediate subdirectories (1 level deep), preferring the one with the most recently modified src/ directory
+    4. Default to target_dir.
     """
-    if not os.path.exists(target_dir):
+    if not os.path.exists(target_dir) or target_dir in ("./aztec_output", "aztec_output"):
+        # Fallback to current working directory or subproject if target_dir doesn't exist
+        if os.path.exists("package.json"):
+            return "."
+        try:
+            candidates = []
+            for d in os.listdir("."):
+                if os.path.isdir(d) and not d.startswith((".", "tests", "aztec_circle", "venv", ".venv", "node_modules")):
+                    if os.path.exists(os.path.join(d, "package.json")) or (os.path.exists(os.path.join(d, "pyproject.toml")) and not os.path.isdir(os.path.join(d, "aztec_circle"))):
+                        candidates.append(d)
+            if candidates:
+                def _src_mtime(dir_path: str) -> float:
+                    s = os.path.join(dir_path, "src")
+                    return os.path.getmtime(s) if os.path.isdir(s) else 0.0
+                return max(candidates, key=_src_mtime)
+        except Exception:
+            pass
+        if not os.path.exists(target_dir):
+            return target_dir
+
+    # Check root: if has package.json -> target_dir
+    if os.path.exists(os.path.join(target_dir, "package.json")):
         return target_dir
 
-    # Check root
-    if os.path.exists(os.path.join(target_dir, "package.json")) or os.path.exists(os.path.join(target_dir, "pyproject.toml")):
+    # If has pyproject.toml and is NOT the Aztec engine itself -> target_dir
+    if os.path.exists(os.path.join(target_dir, "pyproject.toml")) and not os.path.isdir(os.path.join(target_dir, "aztec_circle")):
         return target_dir
 
     # Check immediate subdirectories (1 level deep)
     try:
         subdirs = [os.path.join(target_dir, d) for d in os.listdir(target_dir) if os.path.isdir(os.path.join(target_dir, d))]
+        candidates = []
         for sub in subdirs:
-            if os.path.exists(os.path.join(sub, "package.json")) or os.path.exists(os.path.join(sub, "pyproject.toml")):
-                return sub
+            base = os.path.basename(sub)
+            if base.startswith((".", "tests", "aztec_circle", "venv", ".venv", "__pycache__", "node_modules", "dist", "build")):
+                continue
+            if os.path.exists(os.path.join(sub, "package.json")) or (os.path.exists(os.path.join(sub, "pyproject.toml")) and not os.path.isdir(os.path.join(sub, "aztec_circle"))):
+                candidates.append(sub)
+        if candidates:
+            def _src_mtime(dir_path: str) -> float:
+                s = os.path.join(dir_path, "src")
+                return os.path.getmtime(s) if os.path.isdir(s) else 0.0
+            return max(candidates, key=_src_mtime)
     except Exception:
         pass
 

@@ -6,6 +6,7 @@ LLM calls to repair failing source files one file at a time.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -28,6 +29,33 @@ TS_ERROR_PATTERN = re.compile(
     re.MULTILINE,
 )
 
+# Vite React-Babel plugin errors:
+# [plugin:vite:react-babel] /path/to/src/App.tsx: 'return' outside of function. (88:2)
+VITE_BABEL_PATTERN = re.compile(
+    r"\[plugin:vite:react-babel\]\s+(?P<file>[^\n:]+?):\s*(?P<msg>[^\n]+?)\s*\((?P<line>\d+):(?P<col>\d+)\)",
+    re.MULTILINE,
+)
+
+# Vite esbuild transform errors:
+# src/components/POS/PosTerminal.tsx:444:0: ERROR: The character "}" is not valid inside a JSX element
+VITE_ESBUILD_PATTERN = re.compile(
+    r"(?P<file>(?:src/|[a-zA-Z0-9_\-./]+)[^\s:]+\.[a-zA-Z0-9]{2,4}):(?P<line>\d+):(?P<col>\d+):\s*(?:ERROR:\s*)?(?P<msg>.+)",
+    re.MULTILINE,
+)
+
+# Generic Vite/Rollup plugin errors (fallback):
+# [plugin:vite:something] file.tsx: some error message
+VITE_GENERIC_PATTERN = re.compile(
+    r"\[plugin:vite:[^\]]+\]\s+(?P<file>[^\n:]+?)(?::\s*(?P<msg>[^\n]+))?$",
+    re.MULTILINE,
+)
+
+# Standard unix compiler: file.tsx:line:col: error: message
+UNIX_COMPILER_PATTERN = re.compile(
+    r"^(?P<file>[\w./\\-]+\.[a-zA-Z0-9]{1,5}):(?P<line>\d+):(?P<col>\d+):\s*(?:error:\s+)?(?P<msg>.+)$",
+    re.MULTILINE,
+)
+
 PHP_ERROR_PATTERN = re.compile(
     r"(?:PHP Fatal error|Fatal error|Parse error|PHP Parse error):\s+(?P<msg>.+?)\s+in\s+(?P<file>.+?)\s+on\s+line\s+(?P<line>\d+)",
     re.IGNORECASE | re.MULTILINE,
@@ -42,6 +70,22 @@ LEAN_ERROR_PATTERN = re.compile(
     r"^(?P<file>[^\s:]+\.lean):(?P<line>\d+):(?P<col>\d+):\s+error:\s+(?P<msg>.+)$",
     re.MULTILINE,
 )
+
+VITEST_FAIL_PATTERN = re.compile(
+    r"FAIL\s+(?P<file>(?:src/|[a-zA-Z0-9_\-./]+)[^\s\n>:]+\.[a-zA-Z0-9]{2,4})(?:\s*>\s*(?P<msg>[^\n]+))?",
+    re.MULTILINE,
+)
+
+UNRECOVERABLE_SIGNALS = frozenset([
+    "cannot find module",
+    "npm err!",
+    "permission denied",
+    "enoent",
+    "disk quota",
+    "port already in use",
+    "eaddrinuse",
+    "command not found",
+])
 
 
 @dataclass
@@ -66,7 +110,7 @@ class FixResult:
 class BuildFixAgent:
     """
     Automated self-healing multi-tier build and test error repair agent.
-    Extracts compiler diagnostics (TypeScript, PHP, Python, SQL, Lean 4), groups them by file,
+    Extracts compiler diagnostics (TypeScript, Vite, ESBuild, PHP, Python, SQL, Lean 4), groups them by file,
     and prompts LLM for targeted atomic file repairs.
     """
 
@@ -102,43 +146,125 @@ CRITICAL INSTRUCTIONS:
         self.console = console
         self.max_iterations = max_iterations
         self.model = model or settings.get_effective_model("FIXER")
+        self._fixed_fingerprints: set[str] = set()
 
-    def parse_errors(self, build_output: str) -> List[TSError]:
-        """Extract structured errors from compiler diagnostics across TS, PHP, Python, and Lean."""
+    @staticmethod
+    def is_recoverable(build_output: str) -> bool:
+        """Return False if error output contains unrecoverable signals (missing npm packages, etc.)."""
+        lower = build_output.lower()
+        return not any(sig in lower for sig in UNRECOVERABLE_SIGNALS)
+
+    @staticmethod
+    def has_vite_errors(build_output: str) -> bool:
+        """Return True if output contains Vite-specific plugin error markers."""
+        return "[plugin:vite:" in build_output or "Transform failed" in build_output
+
+    def parse_errors(self, build_output: str, project_root: str = "") -> List[TSError]:
+        """Extract structured errors from compiler diagnostics across TS, Vite, ESBuild, PHP, Python, and Lean."""
         errors: List[TSError] = []
-        
+        seen: set[tuple] = set()
+
+        def _clean_path(raw_file: str) -> str:
+            clean = raw_file.strip().strip("'\"").replace("\\", "/")
+            if project_root and os.path.isabs(clean):
+                try:
+                    clean = os.path.relpath(clean, project_root).replace("\\", "/")
+                except Exception:
+                    pass
+            # Remove any leading ./
+            if clean.startswith("./"):
+                clean = clean[2:]
+            return clean
+
+        def _add(file: str, line: int, code: str, msg: str):
+            c_file = _clean_path(file)
+            key = (c_file, line, code)
+            if key not in seen and c_file:
+                seen.add(key)
+                errors.append(
+                    TSError(
+                        file=c_file,
+                        line=line,
+                        code=code,
+                        message=msg.strip(),
+                    )
+                )
+
         # 1. TypeScript errors
         for match in TS_ERROR_PATTERN.finditer(build_output):
-            errors.append(
-                TSError(
-                    file=match.group("file").strip(),
-                    line=int(match.group("line")),
-                    code=match.group("code").strip(),
-                    message=match.group("msg").strip(),
-                )
+            _add(
+                match.group("file"),
+                int(match.group("line")),
+                match.group("code").strip(),
+                match.group("msg").strip(),
             )
 
-        # 2. PHP errors
+        # 2. Vite React-Babel errors
+        for match in VITE_BABEL_PATTERN.finditer(build_output):
+            _add(
+                match.group("file"),
+                int(match.group("line")),
+                "VITE_BABEL",
+                match.group("msg").strip(),
+            )
+
+        # 3. Vite ESBuild transform errors
+        for match in VITE_ESBUILD_PATTERN.finditer(build_output):
+            _add(
+                match.group("file"),
+                int(match.group("line")),
+                "VITE_ESBUILD",
+                match.group("msg").strip(),
+            )
+
+        # 4. Generic Vite / Rollup plugin errors
+        for match in VITE_GENERIC_PATTERN.finditer(build_output):
+            f = match.group("file").strip()
+            msg = match.group("msg") or "Vite plugin compilation error"
+            if any(f.endswith(ext) for ext in (".tsx", ".ts", ".jsx", ".js", ".css", ".html")):
+                _add(f, 0, "VITE_PLUGIN", msg)
+
+        # 5. Standard Unix compiler diagnostics
+        for match in UNIX_COMPILER_PATTERN.finditer(build_output):
+            _add(
+                match.group("file"),
+                int(match.group("line")),
+                "COMPILER_ERROR",
+                match.group("msg").strip(),
+            )
+
+        # 6. PHP errors
         for match in PHP_ERROR_PATTERN.finditer(build_output):
-            errors.append(
-                TSError(
-                    file=match.group("file").strip(),
-                    line=int(match.group("line")),
-                    code="PHP_ERROR",
-                    message=match.group("msg").strip(),
-                )
+            _add(
+                match.group("file"),
+                int(match.group("line")),
+                "PHP_ERROR",
+                match.group("msg").strip(),
             )
 
-        # 3. Lean 4 errors
+        # 7. Lean 4 errors
         for match in LEAN_ERROR_PATTERN.finditer(build_output):
-            errors.append(
-                TSError(
-                    file=match.group("file").strip(),
-                    line=int(match.group("line")),
-                    code="LEAN_ERROR",
-                    message=match.group("msg").strip(),
-                )
+            _add(
+                match.group("file"),
+                int(match.group("line")),
+                "LEAN_ERROR",
+                match.group("msg").strip(),
             )
+
+        # 8. Python errors
+        for match in PYTHON_ERROR_PATTERN.finditer(build_output):
+            _add(
+                match.group("file"),
+                int(match.group("line")),
+                "PYTHON_ERROR",
+                match.group("msg").strip(),
+            )
+
+        # 9. Vitest / Jest test failures
+        for match in VITEST_FAIL_PATTERN.finditer(build_output):
+            f = match.group("file").strip()
+            msg = match.group("msg") or "Test suite failure"
+            _add(f, 1, "TEST_FAILURE", msg)
 
         return errors
 
@@ -172,10 +298,24 @@ CRITICAL INSTRUCTIONS:
 
         for loop in range(1, self.max_iterations + 1):
             combined_log = f"{current_build.stderr}\n{current_build.stdout}"
-            errors = self.parse_errors(combined_log)
-
-            if not errors and not combined_log.strip():
+            if not combined_log.strip():
                 break
+
+            # Check if errors are unrecoverable
+            if not self.is_recoverable(combined_log):
+                if self.console:
+                    self.console.print("  [bold yellow]⚠ Error appears unrecoverable by code fixes (missing system dependency / package).[/bold yellow]")
+                break
+
+            # Error fingerprint deduplication
+            fp = hashlib.md5(combined_log[:1000].encode("utf-8")).hexdigest()
+            if fp in self._fixed_fingerprints:
+                if self.console:
+                    self.console.print("  [dim]Error fingerprint already handled this session — skipping duplicate repair loop.[/dim]")
+                break
+            self._fixed_fingerprints.add(fp)
+
+            errors = self.parse_errors(combined_log, project_root=root)
 
             # Group errors by file
             errors_by_file: Dict[str, List[TSError]] = {}
@@ -183,6 +323,14 @@ CRITICAL INSTRUCTIONS:
                 errors_by_file.setdefault(e.file, []).append(e)
 
             target_files = list(errors_by_file.keys())
+            if not target_files:
+                # Fallback: scan combined log for any source files existing under root
+                for match in re.finditer(r"(?:src/|[a-zA-Z0-9_\-./]+/)[a-zA-Z0-9_\-./]+\.(?:tsx|ts|jsx|js|py|php|lean)", combined_log):
+                    candidate = match.group(0).lstrip("/\\").replace("\\", "/")
+                    if os.path.exists(os.path.join(root, candidate)) and candidate not in target_files:
+                        target_files.append(candidate)
+                        errors_by_file[candidate] = []
+
             if not target_files:
                 for f in ["src/App.tsx", "src/main.tsx", "src/utils/constants.ts"]:
                     if os.path.exists(os.path.join(root, f)):

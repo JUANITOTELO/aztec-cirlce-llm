@@ -138,3 +138,60 @@ async def test_build_fix_agent_already_clean():
     res = await fixer.fix("/tmp", clean_build)
     assert res.success is True
     assert res.iterations == 0
+
+
+@pytest.mark.parametrize("error_log,expected_code,expected_file,expected_line", [
+    (
+        "[plugin:vite:react-babel] /abs/src/App.tsx: 'return' outside of function. (88:2)",
+        "VITE_BABEL", "src/App.tsx", 88,
+    ),
+    (
+        "src/components/POS/PosTerminal.tsx:444:0: ERROR: The character \"}\" is not valid inside a JSX element",
+        "VITE_ESBUILD", "src/components/POS/PosTerminal.tsx", 444,
+    ),
+    (
+        "[plugin:vite:react-babel] /abs/src/components/POS/PosTerminal.tsx: Unexpected token (193:16)",
+        "VITE_BABEL", "src/components/POS/PosTerminal.tsx", 193,
+    ),
+    (
+        "src/main.tsx:12:5: error: Unexpected identifier",
+        "VITE_ESBUILD", "src/main.tsx", 12,
+    ),
+])
+def test_parse_vite_and_esbuild_errors(error_log, expected_code, expected_file, expected_line):
+    agent = BuildFixAgent()
+    errors = agent.parse_errors(error_log, project_root="/abs")
+    assert len(errors) >= 1
+    assert errors[0].code == expected_code
+    assert errors[0].file == expected_file
+    assert errors[0].line == expected_line
+
+
+def test_is_recoverable_and_has_vite_errors():
+    agent = BuildFixAgent()
+    assert agent.has_vite_errors("[plugin:vite:react-babel] error") is True
+    assert agent.has_vite_errors("Transform failed with 1 error:") is True
+    assert agent.has_vite_errors("Clean code") is False
+
+    assert agent.is_recoverable("src/App.tsx: syntax error") is True
+    assert agent.is_recoverable("npm ERR! code ENOENT") is False
+    assert agent.is_recoverable("Error: Cannot find module 'react'") is False
+
+
+@pytest.mark.asyncio
+async def test_build_fix_agent_fingerprint_deduplication(tmp_path):
+    mock_provider = MagicMock()
+    mock_provider.invoke = AsyncMock(return_value=LLMResponse(
+        content=json.dumps({"fixes_summary": "fixed", "patched_files": {}}),
+        prompt_tokens=10, completion_tokens=10, total_tokens=20, model="test",
+    ))
+    runner = ProjectRunner(console=Console(record=True))
+    failing_build = CommandResult(success=False, stdout="", stderr="src/App.tsx(10,1): error TS1005: ';' expected.", exit_code=1, duration_seconds=0.1)
+
+    with patch.object(runner, "build_project", new_callable=AsyncMock, return_value=failing_build):
+        fixer = BuildFixAgent(provider=mock_provider, max_iterations=3)
+        res = await fixer.fix(str(tmp_path), failing_build, runner=runner)
+        # Should stop without looping infinitely on duplicate fingerprint
+        assert res.success is False
+        assert fixer.provider.invoke.call_count <= 2
+

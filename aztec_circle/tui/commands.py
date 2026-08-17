@@ -264,13 +264,20 @@ async def cmd_resume(args: str, state: SessionState, console: Console) -> None:
     state.active_task_id = loaded_state.task_id
 
 
+def _resolve_target_dir(state: SessionState, explicit_target: str = "") -> str:
+    """Auto-discover canonical project root from explicit input or session state."""
+    from aztec_circle.engine.scaffolder import find_project_root
+    target = explicit_target.strip() or state.output_dir
+    return find_project_root(target)
+
+
 async def cmd_build(args: str, state: SessionState, console: Console) -> None:
     """Scaffold missing files, install dependencies, and build project with auto-repair."""
     from aztec_circle.engine.scaffolder import scaffold_project
     from aztec_circle.engine.project_runner import ProjectRunner
     from aztec_circle.engine.build_fixer import BuildFixAgent
 
-    target = args.strip() or state.output_dir
+    target = _resolve_target_dir(state, args)
     console.print(f"[bold cyan]Scaffolding and building project at:[/bold cyan] {target}")
     scaffold_res = scaffold_project(target)
     if scaffold_res.files_injected:
@@ -281,28 +288,43 @@ async def cmd_build(args: str, state: SessionState, console: Console) -> None:
     if install_res.success:
         build_res = await runner.build_project(scaffold_res.project_root)
         if not build_res.success:
-            fixer = BuildFixAgent(console=console, max_iterations=2)
-            await fixer.fix(scaffold_res.project_root, build_res, runner=runner)
+            fixer = BuildFixAgent(console=console, max_iterations=3)
+            fix_res = await fixer.fix(scaffold_res.project_root, build_res, runner=runner)
+            state.record_cost(fix_res.total_cost_usd)
 
 
 async def cmd_fix(args: str, state: SessionState, console: Console) -> None:
     """Run automated build error fix loop on project."""
-    from aztec_circle.engine.scaffolder import find_project_root
     from aztec_circle.engine.project_runner import ProjectRunner
     from aztec_circle.engine.build_fixer import BuildFixAgent
 
-    target = args.strip() or state.output_dir
-    root = find_project_root(target)
+    root = _resolve_target_dir(state, args)
     console.print(f"[bold cyan]Running Aztec Build Fixer on project at:[/bold cyan] {root}")
     runner = ProjectRunner(console=console)
-    initial_build = await runner.build_project(root)
 
-    if initial_build.success:
-        console.print("[bold green]✓ Project is already building cleanly with zero errors![/bold green]\n")
+    server_err_res = None
+    if state.active_server:
+        server_err_res = runner.drain_server_errors(state.active_server)
+
+    initial_build = await runner.verify_project_smart(root, force_full_build=True)
+
+    combined_fail = None
+    if not initial_build.success:
+        combined_fail = initial_build
+    elif server_err_res and not server_err_res.success:
+        combined_fail = server_err_res
+    else:
+        # Check if project test suites pass
+        test_res = await runner.test_project(root)
+        if not test_res.success:
+            combined_fail = test_res
+
+    if not combined_fail:
+        console.print("[bold green]✓ Project is already building and passing tests cleanly with zero errors![/bold green]\n")
         return
 
     fixer = BuildFixAgent(console=console, max_iterations=3)
-    res = await fixer.fix(root, initial_build, runner=runner)
+    res = await fixer.fix(root, combined_fail, runner=runner)
     state.record_cost(res.total_cost_usd)
     if res.success:
         console.print(f"[bold green]✓ Successfully repaired {len(res.patches_applied)} file(s) across {res.iterations} iteration(s)![/bold green]\n")
@@ -312,11 +334,9 @@ async def cmd_fix(args: str, state: SessionState, console: Console) -> None:
 
 async def cmd_test(args: str, state: SessionState, console: Console) -> None:
     """Run test suite for generated project."""
-    from aztec_circle.engine.scaffolder import find_project_root
     from aztec_circle.engine.project_runner import ProjectRunner
 
-    target = args.strip() or state.output_dir
-    root = find_project_root(target)
+    root = _resolve_target_dir(state, args)
     console.print(f"[bold cyan]Running test suite for project at:[/bold cyan] {root}")
     runner = ProjectRunner(console=console)
     await runner.test_project(root)
@@ -324,16 +344,11 @@ async def cmd_test(args: str, state: SessionState, console: Console) -> None:
 
 async def cmd_start(args: str, state: SessionState, console: Console) -> None:
     """Start live background development server."""
-    import os
-    from aztec_circle.engine.scaffolder import scaffold_project, find_project_root
+    from aztec_circle.engine.scaffolder import scaffold_project
     from aztec_circle.engine.project_runner import ProjectRunner
 
-    target = args.strip() or state.output_dir
-    if not os.path.exists(target) or target == "./aztec_output":
-        if os.path.exists("package.json") or os.path.exists("src"):
-            target = "."
-
-    scaffold_res = scaffold_project(target)
+    root = _resolve_target_dir(state, args)
+    scaffold_res = scaffold_project(root)
     runner = ProjectRunner(console=console)
 
     if state.active_server:
@@ -354,14 +369,8 @@ async def cmd_start(args: str, state: SessionState, console: Console) -> None:
 async def cmd_logs(args: str, state: SessionState, console: Console) -> None:
     """View background development server logs: /logs [num_lines]"""
     import os
-    from aztec_circle.engine.scaffolder import find_project_root
 
-    target = state.output_dir
-    if not os.path.exists(target) or target == "./aztec_output":
-        if os.path.exists("package.json") or os.path.exists("src"):
-            target = "."
-
-    root = find_project_root(target)
+    root = _resolve_target_dir(state)
     log_file = os.path.join(root, ".aztec_server.log")
 
     if not os.path.exists(log_file):
@@ -415,19 +424,11 @@ async def cmd_edit(args: str, state: SessionState, console: Console) -> None:
         console.print("[yellow]Usage: /edit <instruction e.g. 'Add a screenshot button'>[/yellow]\n")
         return
 
-    import os
     from aztec_circle.engine.patch_agent import PatchAgent
     from aztec_circle.engine.project_runner import ProjectRunner
     from aztec_circle.engine.build_fixer import BuildFixAgent
-    from aztec_circle.engine.scaffolder import find_project_root
 
-    target_dir = state.output_dir
-    # Auto-detect if target_dir doesn't exist but current directory is a project
-    if not os.path.exists(target_dir) or target_dir == "./aztec_output":
-        if os.path.exists("package.json") or os.path.exists("src"):
-            target_dir = "."
-
-    root = find_project_root(target_dir)
+    root = _resolve_target_dir(state)
     agent = PatchAgent(console=console)
     res = await agent.run(instruction=instruction, project_dir=root, images=list(state.attached_images), verbose=True)
 
@@ -438,16 +439,29 @@ async def cmd_edit(args: str, state: SessionState, console: Console) -> None:
     state.record_cost(res.total_cost_usd, res.round1_tokens + res.round2_tokens)
     console.print(f"\n[bold green]Summary:[/bold green] {res.edit_summary}")
     runner = ProjectRunner(console=console)
-    tc_res = await runner.typecheck_project(root)
-    if not tc_res.success:
-        console.print("[yellow]Type check reported errors. Triggering atomic Build Fix Agent...[/yellow]")
-        fixer = BuildFixAgent(console=console, max_iterations=2)
-        fix_res = await fixer.fix(root, tc_res, runner=runner)
-        state.record_cost(fix_res.total_cost_usd)
-        if not fix_res.success:
-            console.print("[bold red]Warning: Post-edit build check still has unresolved errors.[/bold red]\n")
+    gate_res = await runner.verify_project_smart(root)
+    if not gate_res.success:
+        if BuildFixAgent.is_recoverable(gate_res.stderr + gate_res.stdout):
+            console.print("[yellow]Build verification reported errors. Triggering atomic Build Fix Agent...[/yellow]")
+            fixer = BuildFixAgent(console=console, max_iterations=3)
+            fix_res = await fixer.fix(root, gate_res, runner=runner)
+            state.record_cost(fix_res.total_cost_usd)
+            if not fix_res.success:
+                console.print("[bold red]Warning: Post-edit build check still has unresolved errors.[/bold red]\n")
+            else:
+                console.print(f"[bold green]✓ Build healed successfully in {fix_res.iterations} iteration(s)![/bold green]\n")
+        else:
+            console.print("[bold yellow]⚠ Unrecoverable build error detected. Use /fix for details.[/bold yellow]\n")
     else:
-        console.print("[bold green]✓ Type check passed with zero errors![/bold green]\n")
+        console.print("[bold green]✓ Quality gate passed cleanly with zero errors![/bold green]\n")
+
+    if state.active_server:
+        srv_errs = runner.drain_server_errors(state.active_server)
+        if srv_errs and not srv_errs.success and BuildFixAgent.is_recoverable(srv_errs.stderr):
+            console.print("[yellow]Live server reported runtime errors. Auto-healing...[/yellow]")
+            fixer = BuildFixAgent(console=console, max_iterations=2)
+            fix_res = await fixer.fix(root, srv_errs, runner=runner)
+            state.record_cost(fix_res.total_cost_usd)
 
 
 async def cmd_rebuild(args: str, state: SessionState, console: Console) -> None:

@@ -7,6 +7,8 @@ from unittest.mock import AsyncMock, patch, MagicMock
 from rich.console import Console
 
 from aztec_circle.domain.models import ConsoleCommand
+from aztec_circle.engine.build_fixer import FixResult
+from aztec_circle.engine.project_runner import CommandResult
 from aztec_circle.tui.commands import (
     dispatch_slash_command,
     cmd_run,
@@ -116,3 +118,33 @@ async def test_cmd_budget(tmp_path):
     assert handled2 is True
     assert state.budget_limit_usd == 3.50
     assert "$3.50" in console2.export_text()
+
+
+@pytest.mark.asyncio
+async def test_cmd_fix_execution_clean(tmp_path):
+    (tmp_path / "package.json").write_text("{}", encoding="utf-8")
+    console = Console(record=True)
+    state = SessionState(output_dir=str(tmp_path))
+
+    with patch("aztec_circle.engine.project_runner.ProjectRunner.verify_project_smart", new_callable=AsyncMock) as mock_vfy:
+        mock_vfy.return_value = CommandResult(success=True, stdout="clean", stderr="", exit_code=0, duration_seconds=0.1)
+        handled = await dispatch_slash_command("/fix", state, console)
+        assert handled is True
+        out = console.export_text()
+        assert "cleanly with zero errors" in out
+
+
+@pytest.mark.asyncio
+async def test_cmd_fix_execution_with_repair(tmp_path):
+    (tmp_path / "package.json").write_text("{}", encoding="utf-8")
+    console = Console(record=True)
+    state = SessionState(output_dir=str(tmp_path))
+
+    fail_res = CommandResult(success=False, stdout="", stderr="[plugin:vite:react-babel] error", exit_code=1, duration_seconds=0.1)
+    with patch("aztec_circle.engine.project_runner.ProjectRunner.verify_project_smart", new_callable=AsyncMock, return_value=fail_res), \
+         patch("aztec_circle.engine.build_fixer.BuildFixAgent.fix", new_callable=AsyncMock) as mock_fix:
+        mock_fix.return_value = FixResult(success=True, iterations=1, final_build_result=CommandResult(success=True, stdout="", stderr="", exit_code=0, duration_seconds=0.1), patches_applied=["src/App.tsx"], total_cost_usd=0.01)
+        handled = await dispatch_slash_command("/fix", state, console)
+        assert handled is True
+        out = console.export_text()
+        assert "Successfully repaired" in out

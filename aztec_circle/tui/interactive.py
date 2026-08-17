@@ -217,21 +217,25 @@ async def run_modular_consensus_session(
 
         state.record_cost(res.total_cost_usd, res.total_tokens_used)
 
-        # Quality Gate: Type Check + Test Suite
+        # Quality Gate: Two-Tier Build Verification + Test Suite
         runner = ProjectRunner(console=console)
-        tc_res = await runner.typecheck_project(root)
-        gate_failed = not tc_res.success
+        gate_res = await runner.verify_project_smart(root)
+        gate_failed = not gate_res.success
 
         if gate_failed:
-            console.print("[yellow]Type check found compiler errors. Triggering atomic Build Fix Agent...[/yellow]")
-            fixer = BuildFixAgent(console=console, max_iterations=2)
-            fix_res = await fixer.fix(root, tc_res, runner=runner)
-            state.record_cost(fix_res.total_cost_usd)
-            if not fix_res.success:
-                console.print("[bold red]Warning: Unresolved type errors remain.[/bold red]\n")
-                gate_failed = True
+            if BuildFixAgent.is_recoverable(gate_res.stderr + gate_res.stdout):
+                console.print("[yellow]Build verification found compiler/transform errors. Triggering atomic Build Fix Agent...[/yellow]")
+                fixer = BuildFixAgent(console=console, max_iterations=3)
+                fix_res = await fixer.fix(root, gate_res, runner=runner)
+                state.record_cost(fix_res.total_cost_usd)
+                if not fix_res.success:
+                    console.print("[bold red]Warning: Unresolved build errors remain.[/bold red]\n")
+                    gate_failed = True
+                else:
+                    console.print(f"[bold green]✓ Build healed cleanly in {fix_res.iterations} iteration(s)![/bold green]\n")
+                    gate_failed = False
             else:
-                gate_failed = False
+                console.print("[bold yellow]⚠ Unrecoverable build error detected.[/bold yellow]\n")
 
         # Run tests if a test script exists in package.json and type check is clean
         pkg_json_path = os.path.join(root, "package.json")
@@ -253,18 +257,29 @@ async def run_modular_consensus_session(
                 title="Quality Gate: Test Suite",
             )
             if not test_res.success:
-                console.print("[yellow]Tests failed. Triggering Build Fix Agent on test errors...[/yellow]")
-                fixer = BuildFixAgent(console=console, max_iterations=2)
-                fix_res = await fixer.fix(root, test_res, runner=runner)
-                state.record_cost(fix_res.total_cost_usd)
-                if not fix_res.success:
-                    console.print("[bold red]Warning: Unresolved test failures remain.[/bold red]\n")
+                if BuildFixAgent.is_recoverable(test_res.stderr + test_res.stdout):
+                    console.print("[yellow]Tests failed. Triggering Build Fix Agent on test errors...[/yellow]")
+                    fixer = BuildFixAgent(console=console, max_iterations=3)
+                    fix_res = await fixer.fix(root, test_res, runner=runner)
+                    state.record_cost(fix_res.total_cost_usd)
+                    if not fix_res.success:
+                        console.print("[bold red]Warning: Unresolved test failures remain.[/bold red]\n")
+                    else:
+                        console.print(f"[bold green]✓ Quality gate passed: tests healed cleanly in {fix_res.iterations} iteration(s)![/bold green]\n")
                 else:
-                    console.print("[bold green]✓ Quality gate passed: tests healed cleanly![/bold green]\n")
+                    console.print("[bold red]Warning: Test failure requires manual attention.[/bold red]\n")
             else:
-                console.print("[bold green]✓ Quality gate passed: type check + tests clean![/bold green]\n")
+                console.print("[bold green]✓ Quality gate passed: build + tests clean![/bold green]\n")
         elif not gate_failed:
-            console.print("[bold green]✓ Quality gate passed: type check clean![/bold green]\n")
+            console.print("[bold green]✓ Quality gate passed: build verification clean![/bold green]\n")
+
+        if state.active_server:
+            srv_errs = runner.drain_server_errors(state.active_server)
+            if srv_errs and not srv_errs.success and BuildFixAgent.is_recoverable(srv_errs.stderr):
+                console.print("[yellow]Live server reported runtime errors. Auto-healing...[/yellow]")
+                fixer = BuildFixAgent(console=console, max_iterations=2)
+                fix_res = await fixer.fix(root, srv_errs, runner=runner)
+                state.record_cost(fix_res.total_cost_usd)
 
         await _show_post_debate_menu(state, console)
         return res
@@ -360,18 +375,31 @@ async def run_edit_session(
     state.record_cost(res.total_cost_usd, res.round1_tokens + res.round2_tokens)
     console.print(f"[bold green]Summary:[/bold green] {res.edit_summary}")
 
-    # Quality Gate check
+    # Two-Tier Quality Gate check
     runner = ProjectRunner(console=console)
-    tc_res = await runner.typecheck_project(root)
-    if not tc_res.success:
-        console.print("[yellow]Type check found errors. Triggering atomic Build Fix Agent...[/yellow]")
-        fixer = BuildFixAgent(console=console, max_iterations=2)
-        fix_res = await fixer.fix(root, tc_res, runner=runner)
-        state.record_cost(fix_res.total_cost_usd)
-        if not fix_res.success:
-            console.print("[bold red]Warning: Unresolved type errors remain.[/bold red]\n")
+    gate_res = await runner.verify_project_smart(root)
+    if not gate_res.success:
+        if BuildFixAgent.is_recoverable(gate_res.stderr + gate_res.stdout):
+            console.print("[yellow]Build verification found errors. Triggering atomic Build Fix Agent...[/yellow]")
+            fixer = BuildFixAgent(console=console, max_iterations=3)
+            fix_res = await fixer.fix(root, gate_res, runner=runner)
+            state.record_cost(fix_res.total_cost_usd)
+            if not fix_res.success:
+                console.print("[bold red]Warning: Unresolved errors remain.[/bold red]\n")
+            else:
+                console.print(f"[bold green]✓ Build healed successfully in {fix_res.iterations} iteration(s)![/bold green]\n")
+        else:
+            console.print("[bold yellow]⚠ Unrecoverable build error detected. Use /fix for details.[/bold yellow]\n")
     else:
-        console.print("[bold green]✓ Type check passed cleanly![/bold green]\n")
+        console.print("[bold green]✓ Quality gate passed cleanly with zero errors![/bold green]\n")
+
+    if state.active_server:
+        srv_errs = runner.drain_server_errors(state.active_server)
+        if srv_errs and not srv_errs.success and BuildFixAgent.is_recoverable(srv_errs.stderr):
+            console.print("[yellow]Live server reported runtime/HMR errors. Auto-healing...[/yellow]")
+            fixer = BuildFixAgent(console=console, max_iterations=2)
+            fix_res = await fixer.fix(root, srv_errs, runner=runner)
+            state.record_cost(fix_res.total_cost_usd)
 
 
 async def _show_post_debate_menu(state: SessionState, console: Console) -> None:

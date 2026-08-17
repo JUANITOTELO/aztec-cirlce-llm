@@ -1,40 +1,95 @@
 import React, { useState } from 'react';
 import { Product, CartItem, SaleInvoice } from '../../types/store';
+import { ProductVariant } from '../../types/productVariant';
+import { ProductImage } from '../../types/productMedia';
+import { INITIAL_VARIANTS, INITIAL_PRODUCT_IMAGES } from '../../constants/mockVariants';
 import { formatCOP, calculateCartTotals } from '../../utils/formatters';
-import { ShoppingCart, Plus, Minus, Trash2, CheckCircle2, Search, CreditCard, DollarSign, Smartphone } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Trash2, CheckCircle2, Search, CreditCard, DollarSign, Smartphone, Package, Sparkles } from 'lucide-react';
 
 interface PosTerminalProps {
   products: Product[];
+  variants?: ProductVariant[];
+  images?: ProductImage[];
   onCompleteSale: (invoice: SaleInvoice) => void;
 }
 
-export const PosTerminal: React.FC<PosTerminalProps> = ({ products, onCompleteSale }) => {
+export const PosTerminal: React.FC<PosTerminalProps> = ({
+  products,
+  variants = INITIAL_VARIANTS,
+  images = INITIAL_PRODUCT_IMAGES,
+  onCompleteSale,
+}) => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
   const [paymentMethod, setPaymentMethod] = useState<'Efectivo' | 'Tarjeta' | 'Nequi / Daviplata'>('Efectivo');
   const [customerDoc, setCustomerDoc] = useState('222222222222'); // Consumidor Final DIAN
   const [customerName, setCustomerName] = useState('Consumidor Final');
-  const [lastInvoice, setLastInvoice] = useState<SaleInvoice | null>(null);
+  const [selectedVariantModalProduct, setSelectedVariantModalProduct] = useState<Product | null>(null);
 
   const categories = ['Todos', 'Abarrotes', 'Bebidas', 'Lácteos', 'Aseo', 'Snacks'];
 
+  const getProductImage = (productId: string, variantId?: string) => {
+    if (variantId) {
+      const varImg = images.find((img) => img.variantId === variantId);
+      if (varImg) return varImg.url;
+    }
+    const prodImg = images.find((img) => img.productId === productId);
+    return prodImg ? prodImg.url : null;
+  };
+
+  const getProductVariants = (productId: string) => {
+    return variants.filter((v) => v.productId === productId && v.isActive);
+  };
+
   const filteredProducts = products.filter((p) => {
     const matchesCat = selectedCategory === 'Todos' || p.category === selectedCategory;
-    const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.barcode.includes(search) || p.sku.toLowerCase().includes(search.toLowerCase());
+    const prodVars = getProductVariants(p.id);
+    const variantMatches = prodVars.some(
+      (v) => v.name.toLowerCase().includes(search.toLowerCase()) || v.sku.toLowerCase().includes(search.toLowerCase())
+    );
+    const matchesSearch =
+      p.name.toLowerCase().includes(search.toLowerCase()) ||
+      (p.barcode ? p.barcode.includes(search) : false) ||
+      p.sku.toLowerCase().includes(search.toLowerCase()) ||
+      variantMatches;
     return matchesCat && matchesSearch;
   });
 
-  const addToCart = (product: Product) => {
+  const addToCart = (product: Product, variant?: ProductVariant) => {
+    const cartProduct: Product = variant
+      ? {
+          ...product,
+          id: `${product.id}-${variant.id}`,
+          name: variant.name,
+          sku: variant.sku,
+          barcode: variant.barcode,
+          price: variant.price,
+          cost: variant.cost,
+          stock: variant.stock,
+        }
+      : product;
+
     setCart((prev) => {
-      const existing = prev.find((item) => item.product.id === product.id);
+      const existing = prev.find((item) => item.product.id === cartProduct.id);
       if (existing) {
         return prev.map((item) =>
-          item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+          item.product.id === cartProduct.id ? { ...item, quantity: item.quantity + 1 } : item
         );
       }
-      return [...prev, { product, quantity: 1 }];
+      return [...prev, { product: cartProduct, quantity: 1 }];
     });
+  };
+
+  const handleProductCardClick = (product: Product) => {
+    const prodVars = getProductVariants(product.id);
+    if (prodVars.length > 1) {
+      setSelectedVariantModalProduct(product);
+    } else if (prodVars.length === 1) {
+      addToCart(product, prodVars[0]);
+    } else {
+      addToCart(product);
+    }
   };
 
   const updateQuantity = (productId: string, delta: number) => {
@@ -73,12 +128,12 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({ products, onCompleteSa
     };
 
     onCompleteSale(invoice);
-    setLastInvoice(invoice);
     setCart([]);
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-140px)]">
+    <>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-140px)]">
       {/* Product Catalog Column */}
       <div className="lg:col-span-7 flex flex-col space-y-4 min-h-0">
         <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700 space-y-3">
@@ -86,7 +141,7 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({ products, onCompleteSa
             <Search className="w-5 h-5 absolute left-3 top-2.5 text-slate-400" />
             <input
               type="text"
-              placeholder="Buscar producto por nombre, SKU o código de barras..."
+              placeholder="Buscar producto por nombre, SKU, variación o código..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-10 pr-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500 text-sm"
@@ -111,40 +166,87 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({ products, onCompleteSa
 
         {/* Products Grid */}
         <div className="flex-1 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 gap-3 pr-1 content-start auto-rows-max">
-          {filteredProducts.map((product) => (
-            <div
-              key={product.id}
-              onClick={() => addToCart(product)}
-              className="bg-slate-800/90 border border-slate-700 hover:border-emerald-500/60 p-3 rounded-xl cursor-pointer transition flex flex-col justify-between group hover:shadow-lg hover:shadow-emerald-950/20"
-            >
-              <div>
-                <div className="flex justify-between items-start">
-                  <span className="text-[10px] bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded font-mono">
-                    {product.sku}
-                  </span>
-                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${product.stock <= product.minStock ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'text-slate-400'}`}>
-                    Stock: {product.stock}
-                  </span>
+          {filteredProducts.map((product) => {
+            const prodVars = getProductVariants(product.id);
+            const defaultVar = prodVars.find((v) => v.isDefault) || prodVars[0];
+            const imgUrl = getProductImage(product.id, defaultVar?.id);
+            const displayPrice = defaultVar ? defaultVar.price : product.price;
+            const hasMultipleVariants = prodVars.length > 1;
+
+            return (
+              <div
+                key={product.id}
+                className="bg-slate-800/90 border border-slate-700 hover:border-emerald-500/60 rounded-xl overflow-hidden transition flex flex-col justify-between group hover:shadow-lg hover:shadow-emerald-950/20"
+              >
+                <div className="cursor-pointer" onClick={() => handleProductCardClick(product)}>
+                  {/* Product Image Banner */}
+                  <div className="relative w-full h-28 bg-slate-900 overflow-hidden flex items-center justify-center">
+                    {imgUrl ? (
+                      <img
+                        src={imgUrl}
+                        alt={product.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center text-slate-600">
+                        <Package className="w-8 h-8 stroke-[1.5] mb-1" />
+                        <span className="text-[10px]">Sin imagen</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-2.5 space-y-1">
+                    <div className="flex items-center justify-between text-[10px] text-slate-400">
+                      <span>{product.sku || product.barcode}</span>
+                      <span className="font-medium bg-slate-700/60 px-1.5 py-0.5 rounded text-slate-300">
+                        Stock: {product.stock}
+                      </span>
+                    </div>
+                    <h3 className="font-semibold text-white text-xs line-clamp-2 leading-snug group-hover:text-emerald-400 transition">
+                      {product.name}
+                    </h3>
+                  </div>
                 </div>
-                <h3 className="font-semibold text-white text-sm mt-2 line-clamp-2 leading-snug group-hover:text-emerald-400 transition">
-                  {product.name}
-                </h3>
+
+                {/* Quick Variations Chips (if available) */}
+                {hasMultipleVariants ? (
+                  <div className="px-2.5 py-1 flex flex-wrap gap-1 border-t border-slate-700/40 bg-slate-900/30">
+                    {prodVars.slice(0, 3).map((v) => (
+                      <button
+                        key={v.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addToCart(product, v);
+                        }}
+                        title={v.name}
+                        className="text-[10px] bg-slate-700/80 hover:bg-emerald-600 hover:text-white text-slate-300 px-1.5 py-0.5 rounded transition truncate max-w-full font-medium"
+                      >
+                        +{Object.values(v.attributes || {})[0] || v.name.split(' ').slice(-1)[0]}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+
+                {/* Footer Price & Add Button */}
+                <div className="p-2.5 pt-2 border-t border-slate-700/60 flex items-center justify-between">
+                  <div>
+                    <div className="text-[10px] text-slate-400">IVA: {product.ivaRate > 0 ? '19%' : 'Exento'}</div>
+                    <div className="text-emerald-400 font-bold text-sm">{formatCOP(displayPrice)}</div>
+                  </div>
+                  <button
+                    onClick={() => handleProductCardClick(product)}
+                    className="w-7 h-7 rounded-lg bg-emerald-600/20 text-emerald-400 flex items-center justify-center hover:bg-emerald-600 hover:text-white transition shadow-sm"
+                    title="Agregar al carrito"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
-              <div className="mt-3 pt-2 border-t border-slate-700/60 flex items-center justify-between">
-                <div>
-                  <div className="text-xs text-slate-400">IVA: {product.ivaRate > 0 ? '19%' : 'Exento'}</div>
-                  <div className="text-emerald-400 font-bold text-base">{formatCOP(product.price)}</div>
-                </div>
-                <div className="w-8 h-8 rounded-lg bg-emerald-600/20 text-emerald-400 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition">
-                  <Plus className="w-4 h-4" />
-                </div>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
-
-      {/* Cart & Checkout Panel */}
       <div className="lg:col-span-5 bg-slate-800/90 border border-slate-700 rounded-xl p-5 flex flex-col justify-between shadow-xl min-h-0">
         <div className="flex-1 flex flex-col min-h-0">
           <div className="flex items-center justify-between pb-3 border-b border-slate-700">
@@ -271,7 +373,55 @@ export const PosTerminal: React.FC<PosTerminalProps> = ({ products, onCompleteSa
           </button>
         </div>
       </div>
-    </div>
+
+      {/* Modal for Multiple Variations Selection */}
+      {selectedVariantModalProduct && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div>
+                <h3 className="font-bold text-white text-base">Seleccionar Variación</h3>
+                <p className="text-xs text-slate-400">{selectedVariantModalProduct.name}</p>
+              </div>
+              <button
+                onClick={() => setSelectedVariantModalProduct(null)}
+                className="text-slate-400 hover:text-white text-sm px-2 py-1 rounded-lg bg-slate-800"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+              {getProductVariants(selectedVariantModalProduct.id).map((v) => (
+                <button
+                  key={v.id}
+                  onClick={() => {
+                    addToCart(selectedVariantModalProduct, v);
+                    setSelectedVariantModalProduct(null);
+                  }}
+                  className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-800/80 hover:bg-emerald-950/60 border border-slate-700 hover:border-emerald-500/50 text-left transition group"
+                >
+                  <div>
+                    <div className="text-sm font-semibold text-white group-hover:text-emerald-300 transition">
+                      {v.name}
+                    </div>
+                    <div className="text-xs text-slate-400 mt-0.5 flex gap-2 font-mono">
+                      <span>SKU: {v.sku}</span>
+                      <span>Stock: {v.stock}</span>
+                    </div>
+                  </div>
+                  <div className="text-right pl-2">
+                    <div className="text-emerald-400 font-bold text-sm font-mono">{formatCOP(v.price)}</div>
+                    <span className="text-[10px] text-emerald-500 font-semibold">+ Agregar</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+      </div>
+    </>
   );
 };
 

@@ -1,6 +1,6 @@
 export type ProductCategory = string;
 
-export type AdjustmentType = 'INFLOW' | 'OUTFLOW' | 'ADD' | 'REMOVE';
+export type AdjustmentType = 'INFLOW' | 'OUTFLOW' | 'ADD' | 'REMOVE' | 'IN' | 'OUT';
 
 export type AdjustmentReason =
   | 'PURCHASE'
@@ -39,12 +39,16 @@ export interface StockAdjustmentPayload {
   type?: AdjustmentType;
   adjustmentType?: AdjustmentType;
   quantity: number;
+  quantityChange?: number;
   unitCost?: number;
-  reason?: AdjustmentReason;
+  reason?: AdjustmentReason | string;
   notes?: string;
   performedBy?: string;
   adjustedBy?: string;
   adjustedAt?: string;
+  timestamp?: string;
+  counterpartAccount?: string;
+  counterpartAccountName?: string;
 }
 
 export interface ProductFormData {

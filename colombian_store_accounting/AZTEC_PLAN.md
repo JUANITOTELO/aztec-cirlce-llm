@@ -2,7 +2,7 @@
 
 > **Project Goal**: Aztec Software Project  
 > **Status**: Active / Synced with Codebase  
-> **Last Updated**: 2026-08-16 18:49:16  
+> **Last Updated**: 2026-08-16 21:29:20  
 > **Files Indexed**: 15 total source files  
 
 ---
@@ -45,6 +45,32 @@
 
 | File | Layer | Responsibility |
 | :--- | :--- | :--- |
+| `src/utils/formatters.ts` | Utils (Pure Helpers) | Module implementation for formatters |
+| `src/test/dexieMigration.test.ts` | Test Suite | Unit tests for dexieMigration |
+| `src/test/variantCrudEngine.test.ts` | Test Suite | Unit tests for variantCrudEngine |
+| `backend/api/images.php` | Source | Module implementation for images |
+| `backend/api/variants.php` | Source | Module implementation for variants |
+| `src/hooks/useProductImageCrud.ts` | Hook (State/Behavior) | React state management hook for useProductImageCrud |
+| `src/components/Products/ProductMediaManagerModal.tsx` | Component (Composite) | Composite panel for ProductMediaManagerModal |
+| `src/components/Products/VariantEditModal.tsx` | Component (Composite) | Composite panel for VariantEditModal |
+| `src/components/Products/VariantAttributeForm.tsx` | Component (Composite) | Composite panel for VariantAttributeForm |
+| `src/engine/variantCrudEngine.ts` | Engine (Domain Logic) | Pure mathematical & domain algorithms for variantCrudEngine |
+| `src/types/permissions.ts` | Types (Interfaces) | Type definitions & data contracts for permissions |
+| `src/test/mediaValidation.test.ts` | Test Suite | Unit tests for mediaValidation |
+| `src/test/variantQueries.test.ts` | Test Suite | Unit tests for variantQueries |
+| `src/components/Products/ProductVariantManager.tsx` | Component (Composite) | Composite panel for ProductVariantManager |
+| `src/components/Products/ImageGalleryUploader.tsx` | Component (Composite) | Composite panel for ImageGalleryUploader |
+| `src/hooks/useProductVariantResolver.ts` | Hook (State/Behavior) | React state management hook for useProductVariantResolver |
+| `src/hooks/useProductVariants.ts` | Hook (State/Behavior) | React state management hook for useProductVariants |
+| `src/hooks/useProductVariantPermissions.ts` | Hook (State/Behavior) | React state management hook for useProductVariantPermissions |
+| `src/atoms/VariantBadge.tsx` | Atom (UI Primitive) | Atomic UI primitive for VariantBadge |
+| `src/constants/mockVariants.ts` | Constants (Config) | Static configuration constants for mockVariants |
+| `src/engine/variantQueries.ts` | Engine (Domain Logic) | Pure mathematical & domain algorithms for variantQueries |
+| `src/engine/variantAuditLogger.ts` | Engine (Domain Logic) | Pure mathematical & domain algorithms for variantAuditLogger |
+| `src/engine/mediaValidation.ts` | Engine (Domain Logic) | Pure mathematical & domain algorithms for mediaValidation |
+| `src/engine/variantSanitization.ts` | Engine (Domain Logic) | Pure mathematical & domain algorithms for variantSanitization |
+| `src/types/productMedia.ts` | Types (Interfaces) | Type definitions & data contracts for productMedia |
+| `src/types/productVariant.ts` | Types (Interfaces) | Type definitions & data contracts for productVariant |
 | `src/test/categoryConstraints.test.ts` | Test Suite | Unit tests for categoryConstraints |
 | `ledgerAccountName` | Source | Module implementation for ledgerAccountName |
 | `ledgerAccountCode` | Source | Module implementation for ledgerAccountCode |
@@ -106,6 +132,59 @@
 ---
 
 ## 📝 Change Log & Iteration History
+- **2026-08-16 21:29:25** — Automated Self-Healing Build Fix (1 files repaired).
+- **2026-08-16 21:29:20** — Incremental Edit: "Module Consensus: on products the variations and images we must be able to add them and edit them all a complete production ready fullstack CRUD." (Modified: src/types/permissions.ts, src/engine/variantCrudEngine.ts, src/components/Products/VariantAttributeForm.tsx, src/components/Products/VariantEditModal.tsx, src/components/Products/ProductMediaManagerModal.tsx, src/hooks/useProductImageCrud.ts, backend/api/variants.php, backend/api/images.php, src/test/variantCrudEngine.test.ts, src/test/dexieMigration.test.ts, src/types/store.ts, src/utils/formatters.ts, src/db/dexie.ts, src/modules/products/index.ts; Executed: npm test -- --run).
+- **2026-08-16 20:58:47** — Incremental Edit: "[plugin:vite:esbuild] Transform failed with 1 error:
+/home/hto/Documents/test-code/aztec-cirlce-llm/colombian_store_accounting/src/components/POS/PosTerminal.tsx:444:0: ERROR: The character "}" is not valid inside a JSX element
+/home/hto/Documents/test-code/aztec-cirlce-llm/colombian_store_accounting/src/components/POS/PosTerminal.tsx:425:0
+The character "}" is not valid inside a JSX element
+441|          }
+442|      </div>
+443|    );
+   |       ^
+444|  };
+   |  ^
+445|" (Modified: src/components/POS/PosTerminal.tsx).
+- **2026-08-16 20:58:35** — Incremental Edit: "[plugin:vite:react-babel] /home/hto/Documents/test-code/aztec-cirlce-llm/colombian_store_accounting/src/components/POS/PosTerminal.tsx: Unexpected token (380:7)
+  383 |       {selectedVariantModalProduct && (
+/home/hto/Documents/test-code/aztec-cirlce-llm/colombian_store_accounting/src/components/POS/PosTerminal.tsx:380:7
+378|  
+379|  export default PosTerminal;
+380|        </div>
+   |         ^
+381|  
+382|        {/* Modal for Multiple Variations Selection */}" (Modified: src/components/POS/PosTerminal.tsx, src/components/POS/PosTerminal.tsx, src/components/POS/PosTerminal.tsx).
+- **2026-08-16 20:58:07** — Incremental Edit: "[plugin:vite:react-babel] /home/hto/Documents/test-code/aztec-cirlce-llm/colombian_store_accounting/src/components/POS/PosTerminal.tsx: Unexpected token (193:16)
+  196 |                 return (
+/home/hto/Documents/test-code/aztec-cirlce-llm/colombian_store_accounting/src/components/POS/PosTerminal.tsx:193:16
+191|                        <div className="flex flex-col items-center justify-center text-slate-600">
+192|                cart.map((item) => {
+193|                  const origId = item.product.id.split('-var-')[0].split('-')[0] + (item.product.id.includes('prod-') ? `prod-${item.product.id.split('prod-')[1].split('-')[0]}` : item.product.id);
+   |                  ^
+194|                  const itemImg = getProductImage(origId) || getProductImage(item.product.id);
+195|" (Modified: src/components/POS/PosTerminal.tsx, src/components/POS/PosTerminal.tsx).
+- **2026-08-16 20:57:34** — Incremental Edit: "[plugin:vite:react-babel] /home/hto/Documents/test-code/aztec-cirlce-llm/colombian_store_accounting/src/App.tsx: 'return' outside of function. (88:2)
+  91 |         currentUser={currentUser}
+/home/hto/Documents/test-code/aztec-cirlce-llm/colombian_store_accounting/src/App.tsx:88:2
+86 |    const handleDeleteRole = (id: string) => setRoles((prev) => prev.filter((r) => r.id !== id));
+87 |  
+88 |    return (
+   |    ^
+89 |      <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col">
+90 |        <Header" (Modified: src/App.tsx).
+- **2026-08-16 20:57:00** — Incremental Edit: "none of the products have images or variations" (Modified: src/constants/mockVariants.ts, src/App.tsx, src/App.tsx, src/App.tsx, src/App.tsx, src/components/POS/PosTerminal.tsx, src/components/POS/PosTerminal.tsx, src/components/POS/PosTerminal.tsx).
+- **2026-08-16 20:54:43** — Incremental Edit: "[plugin:vite:esbuild] Transform failed with 1 error:
+/home/hto/Documents/test-code/aztec-cirlce-llm/colombian_store_accounting/src/engine/productLedgerOrchestrator.ts:20:9: ERROR: Expected ";" but found "generateSaleEntries"
+/home/hto/Documents/test-code/aztec-cirlce-llm/colombian_store_accounting/src/engine/productLedgerOrchestrator.ts:20:9
+Expected ";" but found "generateSaleEntries"
+18 |    static emitStockAdjustment(adjustment: StockAdjustmentPayload): LedgerEntry[] {
+19 |      const unitCost = adjustment.unitCost ?? 0;
+20 |    static generateSaleEntries(invoice: SaleInvoice, categories: Category[]): LedgerEntry[] {
+   |           ^
+21 |      const entries: LedgerEntry[] = [];
+22 |      const now = invoice.date || new Date().toISOString();" (Modified: src/engine/productLedgerOrchestrator.ts).
+- **2026-08-16 20:53:08** — Automated Self-Healing Build Fix (2 files repaired).
+- **2026-08-16 20:53:00** — Incremental Edit: "Module Consensus: We want to add a fullstack module for adding images and variations to the products, so we have the optiion of adding images and variations of the same product, on the database scheme it should be atomic and normalize." (Modified: src/types/productVariant.ts, src/types/productMedia.ts, src/engine/variantSanitization.ts, src/engine/mediaValidation.ts, src/engine/variantAuditLogger.ts, src/engine/variantQueries.ts, src/constants/mockVariants.ts, src/atoms/VariantBadge.tsx, src/hooks/useProductVariantPermissions.ts, src/hooks/useProductVariants.ts, src/hooks/useProductVariantResolver.ts, src/components/Products/ImageGalleryUploader.tsx, src/components/Products/ProductVariantManager.tsx, src/test/variantQueries.test.ts, src/test/mediaValidation.test.ts, src/types/store.ts, src/db/dexie.ts, src/engine/productLedgerOrchestrator.ts, src/modules/products/index.ts, src/App.tsx; Executed: npm test -- --run).
 - **2026-08-16 18:49:16** — Incremental Edit: "make the product dialog follow the theme of the whole app" (Modified: src/components/Products/ProductModalForm.tsx, src/components/Products/CategorySelector.tsx, src/components/Products/CategoryManagerModal.tsx).
 - **2026-08-16 18:31:49** — Incremental Edit: "fix the ui of the product dialog" (Modified: src/components/Products/ProductModalForm.tsx, src/components/Products/ProductModalForm.tsx, src/components/Products/ProductModalForm.tsx).
 - **2026-08-16 18:15:53** — Incremental Edit: "what happend with all the other features?" (Modified: src/types/store.ts, src/components/Header.tsx).

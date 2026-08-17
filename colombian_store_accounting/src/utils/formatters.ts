@@ -20,16 +20,21 @@ export function calculateCartTotals(items: { product: { price: number; ivaRate: 
   let iva = 0;
 
   for (const item of items) {
-    const itemSubtotal = (item.product.price / (1 + item.product.ivaRate)) * item.quantity;
-    const itemIva = (item.product.price - (item.product.price / (1 + item.product.ivaRate))) * item.quantity;
+    const rate = item.product.ivaRate ?? 0;
+    const itemSubtotal = Math.round((item.product.price / (1 + rate)) * item.quantity);
+    const itemIva = Math.round((item.product.price * item.quantity) - itemSubtotal);
     subtotal += itemSubtotal;
     iva += itemIva;
   }
 
-  const total = subtotal + iva;
   return {
-    subtotal: Math.round(subtotal),
-    iva: Math.round(iva),
-    total: Math.round(total),
+    subtotal,
+    iva,
+    taxTotal: iva,
+    total: subtotal + iva,
   };
+}
+
+export function newDateIso(): string {
+  return new Date().toISOString();
 }

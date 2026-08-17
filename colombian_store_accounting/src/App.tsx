@@ -1,8 +1,11 @@
 import React, { useEffect } from 'react';
 import { Product, LedgerEntry, UserAccount, RoleItem, AppModule, SaleInvoice } from './types/store';
 import { Category } from './types/category';
+import { ProductVariant } from './types/productVariant';
+import { ProductImage } from './types/productMedia';
 import { INITIAL_PRODUCTS, INITIAL_LEDGER_ENTRIES, MOCK_USERS, INITIAL_ROLES } from './constants/mockData';
 import { INITIAL_CATEGORIES } from './constants/mockCategories';
+import { INITIAL_VARIANTS, INITIAL_PRODUCT_IMAGES } from './constants/mockVariants';
 import { usePersistentState } from './hooks/usePersistentState';
 import { useCategoryList } from './hooks/useCategoryList';
 import { reassignProductsToCategory } from './engine/categoryConstraints';
@@ -23,14 +26,14 @@ export function App() {
   const [roles, setRoles] = usePersistentState<RoleItem[]>('aztec_roles', INITIAL_ROLES);
   const [activeTab, setActiveTab] = usePersistentState<AppModule>('aztec_active_tab', 'pos');
   const [products, setProducts] = usePersistentState<Product[]>('aztec_products', INITIAL_PRODUCTS);
+  const [variants, setVariants] = usePersistentState<ProductVariant[]>('aztec_variants', INITIAL_VARIANTS);
+  const [images, setImages] = usePersistentState<ProductImage[]>('aztec_images', INITIAL_PRODUCT_IMAGES);
   const [persistedCategories, setPersistedCategories] = usePersistentState<Category[]>('aztec_categories', INITIAL_CATEGORIES);
   const [ledgerEntries, setLedgerEntries] = usePersistentState<LedgerEntry[]>('aztec_ledger_entries', INITIAL_LEDGER_ENTRIES);
 
-  const { categories, setCategories, addCategory, updateCategory, deleteCategory } = useCategoryList(persistedCategories);
-
-  useEffect(() => {
-    setPersistedCategories(categories);
-  }, [categories, setPersistedCategories]);
+  const { categories, addCategory, updateCategory, deleteCategory, setCategories } = useCategoryList(
+    persistedCategories
+  );
 
   if (!currentUser) {
     return <LoginScreen users={users} onLogin={(user) => setCurrentUser(user)} />;
@@ -44,13 +47,13 @@ export function App() {
 
   const handleLogout = () => setCurrentUser(null);
   const handleResetData = () => {
-    if (window.confirm('¿Restablecer datos a los valores iniciales del sistema?')) {
-      setProducts(INITIAL_PRODUCTS);
-      setCategories(INITIAL_CATEGORIES);
-      setLedgerEntries(INITIAL_LEDGER_ENTRIES);
-      setUsers(MOCK_USERS);
-      setRoles(INITIAL_ROLES);
-    }
+    setProducts(INITIAL_PRODUCTS);
+    setVariants(INITIAL_VARIANTS);
+    setImages(INITIAL_PRODUCT_IMAGES);
+    setCategories(INITIAL_CATEGORIES);
+    setLedgerEntries(INITIAL_LEDGER_ENTRIES);
+    setUsers(MOCK_USERS);
+    setRoles(INITIAL_ROLES);
   };
 
   const handleReassignCategory = (sourceName: string, targetName: string) => {
@@ -91,10 +94,12 @@ export function App() {
         onLogout={handleLogout}
         onResetData={handleResetData}
       />
-      <main className="flex-1 p-4 md:p-6 overflow-auto">
+      <main className="flex-1 p-6 overflow-y-auto">
         {activeTab === 'pos' && (
           <PosTerminal
             products={products}
+            variants={variants}
+            images={images}
             onCompleteSale={handleCompleteSale}
           />
         )}

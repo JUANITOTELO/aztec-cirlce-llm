@@ -20,6 +20,7 @@ export interface UserAccount {
   password?: string;
   isActive?: boolean;
 }
+import { ProductVariant } from './productVariant';
 
 export interface Product {
   id: string;
@@ -31,11 +32,18 @@ export interface Product {
   stock: number;
   minStock: number;
   ivaRate: number;
-  barcode: string;
+  barcode?: string;
+  imageUrl?: string;
+  variants?: ProductVariant[];
 }
+
 export interface CartItem {
   product: Product;
   quantity: number;
+  variantId?: string;
+  variantSku?: string;
+  unitCost?: number;
+  unitPrice?: number;
 }
 
 export interface LedgerEntry {
@@ -67,4 +75,5 @@ export interface SaleInvoice {
   iva: number;
   total: number;
   items: CartItem[];
+  variantDetails?: Record<string, any>;
 }

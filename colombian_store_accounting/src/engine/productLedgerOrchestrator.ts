@@ -17,18 +17,17 @@ import { resolveLedgerAccount } from './categoryConstraints';
 export class ProductLedgerOrchestrator {
   static emitStockAdjustment(adjustment: StockAdjustmentPayload): LedgerEntry[] {
     const unitCost = adjustment.unitCost ?? 0;
-    const totalCost = Math.round(adjustment.quantity * unitCost);
-    const timestamp = adjustment.adjustedAt || new Date().toISOString();
-    const txId = adjustment.id ? `ADJ-${adjustment.id}` : `ADJ-${Date.now()}`;
-    const isAdd = adjustment.adjustmentType === 'ADD' || adjustment.type === 'INFLOW';
+    const qty = Math.abs(adjustment.quantityChange ?? adjustment.quantity ?? 0);
+    const totalCost = qty * unitCost;
+    const timestamp = adjustment.timestamp || adjustment.adjustedAt || new Date().toISOString();
+    const txId = adjustment.id || `adj-${Date.now()}`;
     const prodName = adjustment.productName || 'Producto';
 
-    if (totalCost <= 0) return [];
+    const isAdd = adjustment.type === 'IN' || adjustment.adjustmentType === 'ADD' || (adjustment.quantityChange !== undefined && adjustment.quantityChange > 0);
 
     if (isAdd) {
-      const isSupplierPurchase = adjustment.reason === 'COMPRA_PROVEEDOR' || adjustment.reason === 'PURCHASE';
-      const counterPuc = isSupplierPurchase ? '220505' : '110505';
-      const counterName = isSupplierPurchase ? 'Proveedores Nacionales' : 'Caja General (Ajuste)';
+      const counterPuc = adjustment.counterpartAccount || '220505';
+      const counterName = adjustment.counterpartAccountName || 'Proveedores Nacionales';
 
       return [
         {
@@ -36,8 +35,8 @@ export class ProductLedgerOrchestrator {
           transactionId: txId,
           date: timestamp,
           pucCode: '143501',
-          pucName: 'Mercancías no Fabricadas por la Empresa',
-          description: `Entrada Stock: ${prodName} (${adjustment.reason || 'Ingreso'})`,
+          pucName: 'Mercancías No Fabricadas por la Empresa',
+          description: `Entrada Stock / Inventario: ${prodName}`,
           debit: totalCost,
           credit: 0,
         },
@@ -73,8 +72,8 @@ export class ProductLedgerOrchestrator {
           transactionId: txId,
           date: timestamp,
           pucCode: '143501',
-          pucName: 'Mercancías no Fabricadas por la Empresa',
-          description: `Descargue Inventario: ${prodName}`,
+          pucName: 'Mercancías No Fabricadas por la Empresa',
+          description: `Salida Stock / Ajuste: ${prodName}`,
           debit: 0,
           credit: totalCost,
         },
@@ -82,22 +81,23 @@ export class ProductLedgerOrchestrator {
     }
   }
 
-  static generateSaleEntries(invoice: SaleInvoice, categories?: Category[]): LedgerEntry[] {
+  static generateSaleEntries(invoice: SaleInvoice, categories: Category[]): LedgerEntry[] {
     const entries: LedgerEntry[] = [];
     const now = invoice.date || new Date().toISOString();
-    const txId = invoice.consecutive;
+    const txId = invoice.id;
 
-    const cashPuc = invoice.paymentMethod === 'Efectivo' ? '110505' : '111005';
-    const cashName = invoice.paymentMethod === 'Efectivo' ? 'Caja General' : 'Bancos Nacionales';
+    // 1. Débito a Caja / Bancos
+    const debitAccount = invoice.paymentMethod === 'Efectivo'
+      ? { code: '110505', name: 'Caja General' }
+      : { code: '111005', name: 'Bancos Nacionales' };
 
-    // 1. Débito a Caja o Bancos
     entries.push({
-      id: `led-${Date.now()}-1`,
+      id: `entry-${Date.now()}-1`,
       transactionId: txId,
       date: now,
-      pucCode: cashPuc,
-      pucName: cashName,
-      description: `Venta POS #${txId} - ${invoice.customerName || 'Consumidor Final'}`,
+      pucCode: debitAccount.code,
+      pucName: debitAccount.name,
+      description: `Venta POS Factura #${invoice.consecutive} (${invoice.paymentMethod})`,
       debit: invoice.total,
       credit: 0,
     });
@@ -106,12 +106,12 @@ export class ProductLedgerOrchestrator {
     const taxTotal = invoice.iva || 0;
     if (taxTotal > 0) {
       entries.push({
-        id: `led-${Date.now()}-2`,
+        id: `entry-${Date.now()}-2`,
         transactionId: txId,
         date: now,
         pucCode: '240805',
         pucName: 'Impuesto sobre las ventas por pagar (IVA)',
-        description: `IVA generado en Venta POS #${txId}`,
+        description: `IVA generado en Venta POS #${invoice.consecutive}`,
         debit: 0,
         credit: taxTotal,
       });
@@ -124,15 +124,46 @@ export class ProductLedgerOrchestrator {
       : { code: '413505', name: 'Comercio al por mayor y al por menor' };
 
     entries.push({
-      id: `led-${Date.now()}-3`,
+      id: `entry-${Date.now()}-3`,
       transactionId: txId,
       date: now,
       pucCode: revenueAccount.code,
       pucName: revenueAccount.name,
-      description: `Ingreso operacional por venta POS #${txId}`,
+      description: `Ingreso operacional por venta POS #${invoice.consecutive}`,
       debit: 0,
       credit: calculatedNetRevenue,
     });
+
+    // 4. Costo de Ventas (PUC 6135) y Salida de Inventarios (PUC 1435)
+    let totalCost = 0;
+    invoice.items?.forEach((item) => {
+      const unitCost = item.unitCost !== undefined ? item.unitCost : item.product.cost;
+      totalCost += unitCost * item.quantity;
+    });
+
+    if (totalCost > 0) {
+      entries.push({
+        id: `entry-${Date.now()}-4`,
+        transactionId: txId,
+        date: now,
+        pucCode: '613505',
+        pucName: 'Comercio al por mayor y al por menor (Costo)',
+        description: `Costo de Mercancía Vendida #${invoice.consecutive}`,
+        debit: totalCost,
+        credit: 0,
+      });
+
+      entries.push({
+        id: `entry-${Date.now()}-5`,
+        transactionId: txId,
+        date: now,
+        pucCode: '143505',
+        pucName: 'Mercancías No Fabricadas por la Empresa',
+        description: `Salida de Inventario Factura #${invoice.consecutive}`,
+        debit: 0,
+        credit: totalCost,
+      });
+    }
 
     return entries;
   }
