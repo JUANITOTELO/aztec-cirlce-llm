@@ -8,6 +8,8 @@ import { INITIAL_CATEGORIES } from './constants/mockCategories';
 import { INITIAL_VARIANTS, INITIAL_PRODUCT_IMAGES } from './constants/mockVariants';
 import { usePersistentState } from './hooks/usePersistentState';
 import { useCategoryList } from './hooks/useCategoryList';
+import { useBackendSync } from './hooks/useBackendSync';
+import { BackendSyncEngine } from './engine/backendSyncEngine';
 import { reassignProductsToCategory } from './engine/categoryConstraints';
 import { ProductLedgerOrchestrator } from './engine/productLedgerOrchestrator';
 import { validateApiConfig } from './constants/api';
@@ -37,6 +39,23 @@ export const App = React.memo((): React.ReactElement => {
   const [images, setImages] = usePersistentState<ProductImage[]>('aztec_images', INITIAL_PRODUCT_IMAGES);
   const [persistedCategories] = usePersistentState<Category[]>('aztec_categories', INITIAL_CATEGORIES);
   const [ledgerEntries, setLedgerEntries] = usePersistentState<LedgerEntry[]>('aztec_ledger_entries', INITIAL_LEDGER_ENTRIES);
+
+  const { categories, addCategory, updateCategory, deleteCategory, setCategories } = useCategoryList(
+    persistedCategories
+  );
+
+  // Hydrate from Backend API on mount
+  const handleHydrateFromBackend = React.useCallback((data: any) => {
+    if (data.products?.length) setProducts(data.products);
+    if (data.variants?.length) setVariants(data.variants);
+    if (data.images?.length) setImages(data.images);
+    if (data.categories?.length) setCategories(data.categories);
+    if (data.ledgerEntries?.length) setLedgerEntries(data.ledgerEntries);
+    if (data.users?.length) setUsers(data.users);
+    if (data.roles?.length) setRoles(data.roles);
+  }, [setProducts, setVariants, setImages, setCategories, setLedgerEntries, setUsers, setRoles]);
+
+  useBackendSync(handleHydrateFromBackend);
 
   // Synchronize Dexie IndexedDB data into React state on mount and tab switch
   useEffect(() => {
@@ -69,10 +88,6 @@ export const App = React.memo((): React.ReactElement => {
     };
   }, [activeTab, setImages, setVariants]);
 
-  const { categories, addCategory, updateCategory, deleteCategory, setCategories } = useCategoryList(
-    persistedCategories
-  );
-
   if (!currentUser) {
     return <LoginScreen users={users} onLogin={(user: UserAccount) => setCurrentUser(user)} />;
   }
@@ -92,6 +107,15 @@ export const App = React.memo((): React.ReactElement => {
     setLedgerEntries(INITIAL_LEDGER_ENTRIES);
     setUsers(MOCK_USERS);
     setRoles(INITIAL_ROLES);
+    BackendSyncEngine.pushAllData({
+      products: INITIAL_PRODUCTS,
+      variants: INITIAL_VARIANTS,
+      images: INITIAL_PRODUCT_IMAGES,
+      categories: INITIAL_CATEGORIES,
+      ledgerEntries: INITIAL_LEDGER_ENTRIES,
+      users: MOCK_USERS,
+      roles: INITIAL_ROLES,
+    });
   };
 
   const handleReassignCategory = (sourceName: string, targetName: string) => {
@@ -110,6 +134,8 @@ export const App = React.memo((): React.ReactElement => {
         return p;
       })
     );
+    // Persist sale directly to PHP / SQLite backend
+    BackendSyncEngine.saveSale(invoice);
   };
 
   const handleUpdateStock = (id: string, newStock: number) => {

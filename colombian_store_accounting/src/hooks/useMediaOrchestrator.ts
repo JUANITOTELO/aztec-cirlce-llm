@@ -7,6 +7,7 @@ import { validateImageBuffer, compressAndOptimizeImage } from '../engine/imageOp
 import { logVariantMutation } from '../engine/variantAuditLogger';
 import { hasPermission } from '../types/permissions';
 import { INITIAL_PRODUCT_IMAGES } from '../constants/mockVariants';
+import { BackendSyncEngine } from '../engine/backendSyncEngine';
 
 export const GLOBAL_VARIANT_ID = 'product_global';
 const MAX_IMAGE_SIZE_MB = 50;
@@ -157,6 +158,9 @@ export function useMediaOrchestrator({
 
       if (createdImages.length > 0) {
         await db.productImages.bulkAdd(createdImages);
+        for (const img of createdImages) {
+          BackendSyncEngine.saveImage(productId, img);
+        }
         await addTransactionToQueue('VARIANT_MUTATION', {
           action: 'IMAGE_UPLOAD',
           productId,

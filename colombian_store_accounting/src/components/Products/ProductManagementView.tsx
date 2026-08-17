@@ -11,6 +11,7 @@ import { ProductStockAdjustModal } from './ProductStockAdjustModal';
 import { ProductUnifiedModal } from './ProductUnifiedModal';
 import { useVariantSync } from '../../hooks/useVariantSync';
 import { useImageSync } from '../../hooks/useImageSync';
+import { BackendSyncEngine } from '../../engine/backendSyncEngine';
 import { Plus, Tags, Search } from 'lucide-react';
 
 export interface ProductManagementViewProps {
@@ -62,11 +63,13 @@ export const ProductManagementView: React.FC<ProductManagementViewProps> = ({
       }
       return [savedProd, ...prev];
     });
+    BackendSyncEngine.saveProduct(savedProd);
     setIsUnifiedModalOpen(false);
   };
 
   const handleDeleteProduct = (productId: string) => {
     setProducts((prev) => prev.filter((p) => p.id !== productId));
+    BackendSyncEngine.deleteProduct(productId);
   };
 
   const filteredProducts = useMemo(() => {
