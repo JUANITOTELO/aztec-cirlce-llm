@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:php": "php backend/migrate_and_seed.php && php -S 127.0.0.1:8000 backend/index.php",
+    "migrate": "php backend/migrate_and_seed.php",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
