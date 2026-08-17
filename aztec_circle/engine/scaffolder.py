@@ -97,21 +97,69 @@ export default defineConfig({
 });
 """
 
-VITE_CONFIG_TS_PROXY = """import { defineConfig } from 'vite';
+VITE_CONFIG_TS_PROXY = """import { defineConfig, Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+import { spawn, ChildProcess } from 'child_process';
+import path from 'path';
+import fs from 'fs';
+
+function backendProcessPlugin(): Plugin {
+  let backendProc: ChildProcess | null = null;
+  return {
+    name: 'aztec-backend-launcher',
+    configureServer(server) {
+      if (process.env.VITEST || process.env.NODE_ENV === 'test') return;
+      const backendPort = process.env.PHP_PORT || process.env.BACKEND_PORT || '8000';
+      const isPhp = fs.existsSync(path.resolve(__dirname, 'backend/index.php')) || fs.existsSync(path.resolve(__dirname, 'index.php'));
+      const isPy = fs.existsSync(path.resolve(__dirname, 'server.py')) || fs.existsSync(path.resolve(__dirname, 'app.py'));
+
+      const migratePhp = path.resolve(__dirname, 'backend/migrate_and_seed.php');
+      if (isPhp && fs.existsSync(migratePhp)) {
+        try {
+          const mig = spawn('php', [migratePhp], { stdio: 'inherit' });
+          mig.on('close', () => {
+            backendProc = spawn('php', ['-S', `127.0.0.1:${backendPort}`, fs.existsSync(path.resolve(__dirname, 'backend/index.php')) ? 'backend/index.php' : 'index.php'], { stdio: 'inherit' });
+          });
+        } catch {
+          backendProc = spawn('php', ['-S', `127.0.0.1:${backendPort}`, fs.existsSync(path.resolve(__dirname, 'backend/index.php')) ? 'backend/index.php' : 'index.php'], { stdio: 'inherit' });
+        }
+      } else if (isPhp) {
+        backendProc = spawn('php', ['-S', `127.0.0.1:${backendPort}`, fs.existsSync(path.resolve(__dirname, 'backend/index.php')) ? 'backend/index.php' : 'index.php'], { stdio: 'inherit' });
+      } else if (isPy) {
+        const pyEntry = fs.existsSync(path.resolve(__dirname, 'server.py')) ? 'server.py' : 'app.py';
+        backendProc = spawn('python3', [pyEntry], { stdio: 'inherit' });
+      }
+
+      const cleanUp = () => {
+        if (backendProc) {
+          backendProc.kill();
+          backendProc = null;
+        }
+      };
+
+      process.on('exit', cleanUp);
+      process.on('SIGINT', () => { cleanUp(); process.exit(); });
+      process.on('SIGTERM', () => { cleanUp(); process.exit(); });
+      server.httpServer?.on('close', cleanUp);
+    },
+  };
+}
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), backendProcessPlugin()],
   server: {
     port: 5173,
     host: '0.0.0.0',
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8000',
+        target: process.env.VITE_API_URL || 'http://127.0.0.1:8000',
         changeOrigin: true,
       },
     },
+  },
+  build: {
+    minify: 'esbuild',
   },
   test: {
     globals: true,

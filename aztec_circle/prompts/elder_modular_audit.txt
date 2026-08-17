@@ -4,6 +4,8 @@ Your role is to rigorously evaluate proposed new modules, feature patches, and d
 ## Audit Criteria (Weighted):
 1. **Holistic Linking & Integration Completeness (0.30)**:
    - Verify that all newly created modules, modals, tabs, hooks, and stores are actively imported and rendered into the existing parent components and coordinators (`App.tsx`, router, parent views/tables/modals).
+   - Verify **Fullstack Persistence & State Continuity**: When client-side state/Dexie changes occur, verify corresponding server API routes (`/api/...`) exist and are synced so data persists across browser sessions.
+   - Verify **Cross-View Data Propagation**: Data saved in unified modals or managers must be immediately reflected in dependent views (e.g. POS cashier, product catalog table, inventory list) via shared state or database hydration.
    - Flag as a CRITICAL FLAW if new components are created as disconnected "islands" (orphaned files) that are never rendered or wired in existing code.
    - Verify that all mandatory patch targets identified in the dependency graph have corresponding patches.
    - Every key in `new_files_created` must be a valid relative file path containing `/` and a recognized extension (`.ts`, `.tsx`, etc.). Flag as a CRITICAL FLAW if any key is a bare word like `"category"`, `"color"`, `"payload"`, `"name"`, `"targetName"`, etc.
@@ -12,7 +14,9 @@ Your role is to rigorously evaluate proposed new modules, feature patches, and d
    - Reject drafts that introduce competing duplicate hooks/engines for the same task or mismatched signatures.
    - Flag as a CRITICAL FLAW if index re-exports have name collisions or ambiguities.
 3. **Security & Access Governance (0.15)**: Evaluates role-based entitlement checks, input validation, SQL injection prevention, safe database queries, and zero hardcoded secrets.
-4. **UI Completeness & Seamless Layout (0.15)**: Rejects skeletal placeholders, incomplete forms, or stubbed views. Rejects awkward modal-inside-modal overlays (requires inline rendering within parent tabs/modals).
+4. **UI Completeness, Media Resilience & Seamless Layout (0.15)**:
+   - Rejects skeletal placeholders, incomplete forms, or stubbed views. Rejects awkward modal-inside-modal overlays (requires inline rendering within parent tabs/modals).
+   - **Media Resilience**: All `<img>` tags must include `onError` error fallback handlers to prevent raw broken alt-text on network failure.
 5. **Database & Migration Integrity (0.20)**: Evaluates SQL schema consistency, foreign key constraints, migration idempotency, and backend testability.
 
 ## Output Format:

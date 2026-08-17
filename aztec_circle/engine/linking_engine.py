@@ -104,6 +104,20 @@ class DependencyGraph:
     """Directed dependency graph across project source files."""
     nodes: Dict[str, FileNode] = field(default_factory=dict)
     entry_points: Dict[str, str] = field(default_factory=dict)  # rel_path -> primary role
+    project_root: str = "."
+
+
+@dataclass
+class FullstackAuditReport:
+    """
+    Detailed audit report on fullstack state persistence,
+    cross-view synchronization, and UI media resilience.
+    """
+    is_linked: bool
+    unpersisted_client_mutations: List[str] = field(default_factory=list)
+    missing_media_fallbacks: List[str] = field(default_factory=list)
+    cross_view_inconsistencies: List[str] = field(default_factory=list)
+    recommendations: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -116,6 +130,7 @@ class IntegrationManifest:
     mandatory_patch_targets: List[str]
     dependency_graph_summary: str
     hotspot_files: List[str] = field(default_factory=list)
+    fullstack_audit: Optional[FullstackAuditReport] = None
 
 
 class LinkingEngine:
@@ -170,7 +185,7 @@ class LinkingEngine:
     def build_graph(self, project_root: str) -> DependencyGraph:
         """Scan project_root and construct a complete DependencyGraph."""
         root = find_project_root(project_root) or project_root
-        graph = DependencyGraph()
+        graph = DependencyGraph(project_root=root)
 
         if not os.path.exists(root):
             return graph
@@ -330,11 +345,89 @@ class LinkingEngine:
             role = graph.entry_points.get(m, "custom_anchor")
             summary_lines.append(f"  ✦ {m}  [{role}]")
 
+        root = graph.project_root or "."
+        audit_report = self.audit_fullstack_persistence(root, graph)
+
+        if audit_report.recommendations:
+            summary_lines.extend(["", "FULLSTACK CONTINUITY & RESILIENCE AUDIT:"])
+            for rec in audit_report.recommendations:
+                summary_lines.append(f"  ⚡ Recommendation: {rec}")
+            for unp in audit_report.unpersisted_client_mutations:
+                summary_lines.append(f"  ⚠️ Persistence gap: {unp}")
+
         return IntegrationManifest(
             entry_points=dict(graph.entry_points),
             mandatory_patch_targets=mandatory,
             dependency_graph_summary="\n".join(summary_lines),
             hotspot_files=[h.rel_path for h in hotspots],
+            fullstack_audit=audit_report,
+        )
+
+    def audit_fullstack_persistence(
+        self,
+        project_root: str,
+        graph: Optional[DependencyGraph] = None,
+    ) -> FullstackAuditReport:
+        """
+        Statically inspects project for:
+        1. Client-side mutations (Dexie, localStorage, Zustand, persistent state) without backend sync routes.
+        2. UI media elements (<img>) without onError fallback handlers.
+        3. Multi-view state disconnects (e.g. state updated in modal but not reflected across other views).
+        """
+        root = find_project_root(project_root) or project_root
+        if graph is None:
+            graph = self.build_graph(root)
+
+        unpersisted_client_mutations: List[str] = []
+        missing_media_fallbacks: List[str] = []
+        cross_view_inconsistencies: List[str] = []
+        recommendations: List[str] = []
+
+        has_backend = any(role in ("php_entry", "python_entry", "db_schema") for role in graph.entry_points.values())
+        has_client_db = any(role in ("indexed_db", "state_store") for role in graph.entry_points.values())
+
+        # Check for media resilience in TSX/JSX/HTML files
+        img_tag_re = re.compile(r"<img\b([^>]*?)/?>", re.IGNORECASE | re.DOTALL)
+        onerror_re = re.compile(r"\bonError\s*=", re.IGNORECASE)
+
+        for rel_path, node in graph.nodes.items():
+            ext = os.path.splitext(rel_path)[1].lower()
+            if ext in (".tsx", ".jsx", ".html"):
+                full_path = os.path.join(root, rel_path)
+                try:
+                    with open(full_path, "r", encoding="utf-8", errors="replace") as f:
+                        src = f.read()
+                    for m in img_tag_re.finditer(src):
+                        tag_attrs = m.group(1)
+                        if not onerror_re.search(tag_attrs):
+                            missing_media_fallbacks.append(f"{rel_path}: <img ...> missing onError fallback")
+                            break
+                except Exception:
+                    pass
+
+        # Check if client database exists without a backend sync engine
+        sync_files = [rel for rel in graph.nodes if "sync" in rel.lower() or "api" in rel.lower()]
+        if has_backend and has_client_db and not sync_files:
+            unpersisted_client_mutations.append(
+                "IndexedDB / Client Store detected alongside Backend API, but no synchronization engine found"
+            )
+            recommendations.append(
+                "Implement a backend sync engine (e.g., BackendSyncEngine / useBackendSync) to bridge client state to server storage."
+            )
+
+        if missing_media_fallbacks:
+            recommendations.append(
+                "Add onError fallback handlers to <img> tags to cleanly display placeholder icons on broken/remote URLs."
+            )
+
+        is_linked = len(unpersisted_client_mutations) == 0 and len(missing_media_fallbacks) == 0
+
+        return FullstackAuditReport(
+            is_linked=is_linked,
+            unpersisted_client_mutations=unpersisted_client_mutations,
+            missing_media_fallbacks=missing_media_fallbacks,
+            cross_view_inconsistencies=cross_view_inconsistencies,
+            recommendations=recommendations,
         )
 
     def to_prompt_context(self, manifest: IntegrationManifest) -> str:

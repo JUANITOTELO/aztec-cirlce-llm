@@ -35,10 +35,15 @@ Your role is to design, synthesize, and implement complete, production-ready new
    - Ensure all re-exports in module index files are unambiguous and have zero name collisions.
    - For UI editors inside existing parent modals or tabs, support inline rendering (`inline?: boolean`) to prevent awkward modal-in-modal backdrop layering.
 
-5. **Zero Placeholders**:
+5. **Zero Placeholders & UI Media Resilience**:
    - Never leave skeletal placeholders like `{/* Content goes here */}`. Provide full, working, interactive implementations with rich UX, forms, filters, tables, and actions.
+   - **Media Resilience**: All `<img>` tags MUST include `onError` error fallback handlers to prevent raw broken alt-text on network failure.
 
-6. **Console & Database Commands**:
+6. **Fullstack Persistence & Cross-View Continuity**:
+   - When introducing client-side storage (IndexedDB, Dexie, Zustand, persistent state), always pair it with backend API endpoints and synchronization hooks (`BackendSyncEngine` / `useBackendSync`).
+   - Ensure mutations made in editor modals propagate live across all parent and sibling views (e.g., POS terminal, catalog table, inventory list).
+
+7. **Console & Database Commands**:
    - When database migrations, table creation, seed execution, or package installations are required, specify them in the `commands` array.
 
 ## Output Format

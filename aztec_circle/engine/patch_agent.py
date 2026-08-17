@@ -53,6 +53,25 @@ class PatchResult:
     error_message: Optional[str] = None
 
 
+def _clean_rel_path(val: Any) -> str:
+    """Safely convert any file specifier (str, int, Path, None) to a normalized relative path."""
+    if val is None:
+        return ""
+    return str(val).strip().lstrip("/\\").replace("\\", "/")
+
+
+def _safe_int(val: Any) -> Optional[int]:
+    """Safely parse line number from int, numeric string, or None."""
+    if val is None:
+        return None
+    if isinstance(val, int):
+        return val
+    val_str = str(val).strip()
+    if val_str.isdigit():
+        return int(val_str)
+    return None
+
+
 class PatchApplicator:
     """
     Applies structured patches to the filesystem with full atomic rollback on error.
@@ -72,7 +91,9 @@ class PatchApplicator:
 
         # 1. Capture backups of all affected files
         for patch in patches:
-            clean_rel = str(patch.file).lstrip("/\\").replace("\\", "/")
+            clean_rel = _clean_rel_path(patch.file)
+            if not clean_rel:
+                continue
             full_path = os.path.join(root, clean_rel)
             if clean_rel not in backups:
                 if os.path.exists(full_path):
@@ -84,15 +105,16 @@ class PatchApplicator:
         # 2. Group patches by file
         patches_by_file: Dict[str, List[FilePatch]] = {}
         for p in patches:
-            clean_rel = str(p.file).lstrip("/\\").replace("\\", "/")
-            patches_by_file.setdefault(clean_rel, []).append(p)
+            clean_rel = _clean_rel_path(p.file)
+            if clean_rel:
+                patches_by_file.setdefault(clean_rel, []).append(p)
 
         try:
             for clean_rel, file_patches in patches_by_file.items():
                 full_path = os.path.join(root, clean_rel)
 
                 for patch in file_patches:
-                    action = (patch.action or "replace").lower()
+                    action = (str(patch.action) if patch.action else "replace").lower()
 
                     if action == "delete":
                         if os.path.exists(full_path):
@@ -103,7 +125,7 @@ class PatchApplicator:
 
                     if action == "create":
                         os.makedirs(os.path.dirname(full_path), exist_ok=True)
-                        content = patch.replacement or ""
+                        content = str(patch.replacement or "")
                         with open(full_path, "w", encoding="utf-8") as fh:
                             fh.write(content)
                         if clean_rel not in created:
@@ -117,7 +139,7 @@ class PatchApplicator:
                         # If file doesn't exist, create it with the replacement content
                         os.makedirs(os.path.dirname(full_path), exist_ok=True)
                         with open(full_path, "w", encoding="utf-8") as fh:
-                            fh.write(patch.replacement or "")
+                            fh.write(str(patch.replacement or ""))
                         if clean_rel not in created:
                             created.append(clean_rel)
                         if clean_rel not in touched:
@@ -128,12 +150,14 @@ class PatchApplicator:
                         lines = fh.readlines()
 
                     num_lines = len(lines)
-                    replacement_lines = (patch.replacement or "").splitlines(keepends=True)
+                    replacement_lines = str(patch.replacement or "").splitlines(keepends=True)
                     if replacement_lines and not replacement_lines[-1].endswith("\n"):
                         replacement_lines[-1] += "\n"
 
-                    start_idx = max(0, (patch.start_line - 1)) if patch.start_line is not None else 0
-                    end_idx = min(num_lines, patch.end_line) if patch.end_line is not None else num_lines
+                    s_line = _safe_int(patch.start_line)
+                    e_line = _safe_int(patch.end_line)
+                    start_idx = max(0, (s_line - 1)) if s_line is not None else 0
+                    end_idx = min(num_lines, e_line) if e_line is not None else num_lines
 
                     if action == "replace":
                         lines[start_idx:end_idx] = replacement_lines
@@ -352,6 +376,8 @@ Please generate the minimal, atomic JSON patches and any required console/databa
             raw_commands = r2_data.get("commands", [])
 
             def _resolve_patch_file(raw_val: Any) -> str:
+                if raw_val is None:
+                    return ""
                 if isinstance(raw_val, int):
                     if 1 <= raw_val <= len(valid_files_to_read):
                         return valid_files_to_read[raw_val - 1]
@@ -375,9 +401,9 @@ Please generate the minimal, atomic JSON patches and any required console/databa
                         FilePatch(
                             file=resolved_file,
                             action=str(p.get("action", "replace")),
-                            start_line=p.get("start_line"),
-                            end_line=p.get("end_line"),
-                            replacement=p.get("replacement"),
+                            start_line=_safe_int(p.get("start_line")),
+                            end_line=_safe_int(p.get("end_line")),
+                            replacement=str(p.get("replacement") or ""),
                             concern=str(p.get("concern", "Code edit")),
                         )
                     )
@@ -391,9 +417,9 @@ Please generate the minimal, atomic JSON patches and any required console/databa
                             FilePatch(
                                 file=resolved_file,
                                 action=str(p.get("action", "replace")),
-                                start_line=p.get("start_line"),
-                                end_line=p.get("end_line"),
-                                replacement=p.get("replacement"),
+                                start_line=_safe_int(p.get("start_line")),
+                                end_line=_safe_int(p.get("end_line")),
+                                replacement=str(p.get("replacement") or ""),
                                 concern=str(p.get("concern", "Code edit")),
                             )
                         )
