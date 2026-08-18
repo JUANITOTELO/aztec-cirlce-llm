@@ -252,4 +252,4 @@ pytest tests/ -v --asyncio-mode=auto --cov=aztec_circle
 ---
 
 ## 📄 License
-MIT © Juanito Telo & Aztec Contributors
+MIT © Juanitotelo & Aztec Contributors
