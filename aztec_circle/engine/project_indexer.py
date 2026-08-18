@@ -162,3 +162,118 @@ class ProjectIndexer:
             lines.append(f"  - {f.rel_path} ({f.line_count}L){export_str}")
 
         return "\n".join(lines)
+
+    @staticmethod
+    def extract_file_skeleton(file_path: str, max_lines: int = 50) -> str:
+        """
+        Extract an AST-like skeleton of a source file (types, interfaces, method signatures, exports)
+        omitting large implementation bodies to minimize context token usage.
+        """
+        if not os.path.exists(file_path):
+            return ""
+
+        try:
+            with open(file_path, "r", encoding="utf-8", errors="replace") as fh:
+                raw_lines = fh.readlines()
+        except Exception:
+            return ""
+
+        if len(raw_lines) <= max_lines:
+            return "".join(raw_lines)
+
+        _, ext = os.path.splitext(file_path)
+        ext = ext.lower()
+        skeleton_lines: List[str] = []
+
+        # TypeScript / JavaScript / React
+        if ext in (".ts", ".tsx", ".js", ".jsx"):
+            in_interface = False
+            for line in raw_lines:
+                stripped = line.strip()
+                if (
+                    stripped.startswith("import ")
+                    or stripped.startswith("export type ")
+                    or stripped.startswith("type ")
+                    or stripped.startswith("export interface ")
+                    or stripped.startswith("interface ")
+                    or stripped.startswith("export const ")
+                    or stripped.startswith("export enum ")
+                    or stripped.startswith("export default ")
+                    or stripped.startswith("export function ")
+                    or stripped.startswith("export class ")
+                    or (in_interface and (";" in stripped or "}" in stripped or ":" in stripped))
+                ):
+                    skeleton_lines.append(line)
+                    if "interface " in stripped and not stripped.endswith("}"):
+                        in_interface = True
+                    if in_interface and "}" in stripped:
+                        in_interface = False
+                elif stripped.startswith("function ") or stripped.startswith("class "):
+                    skeleton_lines.append(line)
+
+        # Python
+        elif ext == ".py":
+            for line in raw_lines:
+                stripped = line.strip()
+                if (
+                    stripped.startswith("import ")
+                    or stripped.startswith("from ")
+                    or stripped.startswith("class ")
+                    or stripped.startswith("def ")
+                    or stripped.startswith("@")
+                    or stripped.startswith("class ")
+                ):
+                    skeleton_lines.append(line)
+
+        # Fallback / Other
+        else:
+            skeleton_lines = raw_lines[:max_lines]
+
+        if not skeleton_lines:
+            skeleton_lines = raw_lines[:max_lines]
+
+        return "".join(skeleton_lines[:max_lines])
+
+    def get_context_with_lod(
+        self,
+        project_root: str,
+        target_files: List[str],
+        reference_files: Optional[List[str]] = None,
+    ) -> str:
+        """
+        Builds a multi-level context:
+        - Target files: Full 1-indexed numbered lines for active code mutation.
+        - Reference files: Compact AST skeletons for interface/type awareness.
+        """
+        root = find_project_root(project_root)
+        sections: List[str] = []
+
+        # 1. Target Files (Full LOD)
+        if target_files:
+            sections.append("### TARGET FILES FOR MODIFICATION (FULL NUMBERED SOURCE):")
+            for rel in target_files:
+                clean_rel = rel.lstrip("/\\").replace("\\", "/")
+                full_path = os.path.join(root, clean_rel)
+                if os.path.exists(full_path):
+                    try:
+                        with open(full_path, "r", encoding="utf-8", errors="replace") as fh:
+                            lines = fh.readlines()
+                        numbered = "".join(f"{idx + 1:4d}: {line}" for idx, line in enumerate(lines))
+                        sections.append(f"#### FILE: {clean_rel} ({len(lines)} lines)\n```\n{numbered}\n```")
+                    except Exception:
+                        pass
+
+        # 2. Reference Files (Skeleton LOD)
+        ref_files = [f for f in (reference_files or []) if f not in target_files]
+        if ref_files:
+            sections.append("\n### REFERENCE / SIBLING CONTEXT (AST INTERFACE SKELETONS - READ ONLY):")
+            for rel in ref_files:
+                clean_rel = rel.lstrip("/\\").replace("\\", "/")
+                full_path = os.path.join(root, clean_rel)
+                if os.path.exists(full_path):
+                    skeleton = self.extract_file_skeleton(full_path)
+                    if skeleton:
+                        sections.append(f"#### SKELETON: {clean_rel}\n```\n{skeleton}\n```")
+
+        return "\n\n".join(sections)
+

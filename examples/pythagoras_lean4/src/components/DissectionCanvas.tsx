@@ -21,7 +21,7 @@ export const DissectionCanvas: React.FC<DissectionCanvasProps> = ({ params, step
 
   return (
     <Card
-      title={theorem === 'pythagoras' ? 'Pythagorean Geometric Dissection' : 'Binomial 45° Diagonal Slicing'}
+      title={theorem === 'pythagoras' ? 'Pythagorean Geometric Dissection' : theorem === 'gougu' ? 'Zhao Shuang Xian Tu (赵爽弦图)' : 'Binomial Geometric Dissection (Euclid II.4)'}
       subtitle={`Tactic Step ${stepIndex} • Dimensions: a=${params.a}, b=${params.b}${params.c ? `, c=${params.c}` : ''}`}
       action={<Badge variant="info">SVG 2D RENDERER</Badge>}
     >

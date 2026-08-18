@@ -26,7 +26,7 @@ export const App: React.FC = () => {
   const currentTactic = tacticStates[state.activeStepIndex] || tacticStates[0];
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-amber-500/30">
       <Header checksum={state.verifiedChecksum} theorem={state.activeTheorem} />
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">

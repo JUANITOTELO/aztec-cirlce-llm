@@ -107,3 +107,70 @@ class PostApplyVerifier:
             errors_summary=summary,
             command_result=result,
         )
+
+    async def verify_tests(self, custom_test_command: Optional[str] = None) -> VerificationResult:
+        """
+        Executes automated test suite to ensure no behavioral regressions.
+        """
+        cmd = custom_test_command
+        if not cmd:
+            pkg_json = os.path.join(self.root, "package.json")
+            if os.path.exists(pkg_json):
+                cmd = "npm test -- --run 2>&1"
+            elif os.path.exists(os.path.join(self.root, "pytest.ini")) or os.path.exists(os.path.join(self.root, "tests")):
+                cmd = "pytest 2>&1"
+
+        if not cmd:
+            return VerificationResult(
+                success=True,
+                command_used="(no test runner detected)",
+                stdout="No test runner detected.",
+            )
+
+        log.info("post_apply_verifier.running_tests", command=cmd, root=self.root)
+        if self.console:
+            self.console.print(f"  [cyan]🧪 Running post-apply test suite:[/cyan] [dim]{cmd}[/dim]")
+
+        result: CommandResult = await self.runner.run_shell_command_streamed(
+            cmd_str=cmd,
+            cwd=self.root,
+            title="Post-Apply Test Verification",
+        )
+
+        combined = f"{result.stdout}\n{result.stderr}".strip()
+        failed_lines = [
+            l.strip()
+            for l in combined.splitlines()
+            if "fail" in l.lower() or "error" in l.lower() or "failed" in l.lower()
+        ]
+        is_success = result.success and (result.exit_code == 0)
+        summary = "\n".join(failed_lines[:25]) if failed_lines else (combined[:500] if not is_success else "")
+
+        return VerificationResult(
+            success=is_success,
+            command_used=cmd,
+            stdout=result.stdout,
+            stderr=result.stderr,
+            error_count=len(failed_lines) if not is_success else 0,
+            errors_summary=summary,
+            command_result=result,
+        )
+
+    async def verify_all(
+        self,
+        ecosystem: Optional[str] = None,
+        run_tests: bool = False,
+    ) -> VerificationResult:
+        """
+        Runs type-checking and optional test verification in sequence.
+        """
+        tc_res = await self.verify(ecosystem=ecosystem)
+        if not tc_res.success:
+            return tc_res
+
+        if run_tests:
+            test_res = await self.verify_tests()
+            if not test_res.success:
+                return test_res
+
+        return tc_res

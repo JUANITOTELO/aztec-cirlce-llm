@@ -1,6 +1,6 @@
-export type TheoremType = 'pythagoras' | 'binomial';
+export type TheoremType = 'pythagoras' | 'binomial' | 'gougu';
 
-export type DissectionMode = 'rearrangement' | 'zhoubi_suanjing' | 'diagonal_slice';
+export type DissectionMode = 'rearrangement' | 'zhoubi_suanjing' | 'diagonal_slice' | 'xian_tu';
 
 export interface GeometryParams {
   readonly a: number;

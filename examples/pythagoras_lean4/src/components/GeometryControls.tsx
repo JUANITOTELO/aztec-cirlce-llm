@@ -37,29 +37,47 @@ export const GeometryControls: React.FC<GeometryControlsProps> = ({
   onSpeedChange
 }) => {
   return (
-    <Card title="Theorem & Dissection Parameters" subtitle="Configure formal algebraic & geometric coefficients">
+    <Card title="Proof Controls & Parameters" subtitle="Manipulate geometry dimensions and step through Lean kernel tactics">
       <div className="space-y-4">
-        <div>
-          <label className="text-xs font-mono text-slate-400 uppercase tracking-wider mb-1.5 block">Active Theorem</label>
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              variant={theorem === 'pythagoras' ? 'primary' : 'secondary'}
-              size="sm"
-              onClick={() => onTheoremChange('pythagoras')}
-            >
-              Pythagoras (a² + b² = c²)
-            </Button>
-            <Button
-              variant={theorem === 'binomial' ? 'primary' : 'secondary'}
-              size="sm"
-              onClick={() => onTheoremChange('binomial')}
-            >
-              Binomial ((a+b)²)
-            </Button>
-          </div>
+        {/* Theorem Selector */}
+        <div className="flex items-center gap-2 p-1 bg-slate-950/60 rounded-lg border border-slate-800">
+          <button
+            type="button"
+            onClick={() => onTheoremChange('pythagoras')}
+            className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${
+              theorem === 'pythagoras'
+                ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Pythagoras (a²+b²=c²)
+          </button>
+          <button
+            type="button"
+            onClick={() => onTheoremChange('gougu')}
+            className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${
+              theorem === 'gougu'
+                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Gougu (Base & Altitude)
+          </button>
+          <button
+            type="button"
+            onClick={() => onTheoremChange('binomial')}
+            className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${
+              theorem === 'binomial'
+                ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Binomial (a+b)²
+          </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        {/* Sliders */}
+        <div className="space-y-3">
           <Slider
             label="Dimension a"
             value={params.a}

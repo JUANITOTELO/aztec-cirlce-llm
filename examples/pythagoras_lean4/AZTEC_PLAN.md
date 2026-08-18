@@ -2,7 +2,7 @@
 
 > **Project Goal**: Aztec Software Project  
 > **Status**: Active / Synced with Codebase  
-> **Last Updated**: 2026-08-18 09:35:14  
+> **Last Updated**: 2026-08-18 10:53:42  
 > **Files Indexed**: 34 total source files  
 
 ---
@@ -45,6 +45,9 @@
 
 | File | Layer | Responsibility |
 | :--- | :--- | :--- |
+| `src/engine/gouguEngine.ts` | Engine (Domain Logic) | Pure mathematical & domain algorithms for gouguEngine |
+| `src/engine/theorems/gouguTactics.ts` | Engine (Domain Logic) | Pure mathematical & domain algorithms for gouguTactics |
+| `src/constants/gouguPresets.ts` | Constants (Config) | Static configuration constants for gouguPresets |
 | `src/engine/theorems/binomialTactics.ts` | Engine (Domain Logic) | Pure mathematical & domain algorithms for binomialTactics |
 | `src/engine/binomialEngine.ts` | Engine (Domain Logic) | Pure mathematical & domain algorithms for binomialEngine |
 | `src/constants/binomialPresets.ts` | Constants (Config) | Static configuration constants for binomialPresets |
@@ -86,6 +89,105 @@
 ---
 
 ## 📝 Change Log & Iteration History
+- **2026-08-18 10:54:10** — Automated Self-Healing Build Fix (2 files repaired).
+- **2026-08-18 10:53:42** — Incremental Edit: "[plugin:vite:esbuild] Transform failed with 1 error:
+/home/coorti/.aztec/examples/pythagoras_lean4/src/engine/theorems/binomialTactics.ts:42:0: ERROR: Unexpected "}"
+/home/coorti/.aztec/examples/pythagoras_lean4/src/engine/theorems/binomialTactics.ts:42:0
+Unexpected "}"
+40 |    });
+41 |  }
+42 |  }
+   |  ^
+43 |" (Modified: src/engine/theorems/binomialTactics.ts).
+- **2026-08-18 10:53:32** — Incremental Edit: "on the binomial diagram we have this: Inaccuracies & Interface QuirksAngle Misnomer ("45° Diagonal Slicing"):The card titles the diagram 45° Diagonal Slicing. However, because $a = 6$ and $b = 3$, the diagonal slicing through each $6 \times 3$ rectangle is at $\arctan(3/6) \approx 26.6^\circ$ (or $63.4^\circ$), not $45^\circ$. The slice is only $45^\circ$ when $a = b$.Euclid II.4 vs. Diagonal Slicing:This diagram is the classical Euclidean / Yang Hui grid dissection (partitioning along the $x=a$ and $y=b$ coordinate lines into two squares and two rectangles). Diagonal slicing of the whole square refers to slicing corner-to-corner across the main diagonal.Simulated Lean State Explorer (UI Mockup Artifacts):The Tactic State Explorer and Proof Tactic Tree display UI mockups rather than raw Lean 4 Infoview outputs:h_geom : area((a+b)^2) = 81 uses high-level pseudocode rather than real Lean propositions.h_quads : a^2=36, b^2=9, 2ab=36 bundles multiple equations into a single comma-separated hypothesis type, which is invalid syntax in Lean 4.by geometr... in the proof tree is a placeholder rather than a standard Mathlib tactic." (Modified: src/components/DissectionCanvas.tsx, src/constants/binomialPresets.ts, src/engine/binomialEngine.ts, src/engine/theorems/binomialTactics.ts).
+- **2026-08-18 10:44:54** — Incremental Edit: "translate the names of the gougu theorem to English" (Modified: src/constants/gouguPresets.ts, src/engine/theorems/gouguTactics.ts, src/engine/gouguEngine.ts, src/engine/gouguEngine.ts, src/engine/gouguEngine.ts, src/engine/gouguEngine.ts, src/components/GeometryControls.tsx, src/components/Header.tsx).
+- **2026-08-18 10:44:01** — Automated Self-Healing Build Fix (1 files repaired).
+- **2026-08-18 10:43:11** — Incremental Edit: "test the lean 4 formal proof" (Modified: src/App.test.tsx; Executed: npm test -- --run).
+- **2026-08-18 10:42:04** — Incremental Edit: "[plugin:vite:react-babel] /home/coorti/.aztec/examples/pythagoras_lean4/src/components/LeanCodeGenerator.tsx: Unexpected token (65:2)
+  67 |
+/home/coorti/.aztec/examples/pythagoras_lean4/src/components/LeanCodeGenerator.tsx:65:2
+63 |      </Card>
+64 |    );
+65 |    );
+   |    ^
+66 |  };
+67 |" (Modified: src/components/LeanCodeGenerator.tsx).
+- **2026-08-18 10:41:50** — Incremental Edit: "the gougu and pythagoras lean 4 specifications seems to be the same file making them wrong, they should be separate files" (Modified: src/engine/proofExporter.ts, src/components/LeanCodeGenerator.tsx).
+- **2026-08-18 10:40:09** — Incremental Edit: "the lean 4 formal specification of the Gougu theorem is wrong" (Modified: src/engine/proofExporter.ts).
+- **2026-08-18 10:38:04** — Incremental Edit: "The visual distortion in the first image is caused by **coordinate transformation and rotation bugs** when attempting to procedurally generate the classical Zhao Shuang Chord Diagram (*Zhao Shuang Xian Tu*).
+
+While the underlying values ($a=3$, $b=12$, $(b-a)^2=81$, $c^2=153$) are mathematically consistent, the geometry engine misplaces the triangle vertices.
+
+---
+
+### Key Programming Bugs
+
+* **Broken Cyclic Rotation ($90^\circ$ Transform):**
+In the classical construction, all four right triangles (**朱实**) are identical copies rotated cyclically around the center by $0^\circ, 90^\circ, 180^\circ,$ and $270^\circ$. In the code, the rotation matrix or origin was applied inconsistently, causing each triangle to point in arbitrary orientations.
+* **Chirality & Reflection Bug (Sign Errors):**
+Triangles 2 and 4 appear reflected (mirrored across an axis) rather than rotated, flipping the positions of leg $a$ (勾) and leg $b$ (股).
+* **Collinearity & Vertex-Sharing Failure:**
+The inner square of side $(b - a)$ exists because along each side, the long leg of one triangle ($b$) overlaps the short leg of the next ($a$), leaving $b - a$ exposed ($12 - 3 = 9$). Because the vertices were computed with independent absolute offsets rather than chained collinear vectors, gaps and protruding "fins" (the red/orange slivers) were created.
+* **Non-Square Outer Boundary:**
+The four hypotenuses ($c$) must connect tip-to-tail to form a continuous, tilted outer square of area $c^2 = 153$. Due to misaligned vertices, the outer perimeter forms an irregular 8-sided polygon.
+
+---
+
+### Correct Coordinate Generation (Python / JavaScript Logic)
+
+To draw this diagram correctly, center the diagram at the origin $(0, 0)$ and construct the 4 triangles using a single standard triangle rotated by $k \times 90^\circ$:
+
+```python
+import numpy as np
+
+a = 3   # 勾 (Gou - short leg)
+b = 12  # 股 (Gu - long leg)
+
+# Center of the inner square is (0, 0)
+d = (b - a) / 2  # half-width of the inner square (4.5)
+
+# Vertices of the base triangle (in standard orientation)
+# 1. Outer corner (right angle): (d + a, -d)
+# 2. Inner corner: (d, -d)
+# 3. Outer hypotenuse tip: (d, -d + b)
+base_triangle = np.array([
+    [ d + a, -d     ],
+    [ d,     -d     ],
+    [ d,     -d + b ]
+])
+
+# Generate all 4 triangles by rotating 0°, 90°, 180°, 270°
+triangles = []
+for k in range(4):
+    theta = k * (np.pi / 2)
+    rot_matrix = np.array([
+        [np.cos(theta), -np.sin(theta)],
+        [np.sin(theta),  np.cos(theta)]
+    ])
+    rotated_tri = base_triangle @ rot_matrix.T
+    triangles.append(rotated_tri)
+
+# Inner square vertices (黄方)
+inner_square = np.array([
+    [-d, -d],
+    [ d, -d],
+    [ d,  d],
+    [-d,  d]
+])
+
+```
+
+Applying this cyclic transform ensures the outer hypotenuses automatically form a closed, tilted square ($c^2 = 153$) enclosing the central $(b - a)^2$ square without overlaps or gaps." (Modified: src/engine/gouguEngine.ts, src/components/DissectionCanvas.tsx).
+- **2026-08-18 10:28:46** — Incremental Edit: "chunk-RQRZJDNV.js?v=20ceec6f:21549 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+leanKernelSimulator.ts:26 Uncaught ReferenceError: a is not defined
+    at leanKernelSimulator.ts:26:51
+    at Array.map (<anonymous>)
+    at LeanKernelSimulator.generateTactics (leanKernelSimulator.ts:25:20)
+    at new ProofStore (proofStore.ts:14:41)
+    at proofStore.ts:109:27" (Modified: src/engine/leanKernelSimulator.ts, src/store/proofStore.ts).
+- **2026-08-18 10:28:10** — Automated Self-Healing Build Fix (1 files repaired).
+- **2026-08-18 10:27:43** — Incremental Edit: "Module Consensus: let's add The Gougu Theorem too" (Modified: src/constants/gouguPresets.ts, src/engine/theorems/gouguTactics.ts, src/engine/gouguEngine.ts, src/types/proofState.ts, src/engine/geometryEngine.ts, src/engine/leanKernelSimulator.ts, src/store/proofStore.ts, src/components/Header.tsx, src/components/GeometryControls.tsx, src/components/LeanCodeGenerator.tsx, src/App.tsx).
+- **2026-08-18 10:27:43** — Automated Self-Healing Build Fix (5 files repaired).
 - **2026-08-18 09:35:14** — Incremental Edit: "the Lean 4 Formal Specifications Dissection.lean result are swap, the pythagoras should be the binomial one and viceversa." (Modified: src/engine/proofExporter.ts, src/App.test.tsx).
 - **2026-08-18 09:32:37** — Incremental Edit: "Minor Observations and Cleanups
 Unused Hypotheses: The positivity hypotheses ha : a > 0, hb : b > 0, and hc : c > 0 are not used in the proof body. The algebraic identity holds over any commutative ring/field regardless of whether the numbers are positive, negative, or zero.

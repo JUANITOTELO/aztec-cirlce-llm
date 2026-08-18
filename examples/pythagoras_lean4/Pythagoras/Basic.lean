@@ -1,21 +1,23 @@
--- Formal Verification of the Pythagorean Theorem via Geometric Dissection
+-- Formal Verification of Geometric Dissections (Pythagoras, Binomial Euclid II.4, Gougu)
 
-namespace Pythagoras
+namespace DissectionProofs
 
-structure RightTriangle where
-  a : Nat
-  b : Nat
-  c : Nat
-  ha : 0 < a
-  hb : 0 < b
-  hc : 0 < c
-
-/-- The total area of the outer square (a + b)^2 equals
-    the inner square c^2 plus 4 right triangles of area (1/2 * a * b).
-    Algebraically simplified: a^2 + 2*a*b + b^2 = c^2 + 2*a*b implies a^2 + b^2 = c^2. -/
-theorem dissection_area_equality (t : RightTriangle)
-    (h_area : t.a * t.a + 2 * t.a * t.b + t.b * t.b = t.c * t.c + 2 * t.a * t.b) :
-    t.a * t.a + t.b * t.b = t.c * t.c := by
+/-- Pythagorean Theorem via Geometric Square Dissection -/
+theorem pythagoras_dissection_nat (a b c : Nat)
+    (h_outer : (a + b) * (a + b) = c * c + 2 * a * b) :
+    a * a + b * b = c * c := by
   omega
 
-end Pythagoras
+/-- Binomial Square Dissection (Euclid II.4 / Yang Hui) -/
+theorem binomial_dissection_nat (a b : Nat) :
+    (a + b) * (a + b) = a * a + 2 * a * b + b * b := by
+  omega
+
+/-- Zhao Shuang Xian Tu Dissection -/
+theorem gougu_xiantu_dissection_nat (gou gu xian : Nat)
+    (h_xiantu : xian * xian = 2 * gou * gu + (gu - gou) * (gu - gou)) :
+    gou * gou + gu * gu = xian * xian := by
+  omega
+
+end DissectionProofs
+

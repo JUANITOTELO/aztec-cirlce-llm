@@ -67,18 +67,21 @@ export const TacticStateExplorer: React.FC<TacticExplorerProps> = ({
             <Hash className="w-3 h-3 text-emerald-400" /> Open Goals ({currentState.goals.length}):
           </div>
           <div className="space-y-1.5">
-            {currentState.goals.map((g, idx) => (
-              <div
-                key={idx}
-                className={`p-2.5 rounded-lg font-mono text-xs border ${
-                  currentState.status === 'PROVEN'
-                    ? 'bg-emerald-950/30 border-emerald-800/60 text-emerald-300'
-                    : 'bg-slate-950 border-slate-800 text-amber-300'
-                }`}
-              >
-                {g}
+            {currentState.goals.length === 0 ? (
+              <div className="p-2.5 rounded-lg font-mono text-xs border bg-emerald-950/30 border-emerald-800/60 text-emerald-300 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <span>Goals accomplished 🎉</span>
               </div>
-            ))}
+            ) : (
+              currentState.goals.map((g, idx) => (
+                <div
+                  key={idx}
+                  className="p-2.5 rounded-lg font-mono text-xs border bg-slate-950 border-slate-800 text-amber-300"
+                >
+                  {g}
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>

@@ -25,6 +25,7 @@ export const ProofTreeVisualizer: React.FC<ProofTreeProps> = ({
             <button
               key={st.stepIndex}
               onClick={() => onSelectStep(idx)}
+              title={st.tacticApplied}
               className={`w-full text-left p-2.5 rounded-lg border font-mono text-xs transition-all flex items-center justify-between ${
                 isActive
                   ? 'bg-sky-950/50 border-sky-500/80 text-sky-200 shadow-sm'

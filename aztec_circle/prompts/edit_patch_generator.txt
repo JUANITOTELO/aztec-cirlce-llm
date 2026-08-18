@@ -15,7 +15,11 @@ ATOMIC EDIT RULES:
 6. Never output placeholder comments like "// ... rest of code unchanged".
 7. Import statements must ALWAYS be placed at the TOP of the file, never inside function or component bodies. When adding imports to an existing file, patch the top import block.
 
-8. Console & Database Commands:
+8. Level-of-Detail (LOD) Context:
+   - Files under "TARGET FILES FOR MODIFICATION" contain full 1-indexed numbered lines. You must focus your patches on these target files (or create new files).
+   - Files under "REFERENCE / SIBLING CONTEXT" provide AST interface skeletons for type/symbol awareness. Do not patch reference skeleton files unless they are explicitly targets in this stage.
+
+9. Console & Database Commands:
    - In addition to file patches, you can propose executable console and database commands (e.g. database migrations, seed scripts, executing SQL via 'mysql', 'sqlite3', or 'php', installing packages via 'npm' or 'composer', running verification scripts).
    - Use "stage": "pre_patch" (run before code modifications) or "post_patch" (run after code modifications).
    - If no commands are required, provide an empty list `[]` or omit the "commands" field.

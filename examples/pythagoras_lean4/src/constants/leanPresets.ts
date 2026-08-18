@@ -8,10 +8,10 @@ export const DEFAULT_GEOMETRY = {
 };
 
 export const TACTIC_EXPLANATIONS = [
-  'Initialize theorem context and right triangle hypotheses (a > 0, b > 0, c > 0).',
-  'Formulate geometric dissection area identity: outer square (a + b)² equals c² + 4 * (ab/2).',
-  'Expand algebraic square (a + b)² into a² + 2ab + b² using the `ring` tactic.',
-  'Simplify right triangle 4-fold summation: 4 * (1/2 * ab) = 2ab.',
-  'Substitute expanded identities into the geometric area equality equation.',
-  'Apply linear arithmetic (`linarith`) to cancel 2ab from both sides, yielding a² + b² = c².'
+  'Initialize theorem context with positive side lengths a > 0, b > 0, c > 0 and outer dissection area equality.',
+  'Expand algebraic square (a + b)² into a² + 2*a*b + b² using the `ring` tactic.',
+  'Simplify 4-fold triangle summation: 4 * ((1 / 2 : ℝ) * a * b) = 2 * a * b via `ring_nf`.',
+  'Substitute expanded algebraic and triangular identities into the outer dissection equality.',
+  'Apply linear combination on the dissection identity to cancel cross-terms 2*a*b, establishing a² + b² = c².',
+  'Conclude Q.E.D. with exact cancellation proof.'
 ];

@@ -4,11 +4,14 @@ import { sanitizeNumber } from '../utils/sanitizer';
 import { computeProofHash } from '../utils/cryptoHash';
 import { COLOR_PALETTE } from '../constants/pythagorasData';
 import { buildBinomialDissectionFrame } from './binomialEngine';
+import { buildGouguDissectionFrame } from './gouguEngine';
 
 export function validateGeometry(a: number, b: number, theorem: TheoremType = 'pythagoras'): GeometryParams {
-  const safeA = sanitizeNumber(a, theorem === 'binomial' ? 5 : 3);
-  const safeB = sanitizeNumber(b, theorem === 'binomial' ? 3 : 4);
-  const c = theorem === 'pythagoras' ? Math.sqrt(safeA * safeA + safeB * safeB) : undefined;
+  const defaultA = theorem === 'binomial' ? 5 : 3;
+  const defaultB = theorem === 'binomial' ? 3 : 4;
+  const safeA = sanitizeNumber(a, defaultA);
+  const safeB = sanitizeNumber(b, defaultB);
+  const c = theorem !== 'binomial' ? Math.sqrt(safeA * safeA + safeB * safeB) : undefined;
 
   if (safeA <= 0 || safeB <= 0) {
     return { a: safeA, b: safeB, c, isValid: false, validationError: 'Dimensions must be positive' };
@@ -30,9 +33,12 @@ export function buildDissectionFrame(
   if (theorem === 'binomial') {
     return buildBinomialDissectionFrame(params, stepIndex);
   }
+  if (theorem === 'gougu') {
+    return buildGouguDissectionFrame(params, stepIndex);
+  }
 
-  const { a, b, c = 5 } = params;
-  const scale = 260 / (a + b);
+  const { a, b, c = Math.sqrt(a * a + b * b) } = params;
+  const scale = 20;
   const sa = a * scale;
   const sb = b * scale;
   const total = sa + sb;

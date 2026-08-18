@@ -72,24 +72,58 @@ def _safe_int(val: Any) -> Optional[int]:
     return None
 
 
+@dataclass
+class EditStage:
+    """Represents a grouped stage of files to modify in sequence."""
+    stage_number: int
+    name: str
+    target_files: List[str]
+    reference_files: List[str] = field(default_factory=list)
+
+
 class PatchApplicator:
     """
     Applies structured patches to the filesystem with full atomic rollback on error.
     """
 
     @staticmethod
-    def apply(project_root: str, patches: List[FilePatch]) -> Tuple[List[str], List[str], List[str]]:
+    def rollback(project_root: str, backups: Dict[str, Optional[str]]) -> None:
+        """Restores original file state for all registered backups."""
+        root = find_project_root(project_root)
+        for clean_rel, original_content in backups.items():
+            full_path = os.path.join(root, clean_rel)
+            if original_content is None:
+                if os.path.exists(full_path):
+                    try:
+                        os.remove(full_path)
+                    except Exception:
+                        pass
+            else:
+                try:
+                    os.makedirs(os.path.dirname(full_path), exist_ok=True)
+                    with open(full_path, "w", encoding="utf-8") as fh:
+                        fh.write(original_content)
+                except Exception:
+                    pass
+
+    @classmethod
+    def apply(
+        cls,
+        project_root: str,
+        patches: List[FilePatch],
+        existing_backups: Optional[Dict[str, Optional[str]]] = None,
+    ) -> Tuple[List[str], List[str], List[str]]:
         """
         Apply patches atomically. Returns (files_touched, files_created, files_deleted).
         If any patch operation fails, rolls back all modified/created/deleted files.
         """
         root = find_project_root(project_root)
-        backups: Dict[str, Optional[str]] = {}  # None indicates file didn't exist before
+        backups: Dict[str, Optional[str]] = existing_backups if existing_backups is not None else {}
         touched: List[str] = []
         created: List[str] = []
         deleted: List[str] = []
 
-        # 1. Capture backups of all affected files
+        # 1. Capture backups of all affected files (if not already captured)
         for patch in patches:
             clean_rel = _clean_rel_path(patch.file)
             if not clean_rel:
@@ -180,23 +214,119 @@ class PatchApplicator:
 
         except Exception as exc:
             log.error("patch_applicator.error_rolling_back", error=str(exc))
-            # Rollback all files
-            for clean_rel, original_content in backups.items():
-                full_path = os.path.join(root, clean_rel)
-                if original_content is None:
-                    if os.path.exists(full_path):
-                        try:
-                            os.remove(full_path)
-                        except Exception:
-                            pass
-                else:
-                    try:
-                        os.makedirs(os.path.dirname(full_path), exist_ok=True)
-                        with open(full_path, "w", encoding="utf-8") as fh:
-                            fh.write(original_content)
-                    except Exception:
-                        pass
+            cls.rollback(root, backups)
             raise
+
+
+class BatchPlanner:
+    """
+    Partitions multi-file edits into topologically ordered dependency stages
+    to prevent LLM output token overflow and context dispersion.
+    """
+
+    @staticmethod
+    def cluster_files_into_stages(
+        files: List[str],
+        phases_payload: Optional[List[Dict[str, Any]]] = None,
+        max_files_per_stage: int = 4,
+    ) -> List[EditStage]:
+        """
+        Cluster files into stages based on architectural layer, or use explicit phases from Round 1.
+        """
+        if phases_payload and isinstance(phases_payload, list) and len(phases_payload) > 0:
+            stages: List[EditStage] = []
+            all_target_files: List[str] = []
+            for item in phases_payload:
+                if isinstance(item, dict):
+                    stage_num = item.get("stage", len(stages) + 1)
+                    name = item.get("name") or item.get("description") or f"Stage {stage_num}"
+                    stage_files = item.get("files", [])
+                    if isinstance(stage_files, list) and stage_files:
+                        clean_files = [_clean_rel_path(f) for f in stage_files if _clean_rel_path(f)]
+                        all_target_files.extend(clean_files)
+                        stages.append(
+                            EditStage(
+                                stage_number=stage_num,
+                                name=name,
+                                target_files=clean_files,
+                            )
+                        )
+            if stages:
+                for st in stages:
+                    st.reference_files = [f for f in all_target_files if f not in st.target_files]
+                return stages
+
+        clean_files = list(dict.fromkeys([_clean_rel_path(f) for f in files if _clean_rel_path(f)]))
+        if len(clean_files) <= max_files_per_stage:
+            return [
+                EditStage(
+                    stage_number=1,
+                    name="Surgical Modifications",
+                    target_files=clean_files,
+                    reference_files=[],
+                )
+            ]
+
+        layer_types: List[str] = []
+        layer_domain: List[str] = []
+        layer_ui: List[str] = []
+        layer_tests: List[str] = []
+        layer_other: List[str] = []
+
+        for f in clean_files:
+            lower = f.lower()
+            if any(k in lower for k in ["/types", "types.", ".d.ts", "interface", "schema.", "migration", "/constants", "presets."]):
+                layer_types.append(f)
+            elif any(k in lower for k in ["/engine", "/store", "/services", "/models", "/backend", "server."]):
+                layer_domain.append(f)
+            elif any(k in lower for k in [".test.", ".spec.", "/tests", "test_"]):
+                layer_tests.append(f)
+            elif any(k in lower for k in ["/components", "/views", "/pages", "/ui", "/atoms", "exporter"]):
+                layer_ui.append(f)
+            else:
+                layer_other.append(f)
+
+        stages: List[EditStage] = []
+        stage_idx = 1
+
+        def _add_layer(name: str, flist: List[str]):
+            nonlocal stage_idx
+            for i in range(0, len(flist), max_files_per_stage):
+                chunk = flist[i : i + max_files_per_stage]
+                if chunk:
+                    stages.append(
+                        EditStage(
+                            stage_number=stage_idx,
+                            name=f"{name} (Part {i // max_files_per_stage + 1})" if len(flist) > max_files_per_stage else name,
+                            target_files=chunk,
+                            reference_files=[f for f in clean_files if f not in chunk],
+                        )
+                    )
+                    stage_idx += 1
+
+        if layer_types:
+            _add_layer("Data Contracts, Schemas & Constants", layer_types)
+        if layer_domain:
+            _add_layer("Core Business Logic & Engines", layer_domain)
+        if layer_ui:
+            _add_layer("UI Presentation & Exporters", layer_ui)
+        if layer_other:
+            _add_layer("Supporting Modules & Configuration", layer_other)
+        if layer_tests:
+            _add_layer("Test Suites & Verification Fixtures", layer_tests)
+
+        if not stages:
+            stages.append(
+                EditStage(
+                    stage_number=1,
+                    name="All Selected Files",
+                    target_files=clean_files,
+                    reference_files=[],
+                )
+            )
+
+        return stages
+
 
 
 class PatchAgent:
@@ -287,6 +417,7 @@ Which files must be read and edited to fulfill this instruction?"""
             )
             r1_data = extract_json_payload(r1_resp.content)
             files_to_read = r1_data.get("files_to_read", [])
+            phases_data = r1_data.get("phases", [])
 
             if not isinstance(files_to_read, list) or not files_to_read:
                 # Fallback: select top matching files or src/App.tsx
@@ -301,11 +432,9 @@ Which files must be read and edited to fulfill this instruction?"""
             )
 
         # ----------------------------------------------------
-        # Prepare Numbered File Contents
+        # Validate and Normalize Files to Read
         # ----------------------------------------------------
-        numbered_files_section = []
-        valid_files_to_read = []
-
+        valid_files_to_read: List[str] = []
         for rel_file in files_to_read:
             if isinstance(rel_file, int):
                 if 1 <= rel_file <= len(index.file_indices):
@@ -322,98 +451,164 @@ Which files must be read and edited to fulfill this instruction?"""
             full_path = os.path.join(root, clean_rel)
             if os.path.exists(full_path) and clean_rel not in valid_files_to_read:
                 valid_files_to_read.append(clean_rel)
-                try:
-                    with open(full_path, "r", encoding="utf-8", errors="replace") as fh:
-                        lines = fh.readlines()
-                    numbered = "".join(f"{idx + 1:4d}: {line}" for idx, line in enumerate(lines))
-                    numbered_files_section.append(f"### FILE: {clean_rel} ({len(lines)} lines)\n```\n{numbered}\n```")
-                except Exception:
-                    pass
+
+        if not valid_files_to_read:
+            valid_files_to_read = [f.rel_path for f in index.file_indices[:3] if f.rel_path.startswith("src/")]
+
+        # ----------------------------------------------------
+        # Plan Phased Execution Stages
+        # ----------------------------------------------------
+        stages: List[EditStage] = BatchPlanner.cluster_files_into_stages(
+            files=valid_files_to_read,
+            phases_payload=phases_data if isinstance(phases_data, list) else None,
+        )
 
         if self.console:
-            self.console.print(f"  [green]✓[/green] Selected [bold]{len(valid_files_to_read)}[/bold] file(s) for modification: [dim]{', '.join(valid_files_to_read)}[/dim]")
+            if len(stages) > 1:
+                self.console.print(f"  [green]✓[/green] Partitioned [bold]{len(valid_files_to_read)}[/bold] file(s) into [bold cyan]{len(stages)}[/bold cyan] phased edit stages:")
+                for st in stages:
+                    self.console.print(f"    [dim]Stage {st.stage_number}: {st.name} ({len(st.target_files)} target files)[/dim]")
+            else:
+                self.console.print(f"  [green]✓[/green] Selected [bold]{len(valid_files_to_read)}[/bold] file(s) for modification: [dim]{', '.join(valid_files_to_read)}[/dim]")
 
         # ----------------------------------------------------
-        # ROUND 2: Patch Generator & Command Proposer
+        # Multi-Stage Execution Pipeline
         # ----------------------------------------------------
+        from aztec_circle.engine.project_runner import ProjectRunner
+        runner = ProjectRunner(console=self.console)
+
+        all_backups: Dict[str, Optional[str]] = {}
+        all_patches: List[FilePatch] = []
+        all_commands: List[ConsoleCommand] = []
+        all_executed_commands: List[CommandExecutionResult] = []
+        all_touched: List[str] = []
+        all_created: List[str] = []
+        all_deleted: List[str] = []
+        stage_summaries: List[str] = []
+        round2_total_tokens = 0
+
+        async def _execute_single_cmd(cmd_obj: ConsoleCommand) -> CommandExecutionResult:
+            confirmed = True
+            effective_cmd = cmd_obj.command
+
+            if confirm_command_callback is not None and not auto_approve_commands:
+                confirmed, edited_cmd = await confirm_command_callback(cmd_obj)
+                if edited_cmd:
+                    effective_cmd = edited_cmd
+
+            if not confirmed:
+                if self.console:
+                    self.console.print(f"  [yellow]⚡ Skipped console command:[/yellow] [dim]{cmd_obj.command}[/dim]")
+                return CommandExecutionResult(
+                    command=cmd_obj.command,
+                    description=cmd_obj.description,
+                    success=True,
+                    confirmed=False,
+                    skipped=True,
+                )
+
+            cwd_target = cmd_obj.cwd or root
+            res = await runner.run_shell_command_streamed(
+                cmd_str=effective_cmd,
+                cwd=cwd_target,
+                title=f"Command ({cmd_obj.description or 'Console'})",
+            )
+            return CommandExecutionResult(
+                command=effective_cmd,
+                description=cmd_obj.description,
+                success=res.success,
+                stdout=res.stdout,
+                stderr=res.stderr,
+                exit_code=res.exit_code,
+                duration_seconds=res.duration_seconds,
+                confirmed=True,
+                skipped=False,
+            )
+
         round2_system = render("edit_patch_generator")
-        files_block = "\n\n".join(numbered_files_section) if numbered_files_section else "(No existing files selected; create new files if required)"
 
-        round2_user = f"""EDIT INSTRUCTION:
+        try:
+            for stage in stages:
+                stage_title = f"Round 2: Patch Generator [{stage.stage_number}/{len(stages)} - {stage.name}]" if len(stages) > 1 else "Round 2: Patch Generator & Command Proposer"
+
+                # Generate Level-of-Detail source context (Target files full lines + Sibling files AST skeletons)
+                files_block = self.indexer.get_context_with_lod(
+                    project_root=root,
+                    target_files=stage.target_files,
+                    reference_files=stage.reference_files,
+                )
+                if not files_block.strip():
+                    files_block = "(No existing files selected for this stage; create new files if required)"
+
+                stage_context_note = f"\nACTIVE EDIT STAGE {stage.stage_number}/{len(stages)}: {stage.name}\n" if len(stages) > 1 else ""
+
+                round2_user = f"""EDIT INSTRUCTION:
 {instruction}
-{plan_section}
-NUMBERED SOURCE FILES:
+{plan_section}{stage_context_note}
+SOURCE CODE & CONTEXT (NUMBERED TARGETS & AST SKELETONS):
 {files_block}
 
-Please generate the minimal, atomic JSON patches and any required console/database commands to fulfill the instruction."""
+Please generate the minimal, atomic JSON patches for this stage and any required console/database commands."""
 
-        vis2 = SingleStreamVisualizer(
-            console=self.console,
-            title="Round 2: Patch Generator & Command Proposer",
-            icon="⚡",
-            show_preview=True,
-        )
-        try:
-            with vis2:
-                r2_resp: LLMResponse = await self.provider.invoke(
-                    model=self.model,
-                    system_prompt=round2_system,
-                    user_message=round2_user,
-                    images=images,
-                    temperature=0.1,
-                    on_chunk=vis2.on_chunk,
+                vis2 = SingleStreamVisualizer(
+                    console=self.console,
+                    title=stage_title,
+                    icon="⚡",
+                    show_preview=True,
                 )
-            bm2 = BudgetManager()
-            total_cost += bm2.record(
-                input_tokens=r2_resp.prompt_tokens,
-                output_tokens=r2_resp.completion_tokens,
-                total_tokens=r2_resp.total_tokens,
-                cached_tokens=r2_resp.cached_tokens,
-            )
-            r2_data = extract_json_payload(r2_resp.content)
-            edit_summary = r2_data.get("edit_summary", "Applied code modifications.")
-            raw_patches = r2_data.get("patches", [])
-            raw_commands = r2_data.get("commands", [])
 
-            def _resolve_patch_file(raw_val: Any) -> str:
-                if raw_val is None:
-                    return ""
-                if isinstance(raw_val, int):
-                    if 1 <= raw_val <= len(valid_files_to_read):
-                        return valid_files_to_read[raw_val - 1]
-                    elif 1 <= raw_val <= len(index.file_indices):
-                        return index.file_indices[raw_val - 1].rel_path
-                val_str = str(raw_val).strip()
-                if val_str.isdigit():
-                    num = int(val_str)
-                    if 1 <= num <= len(valid_files_to_read):
-                        return valid_files_to_read[num - 1]
-                    elif 1 <= num <= len(index.file_indices):
-                        return index.file_indices[num - 1].rel_path
-                return val_str.lstrip("/\\").replace("\\", "/")
-
-            # Parse patches
-            patches: List[FilePatch] = []
-            for p in raw_patches:
-                if isinstance(p, dict) and "file" in p:
-                    resolved_file = _resolve_patch_file(p["file"])
-                    patches.append(
-                        FilePatch(
-                            file=resolved_file,
-                            action=str(p.get("action", "replace")),
-                            start_line=_safe_int(p.get("start_line")),
-                            end_line=_safe_int(p.get("end_line")),
-                            replacement=str(p.get("replacement") or ""),
-                            concern=str(p.get("concern", "Code edit")),
-                        )
+                with vis2:
+                    r2_resp: LLMResponse = await self.provider.invoke(
+                        model=self.model,
+                        system_prompt=round2_system,
+                        user_message=round2_user,
+                        images=images,
+                        temperature=0.1,
+                        on_chunk=vis2.on_chunk,
                     )
 
-            if not patches:
-                items = r2_data.get("items", []) if isinstance(r2_data, dict) else (r2_data if isinstance(r2_data, list) else [])
-                for p in items:
+                bm2 = BudgetManager()
+                total_cost += bm2.record(
+                    input_tokens=r2_resp.prompt_tokens,
+                    output_tokens=r2_resp.completion_tokens,
+                    total_tokens=r2_resp.total_tokens,
+                    cached_tokens=r2_resp.cached_tokens,
+                )
+                round2_total_tokens += r2_resp.total_tokens
+
+                r2_data = extract_json_payload(r2_resp.content)
+                edit_summary = r2_data.get("edit_summary", f"Applied {stage.name} modifications.")
+                stage_summaries.append(edit_summary)
+
+                raw_patches = r2_data.get("patches", [])
+                raw_commands = r2_data.get("commands", [])
+
+                def _resolve_patch_file(raw_val: Any) -> str:
+                    if raw_val is None:
+                        return ""
+                    if isinstance(raw_val, int):
+                        if 1 <= raw_val <= len(stage.target_files):
+                            return stage.target_files[raw_val - 1]
+                        elif 1 <= raw_val <= len(valid_files_to_read):
+                            return valid_files_to_read[raw_val - 1]
+                        elif 1 <= raw_val <= len(index.file_indices):
+                            return index.file_indices[raw_val - 1].rel_path
+                    val_str = str(raw_val).strip()
+                    if val_str.isdigit():
+                        num = int(val_str)
+                        if 1 <= num <= len(stage.target_files):
+                            return stage.target_files[num - 1]
+                        elif 1 <= num <= len(valid_files_to_read):
+                            return valid_files_to_read[num - 1]
+                        elif 1 <= num <= len(index.file_indices):
+                            return index.file_indices[num - 1].rel_path
+                    return val_str.lstrip("/\\").replace("\\", "/")
+
+                stage_patches: List[FilePatch] = []
+                for p in raw_patches:
                     if isinstance(p, dict) and "file" in p:
                         resolved_file = _resolve_patch_file(p["file"])
-                        patches.append(
+                        stage_patches.append(
                             FilePatch(
                                 file=resolved_file,
                                 action=str(p.get("action", "replace")),
@@ -424,114 +619,100 @@ Please generate the minimal, atomic JSON patches and any required console/databa
                             )
                         )
 
-            # Parse console commands
-            commands: List[ConsoleCommand] = []
-            if isinstance(raw_commands, list):
-                for cmd_item in raw_commands:
-                    if isinstance(cmd_item, dict) and "command" in cmd_item:
-                        cmd_str = str(cmd_item["command"]).strip()
-                        if cmd_str:
-                            commands.append(
-                                ConsoleCommand(
-                                    command=cmd_str,
-                                    description=str(cmd_item.get("description", "Execute console command")).strip(),
-                                    stage=str(cmd_item.get("stage", "post_patch")).strip(),
-                                    cwd=cmd_item.get("cwd"),
+                if not stage_patches:
+                    items = r2_data.get("items", []) if isinstance(r2_data, dict) else (r2_data if isinstance(r2_data, list) else [])
+                    for p in items:
+                        if isinstance(p, dict) and "file" in p:
+                            resolved_file = _resolve_patch_file(p["file"])
+                            stage_patches.append(
+                                FilePatch(
+                                    file=resolved_file,
+                                    action=str(p.get("action", "replace")),
+                                    start_line=_safe_int(p.get("start_line")),
+                                    end_line=_safe_int(p.get("end_line")),
+                                    replacement=str(p.get("replacement") or ""),
+                                    concern=str(p.get("concern", "Code edit")),
                                 )
                             )
-                    elif isinstance(cmd_item, str) and cmd_item.strip():
-                        commands.append(
-                            ConsoleCommand(
-                                command=cmd_item.strip(),
-                                description="Execute console command",
-                                stage="post_patch",
-                            )
-                        )
 
-            if not patches and not commands:
+                # Parse stage commands
+                stage_commands: List[ConsoleCommand] = []
+                if isinstance(raw_commands, list):
+                    for cmd_item in raw_commands:
+                        if isinstance(cmd_item, dict) and "command" in cmd_item:
+                            cmd_str = str(cmd_item["command"]).strip()
+                            if cmd_str:
+                                stage_commands.append(
+                                    ConsoleCommand(
+                                        command=cmd_str,
+                                        description=str(cmd_item.get("description", "Execute console command")).strip(),
+                                        stage=str(cmd_item.get("stage", "post_patch")).strip(),
+                                        cwd=cmd_item.get("cwd"),
+                                    )
+                                )
+                        elif isinstance(cmd_item, str) and cmd_item.strip():
+                            stage_commands.append(
+                                ConsoleCommand(
+                                    command=cmd_item.strip(),
+                                    description="Execute console command",
+                                    stage="post_patch",
+                                )
+                            )
+
+                # 1. Execute Pre-Patch Commands for this stage
+                pre_cmds = [c for c in stage_commands if c.stage == "pre_patch"]
+                for c in pre_cmds:
+                    cmd_res = await _execute_single_cmd(c)
+                    all_executed_commands.append(cmd_res)
+
+                # 2. Apply Stage File Patches Atomically (tracking all backups for global rollback)
+                if stage_patches:
+                    s_touched, s_created, s_deleted = PatchApplicator.apply(
+                        project_root=root,
+                        patches=stage_patches,
+                        existing_backups=all_backups,
+                    )
+                    for t in s_touched:
+                        if t not in all_touched:
+                            all_touched.append(t)
+                    for cr in s_created:
+                        if cr not in all_created:
+                            all_created.append(cr)
+                    for d in s_deleted:
+                        if d not in all_deleted:
+                            all_deleted.append(d)
+
+                    if self.console:
+                        for p in stage_patches:
+                            line_info = f" (L{p.start_line}-L{p.end_line})" if p.start_line is not None else ""
+                            self.console.print(f"    [bold cyan]●[/bold cyan] {p.file}{line_info}: [dim]{p.concern}[/dim]")
+                        self.console.print(f"  [bold green]✓ Stage {stage.stage_number} applied {len(stage_patches)} atomic patch(es)![/bold green]")
+
+                # 3. Execute Post-Patch Commands for this stage
+                post_cmds = [c for c in stage_commands if c.stage != "pre_patch"]
+                for c in post_cmds:
+                    cmd_res = await _execute_single_cmd(c)
+                    all_executed_commands.append(cmd_res)
+
+                all_patches.extend(stage_patches)
+                all_commands.extend(stage_commands)
+
+            if not all_patches and not all_commands:
                 return PatchResult(
                     success=False,
-                    edit_summary="No valid patches or commands returned by generator.",
+                    edit_summary="No valid patches or commands returned by generator across all stages.",
                     round1_tokens=r1_resp.total_tokens,
-                    round2_tokens=r2_resp.total_tokens,
+                    round2_tokens=round2_total_tokens,
                     total_cost_usd=round(total_cost, 6),
                     error_message="LLM output did not include actionable patches or commands.",
                 )
 
-            # ----------------------------------------------------
-            # Execution Pipeline: Pre-Patch Commands -> File Patches -> Post-Patch Commands
-            # ----------------------------------------------------
-            from aztec_circle.engine.project_runner import ProjectRunner
-            runner = ProjectRunner(console=self.console)
-            executed_commands: List[CommandExecutionResult] = []
-
-            async def _execute_single_cmd(cmd_obj: ConsoleCommand) -> CommandExecutionResult:
-                confirmed = True
-                effective_cmd = cmd_obj.command
-
-                if confirm_command_callback is not None and not auto_approve_commands:
-                    confirmed, edited_cmd = await confirm_command_callback(cmd_obj)
-                    if edited_cmd:
-                        effective_cmd = edited_cmd
-
-                if not confirmed:
-                    if self.console:
-                        self.console.print(f"  [yellow]⚡ Skipped console command:[/yellow] [dim]{cmd_obj.command}[/dim]")
-                    return CommandExecutionResult(
-                        command=cmd_obj.command,
-                        description=cmd_obj.description,
-                        success=True,
-                        confirmed=False,
-                        skipped=True,
-                    )
-
-                cwd_target = cmd_obj.cwd or root
-                res = await runner.run_shell_command_streamed(
-                    cmd_str=effective_cmd,
-                    cwd=cwd_target,
-                    title=f"Command ({cmd_obj.description or 'Console'})",
-                )
-                return CommandExecutionResult(
-                    command=effective_cmd,
-                    description=cmd_obj.description,
-                    success=res.success,
-                    stdout=res.stdout,
-                    stderr=res.stderr,
-                    exit_code=res.exit_code,
-                    duration_seconds=res.duration_seconds,
-                    confirmed=True,
-                    skipped=False,
-                )
-
-            # 1. Execute Pre-Patch Commands
-            pre_cmds = [c for c in commands if c.stage == "pre_patch"]
-            for c in pre_cmds:
-                cmd_res = await _execute_single_cmd(c)
-                executed_commands.append(cmd_res)
-
-            # 2. Apply File Patches Atomically
-            touched, created, deleted = [], [], []
-            if patches:
-                touched, created, deleted = PatchApplicator.apply(root, patches)
-
-            if self.console and patches:
-                for p in patches:
-                    line_info = f" (L{p.start_line}-L{p.end_line})" if p.start_line is not None else ""
-                    self.console.print(f"    [bold cyan]●[/bold cyan] {p.file}{line_info}: [dim]{p.concern}[/dim]")
-                self.console.print(f"  [bold green]✓ Successfully applied {len(patches)} atomic patch(es)![/bold green]")
-
-            # 3. Execute Post-Patch Commands
-            post_cmds = [c for c in commands if c.stage != "pre_patch"]
-            for c in post_cmds:
-                cmd_res = await _execute_single_cmd(c)
-                executed_commands.append(cmd_res)
-
             if self.console and verbose:
-                self.console.print(f"  [dim]Telemetry: Round 1: {r1_resp.total_tokens:,} tok | Round 2: {r2_resp.total_tokens:,} tok | Total Cost: ${total_cost:.4f}[/dim]\n")
+                self.console.print(f"  [dim]Telemetry: Round 1: {r1_resp.total_tokens:,} tok | Round 2 (Total): {round2_total_tokens:,} tok | Total Cost: ${total_cost:.4f}[/dim]\n")
 
             # Update Living Project Plan (AZTEC_PLAN.md)
-            applied_files = [p.file for p in patches]
-            run_cmd_strings = [c.command for c in executed_commands if not c.skipped]
+            applied_files = list(dict.fromkeys([p.file for p in all_patches]))
+            run_cmd_strings = [c.command for c in all_executed_commands if not c.skipped]
             PlanManager.record_edit_iteration(
                 output_dir=root,
                 instruction=instruction,
@@ -539,26 +720,31 @@ Please generate the minimal, atomic JSON patches and any required console/databa
                 executed_commands=run_cmd_strings,
             )
 
+            consolidated_summary = " ".join(stage_summaries) if stage_summaries else "Applied code modifications."
+
             return PatchResult(
                 success=True,
-                edit_summary=edit_summary,
-                patches=patches,
-                files_touched=touched,
-                files_created=created,
-                files_deleted=deleted,
-                commands_proposed=commands,
-                commands_executed=executed_commands,
+                edit_summary=consolidated_summary,
+                patches=all_patches,
+                files_touched=all_touched,
+                files_created=all_created,
+                files_deleted=all_deleted,
+                commands_proposed=all_commands,
+                commands_executed=all_executed_commands,
                 round1_tokens=r1_resp.total_tokens,
-                round2_tokens=r2_resp.total_tokens,
+                round2_tokens=round2_total_tokens,
                 total_cost_usd=round(total_cost, 6),
             )
 
         except Exception as exc:
-            log.error("patch_agent.round2_or_apply_failed", error=str(exc))
+            log.error("patch_agent.staged_execution_failed", error=str(exc))
+            # Global rollback across all stages
+            PatchApplicator.rollback(root, all_backups)
             return PatchResult(
                 success=False,
-                edit_summary="Failed to apply generated patches or commands.",
+                edit_summary="Failed during staged patch generation or application (all changes rolled back).",
                 round1_tokens=r1_resp.total_tokens,
+                round2_tokens=round2_total_tokens,
                 total_cost_usd=round(total_cost, 6),
                 error_message=str(exc),
             )

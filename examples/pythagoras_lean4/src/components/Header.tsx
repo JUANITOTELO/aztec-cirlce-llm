@@ -10,15 +10,25 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ checksum, theorem }) => {
-  const title = theorem === 'pythagoras'
-    ? 'Lean 4 Formal Pythagoras'
-    : 'Lean 4 Formal Binomial Expansion';
-  const subtitle = theorem === 'pythagoras'
-    ? 'Mathlib-Certified Geometric Dissection Proof (a² + b² = c²)'
-    : 'Mathlib-Certified 45° Diagonal Slicing Proof ((a + b)² = a² + 2ab + b²)';
+  const THEOREM_METADATA: Record<TheoremType, { title: string; subtitle: string }> = {
+    pythagoras: {
+      title: 'Lean 4 Formal Pythagoras',
+      subtitle: 'Mathlib-Certified Geometric Dissection Proof (a² + b² = c²)'
+    },
+    binomial: {
+      title: 'Lean 4 Formal Binomial Expansion (Euclid II.4)',
+      subtitle: 'Mathlib-Certified Geometric Dissection Proof ((a + b)² = a² + 2ab + b²)'
+    },
+    gougu: {
+      title: 'Lean 4 Formal Gougu Theorem (Base & Altitude Theorem)',
+      subtitle: 'Zhoubi Suanjing Zhao Shuang Hypotenuse Diagram Dissection Proof'
+    }
+  };
+
+  const { title, subtitle } = THEOREM_METADATA[theorem];
 
   return (
-    <header className="border-b border-slate-800 bg-slate-950/80 backdrop-blur sticky top-0 z-50 px-4 py-3">
+    <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md px-6 py-3.5 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="h-9 w-9 rounded-lg bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400">

@@ -32,7 +32,9 @@ class ProofStore {
 
   public subscribe(listener: Listener): () => void {
     this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
   }
 
   private notify(): void {
@@ -40,24 +42,29 @@ class ProofStore {
   }
 
   public setTheorem(theorem: TheoremType): void {
-    const defaultParams = theorem === 'pythagoras'
-      ? validateGeometry(6, 8, 'pythagoras')
-      : validateGeometry(5, 3, 'binomial');
-    const tactics = LeanKernelSimulator.generateTactics(defaultParams, theorem);
+    const defaultA = theorem === 'binomial' ? 6 : theorem === 'gougu' ? 3 : 6;
+    const defaultB = theorem === 'binomial' ? 4 : theorem === 'gougu' ? 4 : 8;
+    const validated = validateGeometry(defaultA, defaultB, theorem);
+    const mode: DissectionMode = theorem === 'binomial'
+      ? 'diagonal_slice'
+      : theorem === 'gougu'
+      ? 'xian_tu'
+      : 'zhoubi_suanjing';
+
+    const tactics = LeanKernelSimulator.generateTactics(validated, theorem);
     const checksum = computeMerkleRoot(tactics.map(t => t.merkleHash));
 
     this.state = {
       ...this.state,
       activeTheorem: theorem,
-      params: defaultParams,
-      mode: theorem === 'binomial' ? 'diagonal_slice' : 'zhoubi_suanjing',
+      params: validated,
+      mode,
       activeStepIndex: 0,
       isPlaying: false,
       verifiedChecksum: checksum
     };
     this.notify();
   }
-
   public setGeometry(a: number, b: number): void {
     const params = validateGeometry(a, b, this.state.activeTheorem);
     if (params.isValid) {
