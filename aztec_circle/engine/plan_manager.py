@@ -456,7 +456,7 @@ class PlanManager:
                     task = line.replace("- [x]", "").strip()
                     roadmap_table.add_row("[bold green]✓ Done[/bold green]", task)
                 elif line.startswith("- [ ]"):
-                    task = line.replace("- [ ]]", "").strip()
+                    task = line.replace("- [ ]", "").strip()
                     roadmap_table.add_row("[bold yellow]⏳ Pending[/bold yellow]", task)
 
         console.print(roadmap_table)

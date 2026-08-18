@@ -3,8 +3,9 @@
 [![Version: 0.4.0](https://img.shields.io/badge/version-0.4.0-blue.svg)]()
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests: 219/219](https://img.shields.io/badge/tests-219%2F219%20passing-brightgreen.svg)]()
+[![Tests: 248/248](https://img.shields.io/badge/tests-248%2F248%20passing-brightgreen.svg)]()
 [![Code Architecture](https://img.shields.io/badge/architecture-Multi--Generational-blueviolet.svg)]()
+[![Mathematical Engine](https://img.shields.io/badge/codegen-Categorical%20%26%20Topological-blue.svg)]()
 [![Multimodal Vision](https://img.shields.io/badge/vision-Multimodal%20LLM-orange.svg)]()
 [![Hybrid Fullstack](https://img.shields.io/badge/fullstack-PHP%20%7C%20Python%20%7C%20React%20%7C%20Lean4-success.svg)]()
 
@@ -103,7 +104,18 @@ flowchart TD
 
 ## 🚀 Key Capabilities
 
-### 1. 🔗 Holistic Linking Engine & Dependency Graph Mapping
+### 1. 📐 Mathematically Correct Code Generation (Categorical & Topological Engine)
+Aztec models the entire code generation and mutation pipeline as a **formal category**:
+- **Objects & Morphisms**: Source files are modeled as typed objects (`CodegenFile`); import dependencies are directed morphisms (`ImportEdge`).
+- **Topological Sorter (Kahn's Algorithm & BFS)**: Computes a total dependency ordering over the import graph to ensure files are synthesized in strict dependency order (ground-truth types $\rightarrow$ domain engines/stores $\rightarrow$ hooks $\rightarrow$ UI components $\rightarrow$ coordinators $\rightarrow$ tests).
+- **Cycle Freedom (3-Color DFS)**: Detects circular import dependencies before writing to disk and rejects invalid non-DAG proposals.
+- **Categorical Coherence Checker**: Evaluates functorial preservation of ground-truth contracts (`src/types/`). Guarantees that destructured parameters and component props (`{ field }: MyType`) strictly conform to declared interface signatures.
+- **Grammar-Aware AST Validator (`tree-sitter`)**: Validates TypeScript, TSX, and Python syntax trees pre-flight before applying any patches to disk.
+- **Natural Transformation Safety (Semantic Diff)**: Diffs pre/post dependency graphs to guarantee that patches never silently delete active exports or leave newly synthesized modules orphaned.
+
+---
+
+### 2. 🔗 Holistic Linking Engine & Dependency Graph Mapping
 - **Import Graph Discovery**: Cross-ecosystem import parsing for TypeScript/JavaScript (`import`/`require`), Python (`import`/`from`), and PHP (`use`/`require_once`).
 - **Coordinator Auto-Detection**: Discovers top-level coordinators (`App.tsx`, routers, database contexts, navigation bars, mock data seeds).
 - **Mandatory Integration Enforcement**: Injects mandatory patch anchors into consensus prompts and audits drafts to guarantee every newly created component or module is actively wired into parent views.
@@ -111,14 +123,14 @@ flowchart TD
 
 ---
 
-### 2. 🔧 Comprehensive Build & Test Self-Healing (`aztec fix`)
+### 3. 🔧 Comprehensive Build & Test Self-Healing (`aztec fix`)
 - **Multi-Tier Error Recovery**: Diagnoses and automatically repairs syntax errors, TypeScript compile failures (`tsc --noEmit`), Vite transform issues, and broken unit test assertions (`vitest`, `jest`, `pytest`, `phpunit`).
 - **Verified Success Gates**: Never claims false-positive fixes; actively re-executes both build and test suites on each iteration loop until full correctness is verified.
 - **Fingerprint De-duplication**: Tracks recurring error signatures to prevent oscillation cycles during automated repair.
 
 ---
 
-### 3. 🌐 Hybrid Fullstack Scaffolding & Multi-Service Dev Server
+### 4. 🌐 Hybrid Fullstack Scaffolding & Multi-Service Dev Server
 - **Topology Detection**: Automatically recognizes `php_react`, `python_react`, `lean4_react`, `vite_react`, `node`, `php`, `python`, and `lean4`.
 - **Automatic Reverse Proxying**: Injects `/api` $\rightarrow$ `http://127.0.0.1:8000` into `vite.config.ts` for instant fullstack communication.
 - **Dual-Service Lifecycle (`aztec start`)**: Spawns both the Backend API server (`php -S 127.0.0.1:8000` / Python) and Frontend Vite HMR in parallel with unified logging and clean process-group teardown.
@@ -127,7 +139,7 @@ flowchart TD
 
 ---
 
-### 4. 🧪 Unified Multi-Tier Test Runner (`aztec test`)
+### 5. 🧪 Unified Multi-Tier Test Runner (`aztec test`)
 Run your entire stack's test suites with a single command:
 - **PHP Backend**: `php backend/test_backend.php` / `phpunit`.
 - **Frontend UI**: `vitest run` / `npm test` (with auto-provisioned `src/test/setup.ts`).
@@ -136,14 +148,14 @@ Run your entire stack's test suites with a single command:
 
 ---
 
-### 5. 🌊 Native Async SSE Streaming & Connection Resilience
+### 6. 🌊 Native Async SSE Streaming & Connection Resilience
 - **Real-Time Token Streaming**: Streams tokens continuously via Server-Sent Events (SSE) for zero lost tokens and immediate feedback.
 - **Inactivity Watchdog**: Robust 90-second chunk watchdog prevents hanging network connections.
 - **Adaptive Thinking**: Full support for Claude 3.7 / 3.5 Sonnet adaptive thinking budgets.
 
 ---
 
-### 6. 📷 Multimodal Vision & Image Support
+### 7. 📷 Multimodal Vision & Image Support
 Pass design mockups, wireframes, 3D diagrams, or screenshots directly into the debate circle or edit engine:
 
 ```bash
@@ -159,7 +171,7 @@ aztec edit "Match toolbar styling to screenshot" --paste --path ./my_app
 
 ---
 
-### 7. ⚡ Incremental Edit Engine (Precision 2-Round Patching)
+### 8. ⚡ Incremental Edit Engine (Precision 2-Round Patching)
 Update and improve existing projects with token-effective line-range modifications:
 
 ```bash
@@ -172,7 +184,7 @@ aztec edit "Add keyboard shortcuts: R for reset, W for wireframe toggle" --path 
 
 ---
 
-### 8. 🗺️ Living Project Blueprint & Roadmap (`AZTEC_PLAN.md`)
+### 9. 🗺️ Living Project Blueprint & Roadmap (`AZTEC_PLAN.md`)
 Maintains an evolving project blueprint tracking architecture decisions, module dependencies, and completed/upcoming milestones. Synchronize anytime with:
 
 ```bash

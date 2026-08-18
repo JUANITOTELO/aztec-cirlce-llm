@@ -5,7 +5,7 @@ Elder Rank Agent: Security & Governance Auditor and Structural & Performance Aud
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 import structlog
 
 from aztec_circle.agents.base import BaseAgent, extract_json_payload

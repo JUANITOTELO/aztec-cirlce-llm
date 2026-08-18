@@ -20,6 +20,7 @@ from aztec_circle.domain.exceptions import (
 from aztec_circle.domain.models import (
     CirclePhase,
     CircleRunState,
+    ElderVerdict,
     FallbackPolicy,
     VerdictStatus,
     YouthBrainstormOutput,
@@ -179,11 +180,28 @@ class AztecOrchestrator:
                     agent.audit(draft, self.state.goal, images=self.state.images, on_chunk=cb)
                     for agent, cb in zip(self.elder_agents, on_chunk_elder_cbs)
                 ]
-                verdicts = await asyncio.gather(*elder_tasks)
+                elder_results = await asyncio.gather(*elder_tasks, return_exceptions=True)
 
-            for v in verdicts:
-                self.state.elder_verdicts.append(v)
-                self._record_tokens(v.input_tokens, v.output_tokens, v.tokens_used)
+            verdicts = []
+            for res in elder_results:
+                if isinstance(res, Exception):
+                    log.error("orchestrator.elder_agent_error", error=str(res))
+                    await self._emit("elder.error", {"error": str(res)})
+                    continue
+                verdicts.append(res)
+                self.state.elder_verdicts.append(res)
+                self._record_tokens(res.input_tokens, res.output_tokens, res.tokens_used)
+
+            if not verdicts:
+                verdicts = [
+                    ElderVerdict(
+                        agent_id="elder_fallback",
+                        persona="security_governance",
+                        status=VerdictStatus.REJECTED,
+                        weighted_score=0.0,
+                        critical_flaws=["All Elder auditors encountered execution errors."],
+                    )
+                ]
 
             # Phase 5: Arbitration
             await self._transition(CirclePhase.ARBITRATION)

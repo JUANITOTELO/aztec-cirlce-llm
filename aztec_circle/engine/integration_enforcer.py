@@ -30,9 +30,12 @@ def enforce_mandatory_patches(
             addressed.add(rel.lstrip("/\\").replace("\\", "/").lower())
 
     flaws: List[str] = []
+    # Build lowercased lookup for entry_points as well
+    lower_entry_points = {k.lstrip("/\\").replace("\\", "/").lower(): v for k, v in manifest.entry_points.items()}
+
     for target in manifest.mandatory_patch_targets:
         clean_target = target.lstrip("/\\").replace("\\", "/").lower()
-        role = manifest.entry_points.get(target, "coordinator")
+        role = manifest.entry_points.get(target) or lower_entry_points.get(clean_target, "coordinator")
 
         if clean_target not in addressed:
             flaws.append(

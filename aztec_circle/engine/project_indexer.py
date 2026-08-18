@@ -136,6 +136,9 @@ class ProjectIndexer:
                 except Exception:
                     continue
 
+            if len(indices) >= self.max_files:
+                break
+
         # Sort indices: src/ files first, then alphabetically
         indices.sort(key=lambda f: (0 if f.rel_path.startswith("src/") else 1, f.rel_path))
 

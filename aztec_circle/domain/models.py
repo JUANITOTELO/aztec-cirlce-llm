@@ -137,6 +137,8 @@ class ModularDraftOutput(BaseModel):
     commands: List[ConsoleCommand] = Field(default_factory=list)
     mitigations_applied: List[str] = Field(default_factory=list)
     assumptions_made: List[str] = Field(default_factory=list)
+    ir_coherence_score: float = 1.0
+    ir_topo_violations: List[str] = Field(default_factory=list)
     input_tokens: int = 0
     output_tokens: int = 0
     tokens_used: int = 0

@@ -17,6 +17,7 @@ from aztec_circle.adapters.llm_provider import LLMProvider, LLMResponse
 from aztec_circle.agents.base import extract_json_payload
 from aztec_circle.config import settings
 from aztec_circle.domain.models import ConsoleCommand, CommandExecutionResult
+from aztec_circle.engine.ast_validator import ASTValidator
 from aztec_circle.engine.budget_manager import BudgetManager
 from aztec_circle.engine.project_indexer import ProjectIndex, ProjectIndexer
 from aztec_circle.engine.scaffolder import find_project_root
@@ -112,6 +113,8 @@ class PatchApplicator:
         project_root: str,
         patches: List[FilePatch],
         existing_backups: Optional[Dict[str, Optional[str]]] = None,
+        topo_order: Optional[List[str]] = None,
+        ast_validator: Optional[ASTValidator] = None,
     ) -> Tuple[List[str], List[str], List[str]]:
         """
         Apply patches atomically. Returns (files_touched, files_created, files_deleted).
@@ -143,12 +146,29 @@ class PatchApplicator:
             if clean_rel:
                 patches_by_file.setdefault(clean_rel, []).append(p)
 
+        # 3. Sort files by topological order if provided
+        if topo_order:
+            order_map = {f: i for i, f in enumerate(topo_order)}
+            sorted_files = sorted(patches_by_file.keys(), key=lambda f: order_map.get(f, 999))
+        else:
+            sorted_files = list(patches_by_file.keys())
+
         try:
-            for clean_rel, file_patches in patches_by_file.items():
+            for clean_rel in sorted_files:
+                file_patches = patches_by_file[clean_rel]
                 full_path = os.path.join(root, clean_rel)
 
                 for patch in file_patches:
                     action = (str(patch.action) if patch.action else "replace").lower()
+
+                    if ast_validator and patch.replacement and action in ("create", "replace"):
+                        val_res = ast_validator.validate(patch.replacement, clean_rel)
+                        if not val_res.is_valid and val_res.errors:
+                            log.warning(
+                                "patch_applicator.ast_validation_warning",
+                                file=clean_rel,
+                                errors=val_res.errors[:2],
+                            )
 
                     if action == "delete":
                         if os.path.exists(full_path):

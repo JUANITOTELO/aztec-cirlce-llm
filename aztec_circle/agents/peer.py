@@ -5,7 +5,7 @@ Peer Rank Agent: Code Drafter & System Architect.
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 import structlog
 
 from aztec_circle.adapters.mcp_client import MCPClient

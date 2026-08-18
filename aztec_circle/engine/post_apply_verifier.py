@@ -30,11 +30,19 @@ class VerificationResult:
 
 
 ECOSYSTEM_VERIFIERS: Dict[str, str] = {
+    "vite_react": "npx tsc --noEmit 2>&1",
     "vite-react": "npx tsc --noEmit 2>&1",
+    "vite_react_ts": "npx tsc --noEmit 2>&1",
     "vite-react-ts": "npx tsc --noEmit 2>&1",
+    "php_react": "npx tsc --noEmit 2>&1",
+    "python_react": "npx tsc --noEmit 2>&1",
+    "lean4_react": "npx tsc --noEmit 2>&1",
     "next": "npx tsc --noEmit 2>&1",
+    "node": "npx tsc --noEmit 2>&1",
+    "generic_ts": "npx tsc --noEmit 2>&1",
     "generic-ts": "npx tsc --noEmit 2>&1",
     "php": "php -l backend/index.php 2>&1",
+    "python": "python3 -m py_compile server.py 2>&1",
 }
 
 

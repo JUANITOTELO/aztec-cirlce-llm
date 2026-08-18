@@ -36,10 +36,13 @@ from aztec_circle.domain.models import (
     YouthBrainstormOutput,
     YouthRiskItem,
 )
+from aztec_circle.engine.ast_validator import ASTValidator
 from aztec_circle.engine.budget_manager import BudgetManager
 from aztec_circle.engine.build_fixer import BuildFixAgent
+from aztec_circle.engine.codegen_ir import CodegenIR
 from aztec_circle.engine.consensus import ConsensusEngine
 from aztec_circle.engine.integration_enforcer import enforce_mandatory_patches
+from aztec_circle.engine.ir_builder import IRBuilder
 from aztec_circle.engine.linking_engine import (
     DependencyGraph,
     IntegrationManifest,
@@ -52,6 +55,7 @@ from aztec_circle.engine.post_apply_verifier import PostApplyVerifier, Verificat
 from aztec_circle.engine.project_indexer import ProjectIndex, ProjectIndexer
 from aztec_circle.engine.project_runner import ProjectRunner
 from aztec_circle.engine.scaffolder import find_project_root
+from aztec_circle.engine.semantic_diff import SemanticDiffVerifier
 from aztec_circle.prompts import render
 
 log = structlog.get_logger(__name__)
@@ -108,6 +112,9 @@ class ModularConsensusOrchestrator:
             config_overrides=self.aztec_config.get("entry_point_overrides", {})
         )
         self._integration_manifest: Optional[IntegrationManifest] = None
+        self.ast_validator = ASTValidator()
+        self.ir_builder = IRBuilder(ast_validator=self.ast_validator)
+        self.semantic_diff = SemanticDiffVerifier(linking_engine=self.linking_engine)
 
         # Model bindings
         self.youth_chaos_model = settings.get_effective_model("YOUTH_CHAOS")
@@ -148,6 +155,7 @@ class ModularConsensusOrchestrator:
                 + extra_keys
             )
         )
+        self._sampled_targets = sampled_targets
 
         for rel in sampled_targets[:12]:
             fp = os.path.join(self.root, rel)
@@ -306,6 +314,7 @@ Analyze this goal against the existing codebase. Identify radical opportunities,
         elder_rework_instructions: Optional[str] = None
         loop_count = 0
         final_draft: Optional[ModularDraftOutput] = None
+        final_ir: Optional[CodegenIR] = None
         last_verdict: Optional[ElderVerdict] = None
 
         formatted_risks = []
@@ -409,6 +418,26 @@ Analyze this goal against the existing codebase. Identify radical opportunities,
                     elif isinstance(c, str) and c.strip():
                         parsed_commands.append(ConsoleCommand(command=c.strip()))
 
+            # Build formal Typed Intermediate Representation (IR)
+            existing_type_files: Dict[str, str] = {}
+            for rel in getattr(self, "_sampled_targets", []):
+                fp = os.path.join(self.root, rel)
+                if os.path.exists(fp) and os.path.isfile(fp):
+                    try:
+                        with open(fp, "r", encoding="utf-8", errors="replace") as f:
+                            existing_type_files[rel] = f.read()
+                    except Exception:
+                        pass
+
+            ir: CodegenIR = self.ir_builder.build(
+                goal=self.goal,
+                architecture_overview=peer_data.get("architecture_overview", "Modular architecture synthesized."),
+                new_files=new_files_map,
+                patches=[p.model_dump() for p in parsed_patches],
+                commands=[c.model_dump() for c in parsed_commands],
+                existing_files=existing_type_files,
+            )
+
             draft = ModularDraftOutput(
                 agent_id="peer_modular_architect",
                 loop_index=loop_count,
@@ -418,12 +447,16 @@ Analyze this goal against the existing codebase. Identify radical opportunities,
                 commands=parsed_commands,
                 mitigations_applied=peer_data.get("mitigations_applied", []),
                 assumptions_made=peer_data.get("assumptions_made", []),
+                ir_coherence_score=ir.coherence_score,
+                ir_topo_violations=list(ir.contract_violations) + list(ir.cycle_errors),
                 tokens_used=peer_resp.total_tokens,
             )
             final_draft = draft
+            final_ir = ir
 
             if self.console:
                 self.console.print(f"  [green]✓[/green] [bold]Peer Architect[/bold] synthesized [bold]{len(new_files_map)}[/bold] new file(s), [bold]{len(parsed_patches)}[/bold] patch(es), and [bold]{len(parsed_commands)}[/bold] command(s)")
+                self.console.print(f"  [dim]Categorical Coherence: {ir.coherence_score:.2f} | Topological Nodes: {len(ir.topo_order)}[/dim]")
 
             # ----------------------------------------------------
             # PHASE 3: Elder Council Modular Audits (Parallel)
@@ -448,6 +481,10 @@ Analyze this goal against the existing codebase. Identify radical opportunities,
                 "patches_to_apply": [p.model_dump() for p in draft.patches],
                 "commands_to_execute": [c.model_dump() for c in draft.commands],
                 "mitigations_applied": draft.mitigations_applied,
+                "topological_synthesis_order": ir.topo_order,
+                "categorical_coherence_score": round(ir.coherence_score, 2),
+                "ir_contract_warnings": ir.contract_violations[:5],
+                "ir_cycle_errors": ir.cycle_errors,
                 "new_file_content_for_audit": full_excerpts,
             }, indent=2)
 
@@ -525,7 +562,18 @@ Audit this modular design for integration cohesion, security, non-skeleton deliv
                 if not isinstance(flaws, list):
                     flaws = [str(flaws)] if flaws else []
 
-                score_val = float(v_data.get("weighted_score", 8.0))
+                if "weighted_score" in v_data:
+                    try:
+                        score_val = float(v_data["weighted_score"])
+                    except (ValueError, TypeError):
+                        score_val = 0.0
+                elif audit_items:
+                    total_w = sum(it.weight for it in audit_items)
+                    score_val = sum(it.weight * it.score for it in audit_items) / total_w if total_w > 0 else 0.0
+                else:
+                    score_val = 0.0
+                    flaws.append("Elder audit response could not be parsed into valid audit items.")
+
                 status_enum = VerdictStatus.APPROVED if (score_val >= 8.0 and not flaws) else VerdictStatus.REJECTED
 
                 verd = ElderVerdict(
@@ -548,19 +596,33 @@ Audit this modular design for integration cohesion, security, non-skeleton deliv
             # ----------------------------------------------------
             # PHASE 4: Linking Enforcement & Consensus Arbitration
             # ----------------------------------------------------
+            ir_flaws: List[str] = []
+            for cycle_err in ir.cycle_errors:
+                ir_flaws.append(f"CYCLIC DEPENDENCY: {cycle_err}")
+            if ir.coherence_score < 0.60:
+                for cv in ir.contract_violations[:3]:
+                    ir_flaws.append(f"CATEGORICAL CONTRACT VIOLATION: {cv}")
+
             if self._integration_manifest:
                 missing_flaws = enforce_mandatory_patches(
                     manifest=self._integration_manifest,
                     new_files=draft.new_files,
                     patches=draft.patches,
                 )
+                missing_flaws.extend(ir_flaws)
                 if missing_flaws:
-                    log.warning("modular_consensus.mandatory_patches_missing", count=len(missing_flaws))
+                    log.warning("modular_consensus.mandatory_patches_or_ir_flaws", count=len(missing_flaws))
                     for verd in verdicts:
                         verd.critical_flaws.extend(missing_flaws)
                         verd.status = VerdictStatus.REJECTED
                         if verd.weighted_score > 6.5:
                             verd.weighted_score = 6.5
+            elif ir_flaws:
+                for verd in verdicts:
+                    verd.critical_flaws.extend(ir_flaws)
+                    verd.status = VerdictStatus.REJECTED
+                    if verd.weighted_score > 6.5:
+                        verd.weighted_score = 6.5
 
             consolidated = self.consensus_engine.arbitrate(verdicts)
             last_verdict = consolidated
@@ -584,19 +646,18 @@ Audit this modular design for integration cohesion, security, non-skeleton deliv
             return ModularConsensusResult(
                 success=False,
                 goal=self.goal,
-                architecture_overview="Failed to generate modular draft",
-                error_message="No draft generated during consensus debate.",
+                architecture_overview="Drafting loop produced no viable output.",
+                total_tokens_used=total_tokens,
+                total_cost_usd=round(total_cost, 6),
+                verdict=last_verdict,
+                error_message="No final draft available after consensus loops.",
             )
 
         # ----------------------------------------------------
-        # PHASE 5: Application & Verification
+        # PHASE 5: Application of New Files, Patches, and Commands
         # ----------------------------------------------------
-        if self.console:
-            self.console.print()
-            self.console.rule("[bold green]🏁 Applying Consensus-Approved Modular Deliverable[/bold green]", style="green")
-
-        touched_files: List[str] = []
         created_files: List[str] = []
+        touched_files: List[str] = []
         deleted_files: List[str] = []
         executed_commands: List[CommandExecutionResult] = []
 
@@ -645,12 +706,19 @@ Audit this modular design for integration cohesion, security, non-skeleton deliv
             c_res = await _run_command(c)
             executed_commands.append(c_res)
 
-        # 2. Write New Files to Disk (with path validation)
+        # 2. Write New Files to Disk in Topological Order
         VALID_EXTENSIONS = {
             ".ts", ".tsx", ".js", ".jsx", ".css", ".html",
             ".json", ".py", ".php", ".sql", ".md", ".lean",
         }
-        for rel_path, content in final_draft.new_files.items():
+        effective_topo_order = final_ir.topo_order if final_ir else []
+        topo_order_map = {f: i for i, f in enumerate(effective_topo_order)}
+        sorted_new_files = sorted(
+            final_draft.new_files.items(),
+            key=lambda item: topo_order_map.get(item[0].lstrip("/\\").replace("\\", "/"), 999),
+        )
+
+        for rel_path, content in sorted_new_files:
             clean_rel = rel_path.lstrip("/\\").replace("\\", "/")
             # Validate: must look like a file path with slash or recognized extension
             _, ext = os.path.splitext(clean_rel)
@@ -671,7 +739,7 @@ Audit this modular design for integration cohesion, security, non-skeleton deliv
             if self.console:
                 self.console.print(f"    [bold green]★ Created:[/bold green] {clean_rel}")
 
-        # 3. Apply File Patches
+        # 3. Apply File Patches (Topologically Ordered with AST pre-flight)
         patches_to_apply = [
             FilePatch(
                 file=p.file,
@@ -684,7 +752,12 @@ Audit this modular design for integration cohesion, security, non-skeleton deliv
             for p in final_draft.patches
         ]
         if patches_to_apply:
-            t, c, d = PatchApplicator.apply(self.root, patches_to_apply)
+            t, c, d = PatchApplicator.apply(
+                self.root,
+                patches_to_apply,
+                topo_order=effective_topo_order,
+                ast_validator=self.ast_validator,
+            )
             touched_files.extend(t)
             created_files.extend(c)
             deleted_files.extend(d)

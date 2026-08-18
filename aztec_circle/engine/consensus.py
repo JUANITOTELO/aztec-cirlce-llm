@@ -58,7 +58,15 @@ class ConsensusEngine:
         rework_instructions: List[str] = []
 
         for v in verdicts:
-            w = self.weights.get(v.agent_id, self.weights.get(v.persona, 1.0 / len(verdicts)))
+            w = (
+                self.weights.get(v.agent_id)
+                or self.weights.get(v.persona)
+                or self.weights.get(v.agent_id.lower())
+                or self.weights.get(v.persona.lower())
+            )
+            if w is None:
+                log.debug("consensus.unmatched_weight", agent_id=v.agent_id, persona=v.persona)
+                w = 1.0 / len(verdicts)
             weighted_score_sum += w * v.weighted_score
             total_weight += w
 

@@ -21,6 +21,10 @@ dependencies = [
   "httpx>=0.27.0",
   "prompt_toolkit>=3.0.43",
   "pillow>=10.0.0",
+  "jsonschema>=4.20.0",
+  "tree-sitter>=0.21.0",
+  "tree-sitter-python>=0.21.0",
+  "tree-sitter-typescript>=0.21.0",
 ]
 
 [project.optional-dependencies]
