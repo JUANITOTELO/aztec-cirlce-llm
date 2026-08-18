@@ -164,7 +164,7 @@ Update and improve existing projects with token-effective line-range modificatio
 
 ```bash
 # Surgical 2-round line patch + automatic typecheck & compiler repair
-aztec edit "Add keyboard shortcuts: R for reset, W for wireframe toggle" --path ./cellular_automata_app
+aztec edit "Add keyboard shortcuts: R for reset, W for wireframe toggle" --path ./examples/cellular_automata_app
 ```
 
 - **Round 1 (File Selector)**: Analyzes project symbol index (~300 tokens) to identify only the files needing changes.
@@ -190,10 +190,10 @@ aztec plan --sync
 | `aztec edit <instruction>`| Apply targeted line-range patch (`--image`, `--paste` / `-P`) | `aztec edit "Add dark mode toggle" -p ./app -P` |
 | `aztec config` | Manage API keys, model assignments, presets, and ping tests | `aztec config --preset anthropic_cost_optimized` |
 | `aztec plan` | View or synchronize living roadmap (`AZTEC_PLAN.md`) | `aztec plan --sync` |
-| `aztec build <path>` | Scaffold, install deps, and build | `aztec build ./colombian_accounting_system` |
-| `aztec fix <path>` | Run self-healing multi-tier compiler error repair | `aztec fix ./colombian_accounting_system` |
-| `aztec test <path>` | Execute multi-tier project test suite (PHP, Node, Python, Lean) | `aztec test ./colombian_accounting_system` |
-| `aztec start <path>` | Launch background development server & API daemons | `aztec start ./colombian_accounting_system -p 5173` |
+| `aztec build <path>` | Scaffold, install deps, and build | `aztec build ./examples/colombian_accounting_system` |
+| `aztec fix <path>` | Run self-healing multi-tier compiler error repair | `aztec fix ./examples/colombian_accounting_system` |
+| `aztec test <path>` | Execute multi-tier project test suite (PHP, Node, Python, Lean) | `aztec test ./examples/colombian_accounting_system` |
+| `aztec start <path>` | Launch background development server & API daemons | `aztec start ./examples/colombian_accounting_system -p 5173` |
 | `aztec clean` | Free occupied server ports and clean temporary artifacts | `aztec clean --ports` |
 | `aztec update` | Self-update Aztec to latest version | `aztec update` |
 | `aztec list-runs` | View checkpointed SQLite run history | `aztec list-runs` |

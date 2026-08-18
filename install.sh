@@ -56,7 +56,7 @@ echo -e "\n${BOLD}[1/5] Checking prerequisites...${NC}"
 
 # Find Python 3.10+
 PYTHON_BIN=""
-for cmd in python3.12 python3.11 python3.10 python3 python; do
+for cmd in python3.14 python3.13 python3.12 python3.11 python3.10 python3 python; do
     if command -v "$cmd" >/dev/null 2>&1; then
         VER=$("$cmd" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || echo "0.0")
         MAJOR=$(echo "$VER" | cut -d. -f1)
@@ -83,32 +83,54 @@ else
     exit 1
 fi
 
-# Check Node.js / npm (recommended for Vite + React generation)
+# Check Node.js / npm (optional, for generated web apps)
 if command -v npm >/dev/null 2>&1; then
     echo -e "  ${GREEN}✓${NC} Node.js & npm found (npm $(npm --version))"
 else
-    echo -e "  ${YELLOW}! Node.js / npm not found. (Optional, but recommended for generated React apps)${NC}"
+    echo -e "  ${YELLOW}! Node.js / npm not found. (Optional, recommended for generated React apps)${NC}"
 fi
 
 # ------------------------------------------------------------------------------
-# 3. Clone or Update Aztec Source Repository
+# 3. Clone or Update Aztec Source (Optimized with Sparse-Checkout)
 # ------------------------------------------------------------------------------
 echo -e "\n${BOLD}[2/5] Setting up Aztec source in ${AZTEC_HOME}...${NC}"
 mkdir -p "$AZTEC_HOME"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Check if running inside local source repository
+IS_LOCAL=false
+if [ -n "${BASH_SOURCE[0]:-}" ] && [ -f "${BASH_SOURCE[0]}" ]; then
+    CANDIDATE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if [ -f "$CANDIDATE_DIR/pyproject.toml" ] && [ -f "$CANDIDATE_DIR/aztec_circle/__init__.py" ]; then
+        IS_LOCAL=true
+        REPO_DIR="$CANDIDATE_DIR"
+    fi
+fi
 
-# If running directly inside the cloned repo, sync from local directory
-if [ -f "$SCRIPT_DIR/pyproject.toml" ] && [ -d "$SCRIPT_DIR/aztec_circle" ]; then
-    echo -e "  ${CYAN}●${NC} Installing from local repository: ${SCRIPT_DIR}"
-    REPO_DIR="$SCRIPT_DIR"
+if [ "$IS_LOCAL" = false ] && [ -f "$PWD/pyproject.toml" ] && [ -f "$PWD/aztec_circle/__init__.py" ]; then
+    IS_LOCAL=true
+    REPO_DIR="$PWD"
+fi
+
+if [ "$IS_LOCAL" = true ]; then
+    echo -e "  ${CYAN}●${NC} Installing from local repository: ${REPO_DIR}"
 else
     if [ -d "$REPO_DIR/.git" ]; then
         echo -e "  ${CYAN}●${NC} Updating existing repository in ${REPO_DIR}..."
-        (cd "$REPO_DIR" && git pull --rebase origin main || git pull origin main)
+        (cd "$REPO_DIR" && git pull --rebase origin main 2>/dev/null || git pull origin main 2>/dev/null || true)
     else
-        echo -e "  ${CYAN}●${NC} Cloning repository into ${REPO_DIR}..."
-        git clone "$GIT_REPO_URL" "$REPO_DIR"
+        echo -e "  ${CYAN}●${NC} Downloading Aztec core package (shallow sparse clone)..."
+        # Use shallow sparse-checkout to skip downloading examples and heavy test projects
+        if git clone --help 2>&1 | grep -q -- '--sparse'; then
+            git clone --depth 1 --filter=blob:none --sparse "$GIT_REPO_URL" "$REPO_DIR"
+            (
+                cd "$REPO_DIR"
+                git sparse-checkout set aztec_circle
+            )
+            echo -e "  ${GREEN}✓${NC} Core package sparse-cloned (omitted test projects)"
+        else
+            git clone --depth 1 "$GIT_REPO_URL" "$REPO_DIR"
+            echo -e "  ${GREEN}✓${NC} Core package cloned"
+        fi
     fi
 fi
 
@@ -116,16 +138,19 @@ fi
 # 4. Provision Isolated Virtual Environment
 # ------------------------------------------------------------------------------
 echo -e "\n${BOLD}[3/5] Provisioning isolated Python virtualenv...${NC}"
-if [ ! -f "$VENV_DIR/bin/activate" ]; then
+if [ ! -f "$VENV_DIR/bin/python" ]; then
     "$PYTHON_BIN" -m venv "$VENV_DIR"
     echo -e "  ${GREEN}✓${NC} Virtualenv created at ${VENV_DIR}"
 else
     echo -e "  ${GREEN}✓${NC} Existing virtualenv found at ${VENV_DIR}"
 fi
 
-echo -e "  ${CYAN}●${NC} Upgrading pip and installing Aztec dependencies..."
+echo -e "  ${CYAN}●${NC} Upgrading packaging tools (pip, setuptools, wheel)..."
 "$VENV_DIR/bin/pip" install --quiet --upgrade pip setuptools wheel
+
+echo -e "  ${CYAN}●${NC} Installing Aztec dependencies..."
 "$VENV_DIR/bin/pip" install --quiet -e "$REPO_DIR"
+echo -e "  ${GREEN}✓${NC} Dependencies installed successfully"
 
 # ------------------------------------------------------------------------------
 # 5. Create Symlink and Configure Shell PATH
@@ -133,33 +158,42 @@ echo -e "  ${CYAN}●${NC} Upgrading pip and installing Aztec dependencies..."
 echo -e "\n${BOLD}[4/5] Configuring global binary launcher...${NC}"
 mkdir -p "$BIN_DIR"
 ln -sf "$VENV_DIR/bin/aztec" "$BIN_DIR/aztec"
+chmod +x "$BIN_DIR/aztec"
 echo -e "  ${GREEN}✓${NC} Linked ${BIN_DIR}/aztec -> ${VENV_DIR}/bin/aztec"
 
-# Check if BIN_DIR is in PATH
-PATH_CONFIGURED=false
-if [[ ":$PATH:" == *":$BIN_DIR:"* ]]; then
-    PATH_CONFIGURED=true
-else
-    # Auto-append to shell config files
-    for rcfile in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.bash_profile" "$HOME/.profile"; do
-        if [ -f "$rcfile" ]; then
-            if ! grep -q 'export PATH="\$HOME/.local/bin:\$PATH"' "$rcfile" 2>/dev/null; then
-                echo -e '\n# Aztec CLI Path\nexport PATH="$HOME/.local/bin:$PATH"' >> "$rcfile"
-                echo -e "  ${GREEN}✓${NC} Added ~/.local/bin to ${rcfile}"
-                PATH_CONFIGURED=true
-            fi
-        fi
-    done
+# Check if BIN_DIR is in active PATH
+PATH_IN_SESSION=false
+case ":$PATH:" in
+    *":$BIN_DIR:"*) PATH_IN_SESSION=true ;;
+    *) PATH_IN_SESSION=false ;;
+esac
 
-    # Fish shell support
-    FISH_CONF="$HOME/.config/fish/config.fish"
-    if [ -d "$HOME/.config/fish" ]; then
-        mkdir -p "$(dirname "$FISH_CONF")"
-        if ! grep -q 'fish_add_path $HOME/.local/bin' "$FISH_CONF" 2>/dev/null; then
+# Append to shell rc files if missing
+SHELL_CONFIG_UPDATED=false
+for rcfile in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.bash_profile" "$HOME/.profile"; do
+    if [ -f "$rcfile" ]; then
+        if ! grep -q '\.local/bin' "$rcfile" 2>/dev/null; then
+            echo -e '\n# Aztec CLI Path\nexport PATH="$HOME/.local/bin:$PATH"' >> "$rcfile"
+            echo -e "  ${GREEN}✓${NC} Added ~/.local/bin to ${rcfile}"
+            SHELL_CONFIG_UPDATED=true
+        fi
+    fi
+done
+
+# Fish shell configuration
+FISH_CONF="$HOME/.config/fish/config.fish"
+if [ -d "$HOME/.config/fish" ]; then
+    mkdir -p "$(dirname "$FISH_CONF")"
+    if [ -f "$FISH_CONF" ]; then
+        if ! grep -q 'fish_add_path.*\.local/bin' "$FISH_CONF" 2>/dev/null; then
             echo -e '\n# Aztec CLI Path\nfish_add_path $HOME/.local/bin' >> "$FISH_CONF"
             echo -e "  ${GREEN}✓${NC} Added ~/.local/bin to ${FISH_CONF}"
-            PATH_CONFIGURED=true
+            SHELL_CONFIG_UPDATED=true
         fi
+    else
+        echo -e '# Aztec CLI Path\nfish_add_path $HOME/.local/bin' > "$FISH_CONF"
+        echo -e "  ${GREEN}✓${NC} Created ${FISH_CONF} with ~/.local/bin"
+        SHELL_CONFIG_UPDATED=true
     fi
 fi
 
@@ -178,11 +212,13 @@ echo -e "${GREEN}${BOLD}🎉 Aztec is ready to use!${NC}"
 echo -e "${GREEN}${BOLD}========================================================================${NC}\n"
 
 echo -e "To start using Aztec:"
-if [ "$PATH_CONFIGURED" = true ]; then
-    echo -e "  ${BOLD}1.${NC} Run: ${CYAN}export PATH=\"\$HOME/.local/bin:\$PATH\"${NC} (or restart your terminal)"
+if [ "$PATH_IN_SESSION" = false ]; then
+    echo -e "  ${BOLD}1.${NC} Run: ${CYAN}export PATH=\"\$HOME/.local/bin:\$PATH\"${NC} (or reload your terminal)"
+    echo -e "  ${BOLD}2.${NC} Launch interactive TUI:  ${CYAN}aztec${NC}"
+else
+    echo -e "  ${BOLD}1.${NC} Launch interactive TUI:  ${CYAN}aztec${NC}"
 fi
-echo -e "  ${BOLD}2.${NC} Launch interactive TUI:  ${CYAN}aztec${NC}"
-echo -e "  ${BOLD}3.${NC} Run single prompt:       ${CYAN}aztec run \"Build a 3D robot studio\" --auto-build${NC}"
-echo -e "  ${BOLD}4.${NC} Run multimodal vision:   ${CYAN}aztec run \"Match this UI\" --image mockup.png${NC}"
-echo -e "  ${BOLD}5.${NC} Incremental edit:        ${CYAN}aztec edit \"Add dark mode\" --path ./my_app${NC}"
-echo -e "  ${BOLD}6.${NC} Update in future:        ${CYAN}aztec update${NC} (or ${CYAN}/update${NC} inside TUI)\n"
+echo -e "  ${BOLD}•${NC} Run single prompt:       ${CYAN}aztec run \"Build a 3D robot studio\" --auto-build${NC}"
+echo -e "  ${BOLD}•${NC} Run multimodal vision:   ${CYAN}aztec run \"Match this UI\" --image mockup.png${NC}"
+echo -e "  ${BOLD}•${NC} Incremental edit:        ${CYAN}aztec edit \"Add dark mode\" --path ./examples/cellular_automata_app${NC}"
+echo -e "  ${BOLD}•${NC} Update anytime:          ${CYAN}aztec update${NC} (or ${CYAN}/update${NC} inside TUI)\n"

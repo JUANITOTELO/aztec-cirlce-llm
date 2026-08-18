@@ -159,17 +159,28 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-# Node & Frontend Build Artifacts
-node_modules/
-dist/
-.vite/
-package-lock.json
+# Node & Frontend Build Artifacts (Recursive)
+**/node_modules/
+**/dist/
+**/.vite/
+**/package-lock.json
+**/pnpm-lock.yaml
+**/.pnpm-store/
 
-# Lean 4 Lake Build Artifacts
-.lake/
+# Lean 4 Lake Build Artifacts (Recursive)
+**/.lake/
+**/lake-manifest.json
+
+# Local Environment & Secrets
+config.env
+.env
+.env.*
+!.env.example
 
 # Aztec Runtime Logs & DBs
 .aztec_server.log
 aztec_runs.db
 *.db
 .aztec_images/
+examples/assets/
+
