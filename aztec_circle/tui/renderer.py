@@ -31,11 +31,39 @@ PHASE_FORMATS = {
     "YOUTH_BRAINSTORM": ("🧠 Youth Brainstorm (Parallel Chaos & Devil's Advocate)", "yellow"),
     "YOUTH_OVERRIDE_CHECK": ("✅ Youth Safety & Override Gate", "bright_green"),
     "PEER_DRAFTING": ("⚙  Peer Drafter (Architecture & Code Synthesis)", "blue"),
+    "ELDER_AUDIT": ("👁  Elder Council (Security & Structural Audit)", "magenta"),
     "ELDER_COUNCIL": ("👁  Elder Council (Security & Structural Audit)", "magenta"),
+    "ARBITRATION": ("⚖  Consensus & Arbitration", "cyan"),
     "CONSENSUS": ("⚖  Consensus & Arbitration", "cyan"),
     "RESOLVED": ("🏁 Resolved Deliverable", "green"),
+    "EMERGENCY_HALTED": ("🛑 Emergency Halt Triggered", "bold red"),
     "EMERGENCY_HALT": ("🛑 Emergency Halt Triggered", "bold red"),
+    "ESCALATED": ("⚠  Escalated (Loop/Budget Fallback Policy Applied)", "bold yellow"),
+    "MODULAR_BRAINSTORM": ("🧩 Modular Brainstorm", "yellow"),
+    "MODULAR_DRAFTING": ("🧩 Modular Drafting", "blue"),
+    "MODULAR_AUDIT": ("🧩 Modular Audit", "magenta"),
+    "MODULAR_RESOLVED": ("🏁 Modular Deliverable Ready", "green"),
 }
+
+
+def _plasticity_banner_row() -> str:
+    """Summarize learned neuroplastic state for the welcome banner (safe on failure)."""
+    if not settings.PLASTICITY_ENABLED:
+        return "[dim]off (PLASTICITY_ENABLED=false)[/dim]"
+    try:
+        from aztec_circle.plasticity import PlasticityEngine
+        engine = PlasticityEngine()
+        snap = engine.snapshot()
+        threshold = snap["homeostasis"]["approval_threshold"]
+        runs = snap["memory_stats"]["total_runs"]
+        flaws = snap["memory_stats"]["distinct_flaw_categories"]
+        engine.memory.close()
+        return (
+            f"[bold]on[/bold] · approval gate {threshold} · "
+            f"{runs} run(s) learned · {flaws} flaw categories remembered"
+        )
+    except Exception:
+        return "on [dim](state unavailable)[/dim]"
 
 
 def print_welcome_banner(console: Console, state: SessionState) -> None:
@@ -44,13 +72,14 @@ def print_welcome_banner(console: Console, state: SessionState) -> None:
     console.print(AZTEC_BANNER)
 
     grid = Table.grid(padding=(0, 2))
-    grid.add_column(style="bold cyan", width=12)
+    grid.add_column(style="bold cyan", width=16)
     grid.add_column(style="white")
 
     grid.add_row("Version", f"v{aztec_circle.__version__} [dim](type /update to check latest)[/dim]")
     grid.add_row("Youth Rank", f"{settings.YOUTH_MODEL} [dim](2 parallel agents: chaos & devil's advocate)[/dim]")
     grid.add_row("Peer Rank", f"{settings.PEER_MODEL} [dim](architecture & code synthesis)[/dim]")
     grid.add_row("Elder Rank", f"{settings.ELDER_MODEL} [dim](2 council auditors: security & structural)[/dim]")
+    grid.add_row("Neuroplasticity", _plasticity_banner_row())
     grid.add_row("Budget", f"${state.budget_limit_usd:.2f} max per task  |  Fallback: {state.fallback_policy.value}")
 
     console.print(Panel(grid, title=f"[bold]Active Aztec Engine v{aztec_circle.__version__}[/bold]", border_style="blue", expand=False))
@@ -73,14 +102,85 @@ class TranscriptRenderer:
             self.console.rule(f"[{color}][bold]{title}[/bold][/{color}]", style=color)
 
     def render_event(self, event: dict) -> None:
-        """Render an event emitted by the Aztec orchestrator."""
+        """Render an event emitted by the Aztec orchestrator (live + legacy formats)."""
         evt_type = event.get("event", "")
         phase = event.get("phase")
 
         if phase:
             self.render_phase(phase)
 
-        if evt_type == "AGENT_COMPLETED":
+        # ── Live orchestrator events ─────────────────────────────────────
+        if evt_type == "phase.change":
+            # Phase rule already rendered above; show loop/cost context.
+            loop = event.get("loop", 0)
+            cost = event.get("cost_usd", 0.0) or 0.0
+            if loop and loop > 1:
+                self.console.print(f"  [dim]↻ revision loop {loop} · spend ${cost:.4f}[/dim]")
+
+        elif evt_type == "arbitration.result":
+            approved = str(event.get("status", "")).upper() == "APPROVED"
+            score = float(event.get("score", 0.0) or 0.0)
+            flaws = event.get("flaws") or []
+            loop = event.get("loop", 0)
+            verdict = "[bold green]✓ APPROVED[/bold green]" if approved else "[bold yellow]↻ REWORK REQUESTED[/bold yellow]"
+            flaw_note = f" · {len(flaws)} critical flaw(s)" if flaws else ""
+            self.console.print(
+                f"  [bold cyan]⚖[/bold cyan] Loop {loop} consensus: "
+                f"[bold]{score:.2f}/10[/bold]{flaw_note} ➔ {verdict}"
+            )
+
+        elif evt_type == "override.halt":
+            reason = event.get("rationale", "Critical anomaly detected.")
+            self.console.print(f"  [bold red]🛑 OVERRIDE HALT:[/bold red] {reason}")
+
+        elif evt_type in ("youth.error", "elder.error"):
+            label = "Youth" if evt_type == "youth.error" else "Elder"
+            self.console.print(f"  [bold red]✗ {label} agent error:[/bold red] {event.get('error', 'unknown')}")
+
+        elif evt_type == "circle.resolved":
+            cost = float(event.get("total_cost_usd", 0.0) or 0.0)
+            loops = event.get("loop_count", 0)
+            self.console.print(
+                f"  [bold green]🏁 Circle resolved[/bold green] [dim](loops: {loops} · spend: ${cost:.4f})[/dim]"
+            )
+
+        elif evt_type == "circle.escalated":
+            status = event.get("status", "ESCALATED")
+            warning = event.get("warning") or event.get("escalation_message") or ""
+            self.console.print(f"  [bold yellow]⚠ {status}:[/bold yellow] {warning}")
+
+        # ── Neuroplasticity events ───────────────────────────────────────
+        elif evt_type == "plasticity.routing":
+            tier = event.get("tier", "standard")
+            complexity = float(event.get("complexity_score", 0.0) or 0.0)
+            peer_model = event.get("peer", "?")
+            memory_flag = "institutional memory injected" if event.get("memory_injected") else "no prior lessons"
+            self.console.print(
+                f"  [bold gold1]🧠[/bold gold1] Neuroplastic routing: "
+                f"[bold]{tier}[/bold] tier [dim](complexity {complexity:.1f})[/dim] → peer "
+                f"[cyan]{peer_model}[/cyan] · {memory_flag}"
+            )
+
+        elif evt_type == "plasticity.adapted":
+            notes = event.get("notes") or []
+            detail = "; ".join(notes[-2:]) if notes else f"peer → {event.get('peer', '?')}"
+            self.console.print(f"  [bold gold1]🧠[/bold gold1] Adapting under stress: [italic]{detail}[/italic]")
+
+        elif evt_type == "plasticity.complete":
+            homeostasis = event.get("homeostasis") or {}
+            weights = event.get("synaptic_weights") or {}
+            stats = event.get("memory_stats") or {}
+            threshold = homeostasis.get("approval_threshold", "?")
+            w_sec = weights.get("security_governance")
+            w_str = f"{w_sec:.2f}" if isinstance(w_sec, float) else "?"
+            runs = stats.get("total_runs", 0)
+            self.console.print(
+                f"  [dim][gold1]🧠[/gold1] Learning updated: approval gate {threshold} · "
+                f"security weight {w_str} · {runs} run(s) in experience memory[/dim]"
+            )
+
+        # ── Legacy uppercase events (kept for backward compatibility) ────
+        elif evt_type == "AGENT_COMPLETED":
             agent_role = event.get("agent_role", "Agent")
             tokens = event.get("tokens_used", 0)
             cost = event.get("cost_usd", 0.0)

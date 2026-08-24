@@ -4,6 +4,7 @@ Slash command engine and dispatchers for the Aztec interactive TUI.
 
 from __future__ import annotations
 
+import json
 import sys
 from typing import Callable, Coroutine, Dict, Tuple
 from rich.console import Console
@@ -47,6 +48,108 @@ async def cmd_status(args: str, state: SessionState, console: Console) -> None:
         table.add_row("Last Task ID", state.active_task_id)
 
     console.print(table)
+
+    # ── Neuroplasticity section ─────────────────────────────────────────
+    try:
+        from aztec_circle.plasticity import PlasticityEngine
+
+        if not settings.PLASTICITY_ENABLED:
+            console.print("[dim]🧠 Neuroplasticity: disabled (PLASTICITY_ENABLED=false)[/dim]\n")
+            return
+
+        engine = PlasticityEngine()
+        snap = engine.snapshot()
+        h = snap["homeostasis"]
+        w = snap["synaptic_weights"]
+        m = snap["memory_stats"]
+
+        p_table = Table(title="🧠 Neuroplastic State (learned across runs)", header_style="bold gold1", expand=True)
+        p_table.add_column("Property", style="bold cyan")
+        p_table.add_column("Value", style="green")
+
+        gate = h.get("approval_threshold", settings.PLASTICITY_BASE_THRESHOLD)
+        base = settings.PLASTICITY_BASE_THRESHOLD
+        drift = gate - base
+        arrow = "▲" if drift > 0 else "▼" if drift < 0 else "·"
+        p_table.add_row("Approval Gate", f"{gate} [dim]({arrow}{abs(drift):.2f} vs base {base})[/dim]")
+        p_table.add_row(
+            "Flaw Penalty Multiplier",
+            f"×{h.get('flaw_recurrence_multiplier', 1.0)}",
+        )
+        sec_w = w.get("security_governance")
+        str_w = w.get("structural_perf")
+        if isinstance(sec_w, float) and isinstance(str_w, float):
+            p_table.add_row("Elder Synaptic Weights", f"security {sec_w:.2f} / structural {str_w:.2f}")
+        p_table.add_row("Runs Learned", str(m.get("total_runs", 0)))
+        p_table.add_row("Flaw Categories Remembered", str(m.get("distinct_flaw_categories", 0)))
+        p_table.add_row("Avg Final Score (history)", str(m.get("avg_final_score", 0.0)))
+        if snap.get("routing"):
+            r = snap["routing"]
+            p_table.add_row("Last Run Routing", f"{r.get('tier')} tier · peer {r.get('peer')}")
+        console.print(p_table)
+        engine.memory.close()
+        console.print("[dim]Inspect details or reset learning with /plasticity[/dim]\n")
+    except Exception as exc:
+        console.print(f"[dim]🧠 Neuroplastic state unavailable: {exc}[/dim]\n")
+
+
+async def cmd_plasticity(args: str, state: SessionState, console: Console) -> None:
+    """Inspect or reset the neuroplastic learning subsystem: /plasticity [reset|lessons]"""
+    from aztec_circle.plasticity import PlasticityEngine
+
+    arg = args.strip().lower()
+
+    if not settings.PLASTICITY_ENABLED:
+        console.print("[yellow]Neuroplasticity is disabled.[/yellow] Set PLASTICITY_ENABLED=true to activate.")
+        return
+
+    engine = PlasticityEngine()
+
+    if arg == "reset":
+        before = engine.snapshot()["memory_stats"]
+        engine.reset()
+        engine.memory.close()
+        console.print(
+            "[bold green]✓ Metaplastic reset complete.[/bold green] "
+            f"Forget everything learned from {before.get('total_runs', 0)} run(s); "
+            "weights, thresholds, and experience memory restored to baseline."
+        )
+        return
+
+    if arg == "lessons":
+        recurring = engine.memory.top_recurring_flaws(limit=8)
+        if not recurring:
+            console.print("[dim]No flaw lessons recorded yet — the circle learns after each debate.[/dim]")
+            engine.memory.close()
+            return
+        lessons = Table(title="📚 Lessons Learned (recurring flaw categories)", header_style="bold gold1", expand=True)
+        lessons.add_column("Seen", justify="right", style="bold red", width=6)
+        lessons.add_column("Recurring Flaw", style="white")
+        lessons.add_column("Proven Fix / Mitigation", style="green")
+        for item in recurring:
+            occ = int(item.get("occurrences") or 0)
+            detail = str(item.get("detail") or item.get("category") or "")
+            mitigation = str(item.get("mitigation") or "") or "[dim]not yet solved[/dim]"
+            lessons.add_row(f"{occ}×", detail[:160], mitigation[:160])
+        console.print(lessons)
+        engine.memory.close()
+        return
+
+    # Default: full snapshot
+    snap = engine.snapshot()
+    engine.memory.close()
+    grid = Table.grid(padding=(0, 2))
+    grid.add_column(style="bold cyan", width=22)
+    grid.add_column(style="white")
+    grid.add_row("Enabled", str(snap["enabled"]))
+    grid.add_row("Synaptic Weights", ", ".join(f"{k}={v}" for k, v in snap["synaptic_weights"].items()))
+    grid.add_row("Homeostasis", json.dumps(snap["homeostasis"]))
+    grid.add_row("Memory Stats", json.dumps(snap["memory_stats"]))
+    if snap.get("routing"):
+        grid.add_row("Last Routing Plan", json.dumps(snap["routing"]))
+    grid.add_row("State File", snap["state_path"])
+    console.print(Panel(grid, title="[bold gold1]🧠 Neuroplastic Engine[/bold gold1]", border_style="gold1", expand=False))
+    console.print("[dim]/plasticity lessons → view recurring flaw lessons · /plasticity reset → forget all learned state[/dim]")
 
 
 async def cmd_config(args: str, state: SessionState, console: Console) -> None:
@@ -736,6 +839,7 @@ async def cmd_sqlite(args: str, state: SessionState, console: Console) -> None:
 COMMAND_HANDLERS: Dict[str, Callable[[str, SessionState, Console], Coroutine]] = {
     "/help": cmd_help,
     "/status": cmd_status,
+    "/plasticity": cmd_plasticity,
     "/plan": cmd_plan,
     "/roadmap": cmd_roadmap,
     "/consensus": cmd_consensus,

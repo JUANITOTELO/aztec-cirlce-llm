@@ -287,6 +287,7 @@ Inside the interactive `aztec` TUI prompt:
 | `/logs` | View background development server output logs |
 | `/update` | Check for and apply latest Aztec updates |
 | `/status` | View session spend, token usage, and active models |
+| `/plasticity` | View neuroplastic learning state (`/plasticity lessons` for flaw lessons, `/plasticity reset` to forget) |
 | `/runs` | List checkpointed task runs |
 | `/resume <task_id>` | Resume a past task run from checkpoint |
 
