@@ -722,10 +722,13 @@ async def cmd_clear_images(args: str, state: SessionState, console: Console) -> 
 
 
 async def cmd_update(args: str, state: SessionState, console: Console) -> None:
-    """Check for and apply latest Aztec framework updates."""
+    """Check for and apply latest Aztec framework updates: /update [--check] [--force]"""
     from aztec_circle.engine.updater import AztecUpdater
     updater = AztecUpdater(console=console)
-    check_only = "--check" in args or "-c" in args
+    tokens = args.split()
+    check_only = any(t in ("-c", "--check") for t in tokens)
+    force = any(t in ("-f", "--force") for t in tokens)
+
     if check_only:
         res = updater.check_for_updates()
         if res.has_update:
@@ -734,6 +737,22 @@ async def cmd_update(args: str, state: SessionState, console: Console) -> None:
         else:
             console.print(f"[green]✓ {res.message}[/green] [dim](current: v{res.current_version})[/dim]\n")
         return
+
+    # Apply path: pull, re-sync dependencies, verify.
+    try:
+        res = await updater.perform_update(force=force)
+    except Exception as exc:
+        console.print(f"[bold red]✗ Update crashed:[/bold red] {exc}\n")
+        return
+
+    if res.success:
+        if "already up to date" in (res.message or "").lower():
+            console.print(f"[green]✓ {res.message}[/green] [dim](v{res.new_version})[/dim]\n")
+        else:
+            console.print(f"[bold green]✓ {res.message}[/bold green]\n")
+    else:
+        console.print(f"[bold red]✗ Update failed:[/bold red] {res.message}")
+        console.print("[dim]Run /update --check for diagnostics.[/dim]\n")
 
 async def cmd_plan(args: str, state: SessionState, console: Console) -> None:
     """Display, synchronize, inspect, or build a new module into the living project blueprint (AZTEC_PLAN.md)."""

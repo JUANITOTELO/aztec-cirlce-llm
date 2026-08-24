@@ -584,6 +584,42 @@ def list_runs():
     asyncio.run(_list_runs_async())
 
 
+@app.command("runs")
+def runs_alias():
+    """
+    Alias for list-runs: show historical task runs.
+    """
+    asyncio.run(_list_runs_async())
+
+
+@app.command("help")
+def help_command(ctx: typer.Context):
+    """
+    Show the Aztec CLI help overview.
+    """
+    parent = ctx.parent or ctx
+    console.print(parent.get_help())
+
+
+@app.command()
+def stop(
+    ports: bool = typer.Option(True, "--ports", "-p", help="Free standard development server port ranges"),
+):
+    """
+    Stop background development servers started by Aztec (frees dev ports).
+    """
+    from aztec_circle.engine.project_runner import free_ports
+
+    target_ports = list(range(5173, 5186)) + list(range(8000, 8016))
+    freed = free_ports(target_ports) if ports else []
+    if freed:
+        console.print(
+            f"[bold green]✓ Stopped background servers on ports:[/bold green] {', '.join(str(p) for p in freed)}"
+        )
+    else:
+        console.print("[dim]No background development servers running.[/dim]")
+
+
 async def _list_runs_async():
     store = CheckpointStore()
     runs = await store.list_runs()
