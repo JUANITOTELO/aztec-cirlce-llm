@@ -620,6 +620,145 @@ def stop(
         console.print("[dim]No background development servers running.[/dim]")
 
 
+# ── Tool subsystem ───────────────────────────────────────────────────────────
+
+tool_app = typer.Typer(help="Inspect, run, and create safe project tools.")
+app.add_typer(tool_app, name="tool")
+
+
+def _tool_args_from_pairs(pairs: List[str]) -> dict:
+    args: dict = {}
+    for pair in pairs:
+        if "=" not in pair:
+            raise typer.BadParameter(f"expected key=value, got '{pair}'")
+        k, v = pair.split("=", 1)
+        args[k] = v
+    return args
+
+
+@tool_app.command("list")
+def tool_list_cmd(
+    path: str = typer.Option(".", "--path", "-p", help="Project root"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show parameters and templates"),
+):
+    """List available tools (built-in + project + global custom tools)."""
+    from aztec_circle.tools import get_registry
+    from rich.table import Table as RichTable
+
+    reg = get_registry(path)
+    table = RichTable(title=f"Aztec Tools ({path})", header_style="bold cyan", expand=True)
+    table.add_column("Tool", style="bold white")
+    table.add_column("Safety", style="magenta", width=10)
+    table.add_column("Source", style="dim", width=8)
+    if verbose:
+        table.add_column("Params / Template", style="green", overflow="fold")
+    for spec in reg.list():
+        safety_style = {"read_only": "green", "mutating": "yellow", "dangerous": "bold red"}.get(spec.safety.value, "white")
+        row = [spec.name, f"[{safety_style}]{spec.safety.value}[/{safety_style}]", reg.source_of(spec.name)]
+        if verbose:
+            detail = spec.template or ", ".join(spec.params) or "—"
+            row.append(detail)
+        table.add_row(*row)
+    console.print(table)
+    console.print("[dim]Run: aztec tool run <name> key=value …  ·  Create: aztec tool create --help[/dim]\n")
+
+
+@tool_app.command("run")
+def tool_run_cmd(
+    name: str = typer.Argument(..., help="Tool name"),
+    args: Optional[List[str]] = typer.Argument(None, help="Arguments as key=value pairs"),
+    path: str = typer.Option(".", "--path", "-p", help="Project root"),
+    json_args: Optional[str] = typer.Option(None, "--json", help="Arguments as JSON object"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Auto-approve confirmation gates"),
+):
+    """Execute a tool against the project."""
+    import asyncio
+
+    from aztec_circle.tools import ToolContext, get_registry
+
+    raw: dict = {}
+    if json_args:
+        try:
+            parsed = __import__("json").loads(json_args)
+            if not isinstance(parsed, dict):
+                raise ValueError("--json must be an object")
+            raw.update(parsed)
+        except (ValueError, __import__("json").JSONDecodeError) as exc:
+            console.print(f"[bold red]Invalid --json:[/bold red] {exc}")
+            raise typer.Exit(code=1)
+    raw.update(_tool_args_from_pairs(list(args or [])))
+
+    registry = get_registry(path)
+    ctx = ToolContext(project_root=path, auto_approve=yes)
+
+    async def _go():
+        return await registry.execute(name, raw, ctx)
+
+    result = asyncio.run(_go())
+    if result.output:
+        console.print(result.output.rstrip())
+    if not result.ok:
+        console.print(f"[bold red]✗ {name} failed[/bold red]"
+                      + (f": {result.error}" if result.error else "")
+                      + f" [dim](exit={result.exit_code}, {result.duration_ms}ms)[/dim]")
+        raise typer.Exit(code=1)
+    console.print(f"[dim]{name} ok · exit=0 · {result.duration_ms}ms[/dim]")
+
+
+@tool_app.command("create")
+def tool_create_cmd(
+    name: str = typer.Argument(..., help="Tool name (lowercase_snake)"),
+    template: str = typer.Option(..., "--template", "-t", help='Shell command with {placeholders}, e.g. "wc -l {file}"'),
+    description: str = typer.Option("", "--desc", "-d"),
+    safety: str = typer.Option("mutating", "--safety", help="read_only | mutating | dangerous"),
+    scope: str = typer.Option("project", "--scope", help="project (.aztec/tools) or global (~/.aztec/tools.d)"),
+    param: Optional[List[str]] = typer.Option(None, "--param", help="Param spec 'name:type[:regex]' (repeatable)"),
+    timeout: float = typer.Option(60.0, "--timeout", help="Timeout seconds"),
+    path: str = typer.Option(".", "--path", "-p", help="Project root"),
+):
+    """Create a persistent custom shell-template tool."""
+    from aztec_circle.tools import ParamSpec, ParamType, SafetyClass, ToolSpec
+    from aztec_circle.tools.registry import ToolRegistry
+
+    params: dict = {}
+    for p in param or []:
+        parts = p.split(":", 2)
+        pname = parts[0]
+        ptype = ParamType(parts[1]) if len(parts) > 1 and parts[1] in ("str", "int", "float", "bool") else ParamType.STR
+        pattern = parts[2] if len(parts) > 2 else None
+        params[pname] = ParamSpec(name=pname, type=ptype, pattern=pattern)
+
+    spec = ToolSpec(
+        name=name,
+        description=description or f"custom tool {name}",
+        safety=SafetyClass(safety),
+        params=params,
+        template=template,
+        timeout_s=timeout,
+    )
+    registry = ToolRegistry(project_root=path)
+    saved = registry.save_tool(spec, scope=scope)
+    console.print(f"[bold green]✓ Tool '{name}' created:[/bold green] {saved}")
+    console.print(f"[dim]Try it: aztec tool run {name} … --yes[/dim]")
+
+
+@tool_app.command("remove")
+def tool_remove_cmd(
+    name: str = typer.Argument(...),
+    scope: Optional[str] = typer.Option(None, "--scope", help="project | global (default: both)"),
+    path: str = typer.Option(".", "--path", "-p"),
+):
+    """Remove a saved custom tool."""
+    from aztec_circle.tools.registry import ToolRegistry
+
+    removed = ToolRegistry(project_root=path).remove_tool(name, scope=scope)
+    if removed:
+        console.print(f"[bold green]✓ Removed '{name}'.[/bold green]")
+    else:
+        console.print(f"[yellow]'{name}' was not a saved custom tool.[/yellow]")
+        raise typer.Exit(code=1)
+
+
 async def _list_runs_async():
     store = CheckpointStore()
     runs = await store.list_runs()

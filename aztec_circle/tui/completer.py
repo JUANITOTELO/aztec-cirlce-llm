@@ -12,6 +12,7 @@ SLASH_COMMAND_METADATA = {
     "/help": "Show available commands and usage guide",
     "/status": "Display session stats, token spend, and active configuration",
     "/plasticity": "Inspect neuroplastic learning state: /plasticity [lessons|reset]",
+    "/tool": "Inspect/run/create safe project tools: /tool [list|run <name> k=v|create|remove]",
     "/plan": "View, sync, or build a new module into living blueprint: /plan [sync|file|<goal>]",
     "/roadmap": "View project roadmap milestones and completion status",
     "/consensus": "Run multi-generational consensus debate for a new module or feature: /consensus <goal>",

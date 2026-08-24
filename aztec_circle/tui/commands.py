@@ -721,6 +721,104 @@ async def cmd_clear_images(args: str, state: SessionState, console: Console) -> 
     console.print(f"[green]✓ Cleared {count} attached image(s) from session.[/green]\n")
 
 
+async def cmd_tool(args: str, state: SessionState, console: Console) -> None:
+    """Inspect, run, and create safe audited project tools: /tool [list|run|create|remove]"""
+    from rich.table import Table as RichTable
+
+    from aztec_circle.tools import ToolContext, get_registry
+
+    target_root = state.output_dir if state.output_dir and state.output_dir != "./aztec_output" else "."
+    import shlex
+
+    try:
+        parts = shlex.split(args)
+    except ValueError:
+        parts = args.split()
+    sub = parts[0].lower() if parts else "list"
+    registry = get_registry(target_root)
+
+    if sub == "list":
+        table = RichTable(title=f"🔧 Aztec Tools ({target_root})", header_style="bold cyan", expand=True)
+        table.add_column("Tool", style="white")
+        table.add_column("Safety", width=10)
+        table.add_column("Source", style="dim", width=8)
+        table.add_column("Description", style="green", overflow="fold")
+        for spec in registry.list():
+            color = {"read_only": "green", "mutating": "yellow", "dangerous": "bold red"}.get(spec.safety.value, "white")
+            table.add_row(spec.name, f"[{color}]{spec.safety.value}[/{color}]", registry.source_of(spec.name), spec.description[:70])
+        console.print(table)
+        console.print("[dim]/tool run <name> key=value … · /tool create <name> --template 'cmd {arg}'[/dim]\n")
+        return
+
+    if sub == "run":
+        if len(parts) < 2:
+            console.print("[yellow]Usage: /tool run <name> key=value …[/yellow]")
+            return
+        tool_name = parts[1]
+        raw_args: dict = {}
+        for pair in parts[2:]:
+            if "=" in pair:
+                k, v = pair.split("=", 1)
+                raw_args[k] = v
+        ctx = ToolContext(project_root=target_root, auto_approve=False)
+        result = await registry.execute(tool_name, raw_args, ctx)
+        if result.output:
+            console.print(result.output.rstrip())
+        icon = "[bold green]✓[/bold green]" if result.ok else "[bold red]✗[/bold red]"
+        tail = f"{result.error}" if not result.ok and result.error else f"exit={result.exit_code} · {result.duration_ms}ms"
+        console.print(f"{icon} [dim]{tool_name}: {tail}[/dim]")
+        return
+
+    if sub == "create":
+        # /tool create <name> --template 'cmd {arg}' [--safety mutating] [--scope project]
+        def _flag(flag: str) -> Optional[str]:
+            if flag in parts:
+                idx = parts.index(flag)
+                if idx + 1 < len(parts):
+                    return parts[idx + 1]
+            return None
+
+        name = parts[1] if len(parts) > 1 and not parts[1].startswith("-") else None
+        template = _flag("--template") or _flag("-t")
+        safety = _flag("--safety") or "mutating"
+        scope = _flag("--scope") or "project"
+        description = _flag("--desc") or _flag("-d") or f"custom tool {name}"
+
+        if not name or not template:
+            console.print("[yellow]Usage: /tool create <name> --template 'command {placeholder}' [--safety mutating] [--scope project|global][/yellow]")
+            return
+
+        try:
+            from aztec_circle.tools import ToolSpec
+            from aztec_circle.tools.base import params_from_template
+            saved_spec = ToolSpec(
+                name=name,
+                description=description,
+                safety=safety.lower(),
+                template=template,
+                params=params_from_template(template),
+            )
+            path = registry.save_tool(saved_spec, scope=scope)
+            console.print(f"[bold green]✓ Tool '{name}' saved:[/bold green] {path}")
+            console.print(f"[dim]Run it: /tool run {name} …[/dim]")
+        except Exception as exc:
+            console.print(f"[bold red]✗ Could not save tool:[/bold red] {exc}")
+        return
+
+    if sub == "remove":
+        if len(parts) < 2:
+            console.print("[yellow]Usage: /tool remove <name>[/yellow]")
+            return
+        removed = registry.remove_tool(parts[1])
+        if removed:
+            console.print(f"[bold green]✓ Removed '{parts[1]}'.[/bold green]")
+        else:
+            console.print(f"[yellow]'{parts[1]}' was not a saved custom tool.[/yellow]")
+        return
+
+    console.print(f"[yellow]Unknown /tool subcommand '{sub}'. Use list | run | create | remove.[/yellow]")
+
+
 async def cmd_update(args: str, state: SessionState, console: Console) -> None:
     """Check for and apply latest Aztec framework updates: /update [--check] [--force]"""
     from aztec_circle.engine.updater import AztecUpdater
@@ -939,6 +1037,7 @@ COMMAND_HANDLERS: Dict[str, Callable[[str, SessionState, Console], Coroutine]] =
     "/help": cmd_help,
     "/status": cmd_status,
     "/plasticity": cmd_plasticity,
+    "/tool": cmd_tool,
     "/plan": cmd_plan,
     "/roadmap": cmd_roadmap,
     "/consensus": cmd_consensus,

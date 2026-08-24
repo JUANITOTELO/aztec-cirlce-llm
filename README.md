@@ -348,3 +348,46 @@ pytest tests/ -v --asyncio-mode=auto --cov=aztec_circle
 
 ## 📄 License
 MIT © Juanitotelo & Aztec Contributors
+
+---
+
+## 🔧 Tool Subsystem (Self-Extending, Any Project)
+
+Aztec ships a safe, audited tool layer that works standalone in **any** project — inspect it, run commands, make changes, and teach it new tricks.
+
+### Safety model
+| Class | Behavior |
+| :--- | :--- |
+| `read_only` | Runs automatically (fs_read, fs_list, fs_search, git_*, proj_inspect) |
+| `mutating` | Confirmation gate unless auto-approved (fs_write, proj_test, tool_create) |
+| `dangerous` | Always gated (shell_run) |
+
+Every execution is validated against typed param schemas (+optional regex), confined to the project root, capped in output, timeout-guarded, and written to an append-only audit log at `.aztec/tool_audit.jsonl`. Shell-template tools substitute arguments via `shlex.quote`, so argument injection is structurally impossible.
+
+### CLI
+```bash
+cd ./your-project
+
+aztec tool list -v                      # what's available here
+aztec tool run proj_inspect             # identify project type & structure
+aztec tool run fs_search pattern="TODO" # regex across text files
+aztec tool run shell_run command="make" --yes
+aztec tool create count_loc \
+    --template "find . -name '*.py' | xargs wc -l | tail -1" \
+    --desc "count lines of code" --safety read_only --param path:str
+aztec tool run count_loc --yes
+```
+
+### TUI
+```
+/tool list                       # table: name · safety · source · description
+/tool run fs_search pattern=FIXME
+/tool create pr_stats --template 'gh pr list --limit {n}' --scope global
+```
+
+### Self-extension
+Custom tools persist as JSON definitions:
+- `<project>/.aztec/tools/*.json` — project-local (overrides global on clash)
+- `~/.aztec/tools.d/*.json` — available everywhere
+
+The agents can grow their own toolset through the same `tool_create` meta-tool, with every definition reviewed through the safety gates above.
