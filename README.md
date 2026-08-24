@@ -248,24 +248,26 @@ Model access is no longer a hardcoded list. Aztec discovers what is actually ava
 | :--- | :--- | :--- |
 | **OpenRouter** | `GET openrouter.ai/api/v1/models` (public) | Full 300+ model catalog with live pricing & capabilities |
 | **Ollama** | `GET {OLLAMA_BASE_URL}/api/tags` | Every locally installed model, zero cost |
+| **llama.cpp** | `GET {LLAMACPP_BASE_URL}/v1/models` | Docker or native `llama-server`; reads real `--ctx-size` from server args |
 | **LM Studio** | `GET {LMSTUDIO_BASE_URL}/models` (opt-in) | Any OpenAI-compatible local server (vLLM, llama.cpp…) |
 
 - **TTL cache** (`~/.aztec/model_cache.json`, default 6h): TUI startup never blocks on the network; stale entries are served offline and refreshed opportunistically.
 - **Real-time pricing** flows into budget tracking for any discovered model.
-- **`lmstudio/<model>` namespace**: assign a local server model to any rank; requests are routed to your `LMSTUDIO_BASE_URL` automatically.
+- **`llamacpp/<model>` and `lmstudio/<model>` namespaces**: assign a local-server model to any rank; requests are routed to your local endpoint automatically (no API keys needed).
 
 ```bash
 # In the interactive TUI:
 /models refresh              # discover from all sources
 /models search qwen coder    # fuzzy-search everything known
-/models local                # list installed Ollama / LM Studio models
+/models local                # list installed Ollama / llama.cpp / LM Studio models
 /models openrouter free      # filter the live OpenRouter catalog
 
 # Assign anything you find:
-/models peer lmstudio/qwen3-32b
+/models peer llamacpp/gemma4-coding-Q6_K      # your local llama.cpp server
 /models elder openrouter/deepseek/deepseek-r1
 
 # Environment:
+LLAMACPP_BASE_URL=http://localhost:8080      # llama.cpp server (default)
 LMSTUDIO_BASE_URL=http://localhost:1234/v1   # enable local LM Studio (opt-in)
 MODEL_DISCOVERY_TTL_HOURS=6                  # cache lifetime
 ```

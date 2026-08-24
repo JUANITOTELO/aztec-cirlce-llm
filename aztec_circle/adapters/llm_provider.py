@@ -263,14 +263,20 @@ class LLMProvider:
 
         extra_kwargs: Dict[str, Any] = dict(kwargs)
 
-        # Virtual "lmstudio/" namespace → any local OpenAI-compatible server
-        # (LM Studio, vLLM, llama.cpp). Routed as openai/ with an explicit
-        # api_base so no OPENAI_API_KEY or global base URL is disturbed.
+        # Virtual local-server namespaces ("lmstudio/", "llamacpp/") → route to
+        # the corresponding local OpenAI-compatible endpoint via explicit
+        # api_base, without disturbing global OpenAI credentials or base URLs.
+        virtual_api_base: Optional[str] = None
         if target_model.startswith("lmstudio/"):
             from aztec_circle.adapters.model_discovery import lmstudio_base_url
-            base = lmstudio_base_url() or "http://localhost:1234/v1"
+            virtual_api_base = lmstudio_base_url() or "http://localhost:1234/v1"
             target_model = f"openai/{target_model[len('lmstudio/'):]}"
-            extra_kwargs["api_base"] = base
+        elif target_model.startswith("llamacpp/"):
+            from aztec_circle.adapters.model_discovery import llamacpp_api_base
+            virtual_api_base = llamacpp_api_base() or "http://localhost:8080/v1"
+            target_model = f"openai/{target_model[len('llamacpp/'):]}"
+        if virtual_api_base:
+            extra_kwargs["api_base"] = virtual_api_base
             extra_kwargs.pop("thinking", None)
             thinking_budget = None
 

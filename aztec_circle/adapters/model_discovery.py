@@ -340,7 +340,87 @@ async def fetch_lmstudio(force: bool = False) -> List[DiscoveredModel]:
     return await _fetch_with_cache("lmstudio", _live, force=force)
 
 
-SOURCES = ("openrouter", "ollama", "lmstudio")
+# ── llama.cpp server ─────────────────────────────────────────────────────────
+
+def llamacpp_base_url() -> str:
+    """Configured host root, e.g. http://localhost:8080."""
+    return (getattr(settings, "LLAMACPP_BASE_URL", "") or "").strip().rstrip("/")
+
+
+def llamacpp_api_base() -> str:
+    """OpenAI-compatible API root served by llama-server."""
+    root = llamacpp_base_url()
+    if not root:
+        return ""
+    return root if root.endswith("/v1") else f"{root}/v1"
+
+
+def _ctx_from_llamacpp_args(args: Any) -> int:
+    """
+    Extract --ctx-size from a llama-server launch arg list (or preset text).
+    llama.cpp exposes its actual launch args via /v1/models status payloads.
+    """
+    try:
+        items: List[Any] = []
+        if isinstance(args, list):
+            items = args
+        elif isinstance(args, str):
+            items = args.split()
+        for i, item in enumerate(items[:-1]):
+            if str(item) == "--ctx-size":
+                return max(0, int(items[i + 1]) // 1000)
+    except (TypeError, ValueError):
+        pass
+    return 0
+
+
+def _normalize_llamacpp_entry(model_id: str, entry: Dict[str, Any]) -> DiscoveredModel:
+    lowered = model_id.lower()
+    reasoning = any(t in lowered for t in ("r1", "think", "qwq", "reason", "openthinker"))
+    multimodal = any(t in lowered for t in ("llava", "vision", "minicpm-v", "bakllava", "moondream"))
+    coderish = any(t in lowered for t in ("coder", "coding", "-code", "_code"))
+
+    if coderish:
+        ranks = ["PEER", "FALLBACK"]
+    elif reasoning:
+        ranks = ["ELDER", "PEER"]
+    else:
+        ranks = ["YOUTH", "PEER", "FALLBACK"]
+
+    status = entry.get("status") or {}
+    context_k = _ctx_from_llamacpp_args(status.get("args"))
+
+    return DiscoveredModel(
+        id=f"llamacpp/{model_id}",
+        name=f"{model_id} (local)",
+        provider="llamacpp",
+        context_k=context_k,
+        input_cost_per_m=0.0,
+        output_cost_per_m=0.0,
+        multimodal=multimodal,
+        reasoning=reasoning,
+        description="Local llama.cpp server (GPU/CPU GGUF inference)",
+        recommended_ranks=ranks,
+        fetched_at=time.time(),
+    )
+
+
+async def fetch_llamacpp(force: bool = False) -> List[DiscoveredModel]:
+    root = llamacpp_base_url()
+    if not root:
+        return []
+
+    async def _live() -> List[DiscoveredModel]:
+        payload = await _http_get_json(f"{llamacpp_api_base()}/models")
+        entries = [e for e in (payload.get("data") or []) if e.get("id")]
+        models = [_normalize_llamacpp_entry(e["id"], e) for e in entries]
+        log.info("discovery.llamacpp_fetched", count=len(models), base_url=root)
+        return models
+
+    return await _fetch_with_cache("llamacpp", _live, force=force)
+
+
+SOURCES = ("openrouter", "ollama", "lmstudio", "llamacpp")
 
 
 async def refresh_all(force: bool = True) -> Dict[str, str]:
@@ -353,6 +433,7 @@ async def refresh_all(force: bool = True) -> Dict[str, str]:
         "openrouter": fetch_openrouter(force=force),
         "ollama": fetch_ollama(force=force),
         "lmstudio": fetch_lmstudio(force=force),
+        "llamacpp": fetch_llamacpp(force=force),
     }
     outcomes = await asyncio.gather(*results.values(), return_exceptions=True)
     for source, outcome in zip(results.keys(), outcomes):

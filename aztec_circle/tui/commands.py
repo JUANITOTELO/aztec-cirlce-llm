@@ -207,7 +207,7 @@ async def _render_discovered_table(
 
     models = unified_catalog(provider=provider, search=search, include_curated=not local_only)
     if local_only:
-        models = [m for m in models if m.provider in ("ollama", "lmstudio")]
+        models = [m for m in models if m.provider in ("ollama", "lmstudio", "llamacpp")]
 
     if not models:
         console.print("[yellow]No models found.[/yellow] Run [bold]/models refresh[/bold] to discover OpenRouter + local models.")
@@ -267,7 +267,7 @@ async def cmd_models(args: str, state: SessionState, console: Console) -> None:
     # ── Dynamic model discovery subcommands ──────────────────────────────
     if text.lower() == "refresh":
         from aztec_circle.adapters.model_discovery import refresh_all
-        console.print("[bold cyan]🔎 Discovering models…[/bold cyan] [dim](OpenRouter · Ollama · LM Studio)[/dim]")
+        console.print("[bold cyan]🔎 Discovering models…[/bold cyan] [dim](OpenRouter · Ollama · LM Studio · llama.cpp)[/dim]")
         statuses = await refresh_all(force=True)
         for source, status_str in statuses.items():
             icon = "✓" if "unavailable" not in status_str else "○"
@@ -282,7 +282,7 @@ async def cmd_models(args: str, state: SessionState, console: Console) -> None:
         await _render_discovered_table(console, search=query or None)
         return
 
-    if text.lower() in ("local", "ollama", "lmstudio", "offline"):
+    if text.lower() in ("local", "ollama", "lmstudio", "llamacpp", "offline"):
         await _render_discovered_table(console, local_only=True)
         return
 

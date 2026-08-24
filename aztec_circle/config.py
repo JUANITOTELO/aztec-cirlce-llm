@@ -121,6 +121,7 @@ class Settings(BaseSettings):
 
     # Dynamic model discovery (OpenRouter live catalog + local servers)
     LMSTUDIO_BASE_URL: str = ""  # e.g. "http://localhost:1234/v1" (opt-in)
+    LLAMACPP_BASE_URL: str = "http://localhost:8080"  # llama.cpp server (docker or native)
     MODEL_DISCOVERY_TTL_HOURS: float = 6.0
     MODEL_DISCOVERY_TIMEOUT_SECONDS: float = 8.0
 

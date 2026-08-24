@@ -293,3 +293,95 @@ async def test_models_refresh_handles_offline_sources(monkeypatch, tmp_path):
     await cmd_models("refresh", SessionState(), console)
     text = console.export_text().lower()
     assert "discover" in text or "unavailable" in text or "cached" in text
+
+
+# ── llama.cpp source ─────────────────────────────────────────────────────────
+
+def test_llamacpp_ctx_extraction_from_server_args():
+    args = ["--host", "127.0.0.1", "--ctx-size", "32768", "--model", "m.gguf"]
+    assert md._ctx_from_llamacpp_args(args) == 32
+    assert md._ctx_from_llamacpp_args(None) == 0
+    assert md._ctx_from_llamacpp_args(["--no-value-at-end"]) == 0
+
+
+def test_llamacpp_entry_normalization_coder_ranks():
+    entry = {
+        "id": "gemma4-coding-Q6_K",
+        "status": {"args": ["--alias", "x", "--ctx-size", "32768"]},
+    }
+    dm = md._normalize_llamacpp_entry("gemma4-coding-Q6_K", entry)
+    assert dm.id == "llamacpp/gemma4-coding-Q6_K"
+    assert dm.provider == "llamacpp"
+    assert dm.context_k == 32
+    assert dm.output_cost_per_m == 0.0
+    assert dm.recommended_ranks[0] == "PEER"
+
+
+@pytest.mark.asyncio
+async def test_fetch_llamacpp_parses_real_payload_shape(monkeypatch, tmp_path):
+    monkeypatch.setattr(md, "cache_path", lambda: tmp_path / "cache.json")
+
+    payload = {
+        "data": [{
+            "id": "gemma4-coding-Q6_K",
+            "object": "model",
+            "owned_by": "llamacpp",
+            "status": {"value": "loaded", "args": ["--ctx-size", "32768", "--flash-attn", "on"]},
+        }]
+    }
+
+    async def fake_get(url, headers=None):
+        assert url == "http://localhost:8080/v1/models"
+        return payload
+
+    monkeypatch.setattr(md, "_http_get_json", fake_get)
+
+    models = await md.fetch_llamacpp(force=True)
+    assert len(models) == 1
+    assert models[0].id == "llamacpp/gemma4-coding-Q6_K"
+    assert models[0].context_k == 32
+
+
+@pytest.mark.asyncio
+async def test_llamacpp_namespace_routes_to_local_server(monkeypatch):
+    import litellm as _litellm
+    from aztec_circle.adapters.llm_provider import LLMProvider
+
+    monkeypatch.setattr(settings, "LLAMACPP_BASE_URL", "http://localhost:8080")
+
+    captured = {}
+
+    class _Msg:
+        content = "local reply"
+
+    class _Choice:
+        message = _Msg()
+
+    class _Resp:
+        choices = [_Choice()]
+        usage = None
+
+    async def fake_acompletion(**kwargs):
+        captured.update(kwargs)
+        return _Resp()
+
+    monkeypatch.setattr(_litellm, "acompletion", fake_acompletion)
+
+    provider = LLMProvider(
+        primary_model="llamacpp/gemma4-coding-Q6_K", fallback_model=None, streaming=False
+    )
+    resp = await provider.complete(messages=[{"role": "user", "content": "hi"}], stream=False)
+
+    assert captured["model"] == "openai/gemma4-coding-Q6_K"
+    assert captured["api_base"] == "http://localhost:8080/v1"
+    assert resp.content == "local reply"
+
+
+def test_unified_catalog_includes_llamacpp(monkeypatch, tmp_path):
+    monkeypatch.setattr(md, "cache_path", lambda: tmp_path / "cache.json")
+    md.store_models("llamacpp", [
+        md.DiscoveredModel(id="llamacpp/gemma4-coding-Q6_K", name="gemma (local)",
+                           provider="llamacpp", context_k=32, fetched_at=time.time()),
+    ])
+    local = [m for m in md.unified_catalog(include_curated=False) if m.provider == "llamacpp"]
+    assert len(local) == 1
