@@ -119,6 +119,11 @@ class Settings(BaseSettings):
     PLASTICITY_THRESHOLD_CEILING: float = 9.0
     LLM_MODEL_CASCADE: Optional[str] = None  # comma-separated extra failover models
 
+    # Dynamic model discovery (OpenRouter live catalog + local servers)
+    LMSTUDIO_BASE_URL: str = ""  # e.g. "http://localhost:1234/v1" (opt-in)
+    MODEL_DISCOVERY_TTL_HOURS: float = 6.0
+    MODEL_DISCOVERY_TIMEOUT_SECONDS: float = 8.0
+
     # MCP Client
     MCP_SERVER_URI: str = "http://localhost:8765"
     MCP_TOOL_TIMEOUT_SECONDS: float = 15.0

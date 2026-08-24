@@ -240,6 +240,39 @@ LLM_MODEL_CASCADE=model-a,model-b           # extra failover chain after primary
 
 ---
 
+## 🔎 Dynamic Model Discovery (OpenRouter + Local)
+
+Model access is no longer a hardcoded list. Aztec discovers what is actually available:
+
+| Source | Discovery | Notes |
+| :--- | :--- | :--- |
+| **OpenRouter** | `GET openrouter.ai/api/v1/models` (public) | Full 300+ model catalog with live pricing & capabilities |
+| **Ollama** | `GET {OLLAMA_BASE_URL}/api/tags` | Every locally installed model, zero cost |
+| **LM Studio** | `GET {LMSTUDIO_BASE_URL}/models` (opt-in) | Any OpenAI-compatible local server (vLLM, llama.cpp…) |
+
+- **TTL cache** (`~/.aztec/model_cache.json`, default 6h): TUI startup never blocks on the network; stale entries are served offline and refreshed opportunistically.
+- **Real-time pricing** flows into budget tracking for any discovered model.
+- **`lmstudio/<model>` namespace**: assign a local server model to any rank; requests are routed to your `LMSTUDIO_BASE_URL` automatically.
+
+```bash
+# In the interactive TUI:
+/models refresh              # discover from all sources
+/models search qwen coder    # fuzzy-search everything known
+/models local                # list installed Ollama / LM Studio models
+/models openrouter free      # filter the live OpenRouter catalog
+
+# Assign anything you find:
+/models peer lmstudio/qwen3-32b
+/models elder openrouter/deepseek/deepseek-r1
+
+# Environment:
+LMSTUDIO_BASE_URL=http://localhost:1234/v1   # enable local LM Studio (opt-in)
+MODEL_DISCOVERY_TTL_HOURS=6                  # cache lifetime
+```
+
+---
+
+
 ## 💻 CLI Commands Reference
 
 | Command | Description | Example |

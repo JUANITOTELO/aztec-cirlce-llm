@@ -412,11 +412,53 @@ class ModelCatalog:
         return ["gemini", "anthropic", "openai", "deepseek", "groq", "mistral", "ollama"]
 
     @classmethod
+    def discovered_to_info(cls, dm: Any) -> ModelInfo:
+        """Convert a dynamically-discovered model into the shared ModelInfo shape."""
+        from aztec_circle.adapters.model_discovery import DiscoveredModel
+        assert isinstance(dm, DiscoveredModel)
+        req_key = PROVIDER_KEY_MAP.get(dm.provider)
+        return ModelInfo(
+            id=dm.id,
+            name=dm.name,
+            provider=dm.provider,
+            required_key=req_key,
+            context_k=dm.context_k,
+            multimodal=dm.multimodal,
+            reasoning=dm.reasoning,
+            supports_tools=True,
+            description=dm.description or f"{dm.provider} model",
+            recommended_ranks=list(dm.recommended_ranks or ["PEER", "FALLBACK"]),
+        )
+
+    @classmethod
+    def list_discovered_models(
+        cls,
+        provider: Optional[str] = None,
+        search: Optional[str] = None,
+        include_curated: bool = True,
+    ) -> List[ModelInfo]:
+        """
+        Unified catalog view: dynamically discovered models (from cache — never
+        blocks on network) merged over the curated fallback list.
+        """
+        from aztec_circle.adapters.model_discovery import unified_catalog
+        return [cls.discovered_to_info(dm) for dm in unified_catalog(provider=provider, search=search, include_curated=include_curated)]
+
+    @classmethod
     def get_model_pricing(cls, model_id: str) -> Tuple[float, float]:
         """
         Return (input_cost_per_m, output_cost_per_m) for model_id.
-        Defaults to (3.00, 15.00) if not explicitly registered.
+
+        Lookup order: live-discovered cache (real-time OpenRouter pricing,
+        zero-cost local servers) -> curated list -> conservative default.
         """
+        try:
+            from aztec_circle.adapters.model_discovery import lookup_dynamic_pricing
+            dynamic = lookup_dynamic_pricing(model_id)
+            if dynamic is not None:
+                return (float(dynamic[0]), float(dynamic[1]))
+        except Exception:
+            pass
         curated = next((m for m in CURATED_MODELS if m["id"] == model_id), None)
         if curated and "input_cost_per_m" in curated and "output_cost_per_m" in curated:
             return (float(curated["input_cost_per_m"]), float(curated["output_cost_per_m"]))

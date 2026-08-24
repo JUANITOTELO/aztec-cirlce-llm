@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 import sys
-from typing import Callable, Coroutine, Dict, Tuple
+from typing import Callable, Coroutine, Dict, Optional, Tuple
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -195,6 +195,59 @@ async def cmd_keys(args: str, state: SessionState, console: Console) -> None:
     console.print("[dim]Usage to update: /keys <KEY_NAME> <KEY_VALUE>  (e.g., /keys GEMINI_API_KEY AIzaSy...)[/dim]\n")
 
 
+async def _render_discovered_table(
+    console: Console,
+    search: Optional[str] = None,
+    provider: Optional[str] = None,
+    local_only: bool = False,
+    limit: int = 40,
+) -> None:
+    """Render a table of dynamically-discovered models (cache-backed, offline-safe)."""
+    from aztec_circle.adapters.model_discovery import unified_catalog
+
+    models = unified_catalog(provider=provider, search=search, include_curated=not local_only)
+    if local_only:
+        models = [m for m in models if m.provider in ("ollama", "lmstudio")]
+
+    if not models:
+        console.print("[yellow]No models found.[/yellow] Run [bold]/models refresh[/bold] to discover OpenRouter + local models.")
+        return
+
+    title = "🔎 Discovered Models"
+    if search:
+        title += f" — matching '{search}'"
+    table = Table(title=title, header_style="bold cyan", expand=True)
+    table.add_column("Model ID (assignable)", style="white", overflow="fold")
+    table.add_column("Prov.", style="magenta", width=11)
+    table.add_column("Ctx k", justify="right", width=7)
+    table.add_column("$in/M", justify="right", width=8)
+    table.add_column("$out/M", justify="right", width=8)
+    table.add_column("Caps", width=6)
+    table.add_column("Suggested Ranks", style="dim", overflow="fold")
+
+    def _fmt_cost(v: float) -> str:
+        return "[green]free[/green]" if v <= 0 else f"{v:.2f}"
+
+    for m in models[:limit]:
+        caps = "".join([
+            "V" if m.multimodal else "·",
+            "R" if m.reasoning else "·",
+        ])
+        table.add_row(
+            f"{m.id}",
+            m.provider,
+            str(m.context_k) if m.context_k else "—",
+            _fmt_cost(m.input_cost_per_m),
+            _fmt_cost(m.output_cost_per_m),
+            caps,
+            "/".join(m.recommended_ranks),
+        )
+
+    console.print(table)
+    shown = min(len(models), limit)
+    console.print(f"[dim]{shown} of {len(models)} models · Caps: V=vision R=reasoning · assign with /models <ROLE> <MODEL_ID>[/dim]\n")
+
+
 async def cmd_models(args: str, state: SessionState, console: Console) -> None:
     """Display or change model assignments per agent rank/role: /models, /models <ROLE> <MODEL_ID>, /models reset <ROLE>, or /models pick"""
     from aztec_circle.engine.config_manager import ConfigManager
@@ -209,6 +262,33 @@ async def cmd_models(args: str, state: SessionState, console: Console) -> None:
 
     if text.lower() in ("catalog", "all", "list"):
         render_model_catalog_table(console)
+        return
+
+    # ── Dynamic model discovery subcommands ──────────────────────────────
+    if text.lower() == "refresh":
+        from aztec_circle.adapters.model_discovery import refresh_all
+        console.print("[bold cyan]🔎 Discovering models…[/bold cyan] [dim](OpenRouter · Ollama · LM Studio)[/dim]")
+        statuses = await refresh_all(force=True)
+        for source, status_str in statuses.items():
+            icon = "✓" if "unavailable" not in status_str else "○"
+            style = "green" if "unavailable" not in status_str else "dim"
+            console.print(f"  [{style}]{icon} {source}: {status_str}[/{style}]")
+        total = sum(int(s.split()[0]) for s in statuses.values() if "unavailable" not in s)
+        console.print(f"\n[bold green]✓ {total} live models cached.[/bold green] Browse with [bold]/models search <query>[/bold], [bold]/models local[/bold], or [bold]/models openrouter[/bold].\n")
+        return
+
+    if parts and parts[0].lower() == "search":
+        query = " ".join(parts[1:])
+        await _render_discovered_table(console, search=query or None)
+        return
+
+    if text.lower() in ("local", "ollama", "lmstudio", "offline"):
+        await _render_discovered_table(console, local_only=True)
+        return
+
+    if parts and parts[0].lower() == "openrouter":
+        query = " ".join(parts[1:]) or None
+        await _render_discovered_table(console, provider="openrouter", search=query)
         return
 
     if len(parts) >= 2:

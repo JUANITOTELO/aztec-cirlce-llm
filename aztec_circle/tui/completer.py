@@ -20,7 +20,7 @@ SLASH_COMMAND_METADATA = {
     "/debate": "Run Aztec debate consensus for a module: /debate <goal>",
     "/config": "Open interactive configuration center (keys, models, presets)",
     "/keys": "View and securely configure LLM provider API keys",
-    "/models": "View or reassign active models across agent ranks",
+    "/models": "View or reassign active models across agent ranks (/models refresh|search <q>|local|openrouter [q])",
     "/preset": "Apply one-click architecture preset: /preset <name>",
     "/test-models": "Probe active rank models with a live latency ping",
     "/policy": "Set or view fallback policy (HUMAN_IN_THE_LOOP / BEST_EFFORT / ABORT)",

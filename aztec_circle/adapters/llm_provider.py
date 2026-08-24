@@ -262,6 +262,18 @@ class LLMProvider:
         litellm.drop_params = True
 
         extra_kwargs: Dict[str, Any] = dict(kwargs)
+
+        # Virtual "lmstudio/" namespace → any local OpenAI-compatible server
+        # (LM Studio, vLLM, llama.cpp). Routed as openai/ with an explicit
+        # api_base so no OPENAI_API_KEY or global base URL is disturbed.
+        if target_model.startswith("lmstudio/"):
+            from aztec_circle.adapters.model_discovery import lmstudio_base_url
+            base = lmstudio_base_url() or "http://localhost:1234/v1"
+            target_model = f"openai/{target_model[len('lmstudio/'):]}"
+            extra_kwargs["api_base"] = base
+            extra_kwargs.pop("thinking", None)
+            thinking_budget = None
+
         if thinking_budget and thinking_budget > 0:
             m_lower = target_model.lower()
             if "-5" in m_lower or "claude-fable" in m_lower or "claude-haiku-4-5" in m_lower:
