@@ -37,6 +37,23 @@ class ConsensusEngine:
         self.weights = weights or DEFAULT_ELDER_WEIGHTS
         self.flaw_penalty = flaw_penalty
 
+    def update_params(
+        self,
+        approval_threshold: Optional[float] = None,
+        weights: Optional[Dict[str, float]] = None,
+        flaw_penalty_pct: Optional[float] = None,
+    ) -> None:
+        """
+        Live-tune consensus parameters (used by the neuroplasticity layer so
+        thresholds and auditor weights adapt across runs without rebuilding).
+        """
+        if approval_threshold is not None:
+            self.approval_threshold = float(approval_threshold)
+        if weights:
+            self.weights.update(weights)
+        if flaw_penalty_pct is not None:
+            self.flaw_penalty_pct = float(flaw_penalty_pct)
+
     def arbitrate(self, verdicts: List[ElderVerdict]) -> ElderVerdict:
         """
         Compute weighted consensus of Elder verdicts and evaluate approval vs rework.

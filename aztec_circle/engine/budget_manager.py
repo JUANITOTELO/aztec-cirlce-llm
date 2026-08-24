@@ -88,3 +88,13 @@ class BudgetManager:
             raise BudgetExceeded(
                 f"Budget limit of ${self.limit_usd:.4f} exceeded! Current spend: ${self.total_cost_usd:.4f}"
             )
+
+    def pressure(self) -> float:
+        """
+        Budget pressure ∈ [0, 1]: fraction of the limit already consumed.
+        Used by the plasticity router for graceful degradation *before* the
+        hard circuit breaker trips.
+        """
+        if self.limit_usd <= 0:
+            return 1.0
+        return min(1.0, self.total_cost_usd / self.limit_usd)

@@ -47,9 +47,11 @@ class PeerAgent(BaseAgent):
         loop_index: int = 0,
         images: Optional[List[str]] = None,
         on_chunk: Optional[Callable[[str], None]] = None,
+        institutional_memory: Optional[str] = None,
     ) -> PeerDraftOutput:
         """
-        Execute drafting of architecture and code, addressing Youth risks, Elder critiques, and visual reference images.
+        Execute drafting of architecture and code, addressing Youth risks, Elder critiques, visual reference images,
+        and optional institutional memory distilled from previous runs.
         """
         is_revision = loop_index > 0 and bool(elder_instructions)
         template_name = "peer_drafter_loop" if is_revision else "peer_drafter"
@@ -72,6 +74,9 @@ class PeerAgent(BaseAgent):
             user_content_parts.append(
                 f"ELDER AUDIT REJECTION & REWORKING INSTRUCTIONS:\n{elder_instructions}\n"
             )
+
+        if institutional_memory:
+            user_content_parts.append(f"{institutional_memory}\n")
 
         user_content_parts.append(
             "Synthesize architecture and write complete production implementation code addressing all requirements, risks, and visual reference images."

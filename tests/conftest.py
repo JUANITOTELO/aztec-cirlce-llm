@@ -72,6 +72,22 @@ def temp_db_path():
         os.remove(path)
 
 
+@pytest.fixture(autouse=True)
+def isolate_plasticity_paths(tmp_path, monkeypatch):
+    """
+    Point the neuroplasticity subsystem's persistent state at a per-test
+    temp directory so tests never read or write real ~/.aztec state.
+    """
+    from aztec_circle.config import settings
+
+    monkeypatch.setattr(
+        settings, "PLASTICITY_STATE_PATH", str(tmp_path / "plasticity_state.json")
+    )
+    monkeypatch.setattr(
+        settings, "PLASTICITY_DB_PATH", str(tmp_path / "experience.db")
+    )
+
+
 @pytest.fixture
 def mock_provider():
     return MockLLMProvider()

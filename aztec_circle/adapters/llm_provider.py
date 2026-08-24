@@ -5,7 +5,7 @@ LLM provider resilience layer using LiteLLM, exponential backoff, and failover.
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 import litellm
 import litellm.types.utils as _litellm_utils
 from pydantic import BaseModel as _BaseModel
@@ -317,43 +317,48 @@ class LLMProvider:
         **kwargs: Any,
     ) -> LLMResponse:
         """
-        Execute completion with automatic streaming, retries, and fallback failover.
+        Execute completion with automatic streaming, retries, and cascade failover.
+
+        Candidate order: primary → fallback → LLM_MODEL_CASCADE extras. The
+        first candidate that answers wins; thinking budgets are only sent to
+        the explicitly requested model (mirrors prior failover semantics).
         """
         target = model or self.primary_model
         use_stream = self.streaming if stream is None else stream
 
-        try:
-            resp = await self._call_litellm(
-                target_model=target,
-                messages=messages,
-                temperature=temperature,
-                thinking_budget=thinking_budget,
-                stream=use_stream,
-                on_chunk=on_chunk,
-                **kwargs,
-            )
-            return self._parse_response(resp, target)
-        except Exception as exc:
-            log.warning("llm.primary_attempt_failed", model=target, error=str(exc))
-            if self.fallback_model and target != self.fallback_model:
-                log.info("llm.attempting_failover", fallback_model=self.fallback_model)
-                try:
-                    fallback_resp = await self._call_litellm(
-                        target_model=self.fallback_model,
-                        messages=messages,
-                        temperature=temperature,
-                        thinking_budget=None,
-                        stream=use_stream,
-                        on_chunk=on_chunk,
-                        **kwargs,
-                    )
-                    return self._parse_response(fallback_resp, self.fallback_model)
-                except Exception as fallback_exc:
-                    log.error("llm.fallback_failed", error=str(fallback_exc))
-                    raise LLMProviderFailure(
-                        f"Both primary '{target}' and fallback '{self.fallback_model}' failed: {fallback_exc}"
-                    ) from fallback_exc
-            raise LLMProviderFailure(f"LLM request to '{target}' failed: {exc}") from exc
+        candidates: List[str] = [target]
+        if self.fallback_model and self.fallback_model not in candidates:
+            candidates.append(self.fallback_model)
+        cascade_raw = getattr(settings, "LLM_MODEL_CASCADE", None)
+        if cascade_raw:
+            from aztec_circle.config import normalize_model_name
+            for entry in str(cascade_raw).split(","):
+                entry = normalize_model_name(entry.strip())
+                if entry and entry not in candidates:
+                    candidates.append(entry)
+
+        last_exc: Optional[Exception] = None
+        for index, candidate in enumerate(candidates):
+            try:
+                resp = await self._call_litellm(
+                    target_model=candidate,
+                    messages=messages,
+                    temperature=temperature,
+                    thinking_budget=thinking_budget if candidate == target else None,
+                    stream=use_stream,
+                    on_chunk=on_chunk,
+                    **kwargs,
+                )
+                if index > 0:
+                    log.info("llm.cascade_failover_succeeded", model=candidate, attempt=index)
+                return self._parse_response(resp, candidate)
+            except Exception as exc:
+                last_exc = exc
+                log.warning("llm.cascade_candidate_failed", model=candidate, error=str(exc))
+
+        raise LLMProviderFailure(
+            f"All {len(candidates)} LLM candidates failed for '{target}': {last_exc}"
+        ) from last_exc
 
     async def invoke(
         self,

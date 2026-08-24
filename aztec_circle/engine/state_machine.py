@@ -28,6 +28,7 @@ from aztec_circle.domain.models import (
 from aztec_circle.engine.budget_manager import BudgetManager
 from aztec_circle.engine.checkpoint import CheckpointStore
 from aztec_circle.engine.consensus import ConsensusEngine
+from aztec_circle.plasticity.engine import PlasticityEngine
 
 log = structlog.get_logger(__name__)
 
@@ -44,6 +45,7 @@ class AztecOrchestrator:
         peer_agent: Optional[PeerAgent] = None,
         elder_agents: Optional[List[ElderAgent]] = None,
         console: Optional[Any] = None,
+        plasticity: Optional[PlasticityEngine] = None,
     ):
         self.state = state
         self.events = event_queue or asyncio.Queue()
@@ -61,6 +63,85 @@ class AztecOrchestrator:
             ElderAgent(persona="security_governance", model=settings.get_effective_model("ELDER_SECURITY")),
             ElderAgent(persona="structural_perf", model=settings.get_effective_model("ELDER_STRUCTURAL")),
         ]
+        # Agents explicitly injected by callers (tests / TUI) keep their fixed
+        # models; only orchestrator-owned agents are dynamically routed.
+        self._agents_injected = bool(youth_agents or peer_agent or elder_agents)
+
+        # ── Neuroplasticity layer ────────────────────────────────────────────
+        if plasticity is not None:
+            self.plasticity = plasticity
+        elif settings.PLASTICITY_ENABLED:
+            try:
+                self.plasticity = PlasticityEngine()
+            except Exception as exc:
+                log.warning("orchestrator.plasticity_init_failed", error=str(exc))
+                self.plasticity = None
+        else:
+            self.plasticity = None
+
+        if self.plasticity is not None and self.plasticity.enabled:
+            try:
+                params = self.plasticity.consensus_params()
+                self.consensus.update_params(
+                    approval_threshold=params.get("approval_threshold"),
+                    weights=self.plasticity.elder_weights(),
+                    flaw_penalty_pct=params.get("flaw_penalty_pct"),
+                )
+            except Exception as exc:
+                log.warning("orchestrator.plasticity_consensus_seed_failed", error=str(exc))
+
+    # ── Neuroplasticity helpers ──────────────────────────────────────────────
+    def _apply_routing(self, plan: Any) -> None:
+        """Apply a RoutingPlan to orchestrator-owned agents (never injected ones)."""
+        if plan is None or getattr(self, "_agents_injected", False):
+            return
+        try:
+            for agent in self.youth_agents:
+                agent.model = plan.youth_chaos if "chaos" in agent.persona else plan.youth_advocate
+                agent.provider.primary_model = agent.model
+            self.peer_agent.model = plan.peer
+            self.peer_agent.provider.primary_model = plan.peer
+            for agent in self.elder_agents:
+                agent.model = plan.elder_security if "security" in agent.persona else plan.elder_structural
+                agent.provider.primary_model = agent.model
+        except Exception as exc:
+            log.warning("orchestrator.routing_apply_failed", error=str(exc))
+
+    def _apply_peer_model(self, plan: Any) -> None:
+        """Re-route just the peer drafter (stress escalation)."""
+        if plan is None or getattr(self, "_agents_injected", False):
+            return
+        try:
+            self.peer_agent.model = plan.peer
+            self.peer_agent.provider.primary_model = plan.peer
+        except Exception as exc:
+            log.warning("orchestrator.peer_reroute_failed", error=str(exc))
+
+    async def _plasticity_complete(
+        self,
+        status: str,
+        score: float,
+        verdicts: List[Any],
+        consolidated: Optional[Any],
+    ) -> None:
+        """Close the plasticity loop for this run. Failures must never break the circle."""
+        if not self.plasticity or not self.plasticity.enabled:
+            return
+        try:
+            snapshot = self.plasticity.on_run_complete(
+                task_id=self.state.task_id,
+                goal=self.state.goal,
+                status=status,
+                loops_used=max(1, self.state.loop_count + 1),
+                final_score=float(score or 0.0),
+                cost_usd=float(self.state.total_cost_usd),
+                total_tokens=int(self.state.total_tokens_used),
+                verdicts=[v for v in verdicts if v is not None],
+                consolidated=consolidated,
+            )
+            await self._emit("plasticity.complete", snapshot)
+        except Exception as exc:
+            log.warning("orchestrator.plasticity_complete_failed", error=str(exc))
 
     async def run(self) -> Dict[str, Any]:
         """
@@ -69,6 +150,23 @@ class AztecOrchestrator:
         from aztec_circle.tui.streaming_ui import ParallelStreamVisualizer, SingleStreamVisualizer
 
         log.info("orchestrator.run_started", task_id=self.state.task_id, goal=self.state.goal[:80])
+
+        # ── PHASE 0: Neuroplastic Routing (complexity → model tiers) ──────────
+        routing_plan = None
+        institutional_memory: Optional[str] = None
+        if self.plasticity is not None and self.plasticity.enabled:
+            try:
+                routing_plan = self.plasticity.on_run_start(
+                    self.state.goal, image_count=len(self.state.images)
+                )
+                self._apply_routing(routing_plan)
+                institutional_memory = self.plasticity.institutional_memory()
+                await self._emit("plasticity.routing", {
+                    **routing_plan.snapshot(),
+                    "memory_injected": bool(institutional_memory),
+                })
+            except Exception as exc:
+                log.warning("orchestrator.plasticity_start_failed", error=str(exc))
 
         # ── PHASE 1: Youth Brainstorming (Parallel Execution) ────────────────
         if not self.state.youth_outputs:
@@ -153,6 +251,7 @@ class AztecOrchestrator:
                     loop_index=self.state.loop_count,
                     images=self.state.images,
                     on_chunk=peer_vis.on_chunk,
+                    institutional_memory=institutional_memory if self.state.loop_count == 0 else None,
                 )
 
             self.state.peer_history.append(draft)
@@ -232,12 +331,41 @@ class AztecOrchestrator:
                 }
                 await self.checkpoint.save(self.state)
                 await self._emit("circle.resolved", self.state.final_output)
+                await self._plasticity_complete(
+                    status="APPROVED",
+                    score=consolidated_verdict.weighted_score,
+                    verdicts=self.state.elder_verdicts,  # full debate history
+                    consolidated=consolidated_verdict,
+                )
                 return self.state.final_output
 
             # If rejected, check loop budget
             if self.state.loop_count >= self.state.max_loops:
                 log.warning("orchestrator.loops_exhausted", max_loops=self.state.max_loops)
                 return await self._handle_fallback(best_draft, last_verdict)
+
+            # Neuroplastic stress response: escalate the peer model tier and
+            # degrade gracefully under rising budget pressure.
+            if self.plasticity is not None and self.plasticity.enabled:
+                try:
+                    routing_plan = self.plasticity.on_loop_rejected(
+                        self.state.loop_count, consolidated_verdict
+                    )
+                    if routing_plan is not None:
+                        pressure = self.budget.pressure()
+                        if pressure >= 0.70:
+                            routing_plan = self.plasticity.router.degrade_for_budget(
+                                routing_plan, pressure
+                            )
+                            self._apply_routing(routing_plan)
+                        else:
+                            self._apply_peer_model(routing_plan)
+                        await self._emit("plasticity.adapted", {
+                            "loop": self.state.loop_count,
+                            **routing_plan.snapshot(),
+                        })
+                except Exception as exc:
+                    log.warning("orchestrator.plasticity_adapt_failed", error=str(exc))
 
             # Re-arm for next loop iteration
             elder_instructions = consolidated_verdict.reworking_instructions
@@ -256,6 +384,15 @@ class AztecOrchestrator:
         """
         await self._transition(CirclePhase.ESCALATED)
         policy = self.state.fallback_policy
+
+        # Record escalation outcome for neuroplastic adaptation (thresholds
+        # tighten after unresolved runs). ABORT still records before raising.
+        await self._plasticity_complete(
+            status=f"ESCALATED_{policy.value}",
+            score=last_verdict.weighted_score if last_verdict else 0.0,
+            verdicts=self.state.elder_verdicts[-4:],
+            consolidated=last_verdict,
+        )
 
         if policy == FallbackPolicy.BEST_EFFORT_RELEASE:
             warning = (

@@ -109,6 +109,16 @@ class Settings(BaseSettings):
     LLM_STREAMING: bool = True
     LLM_CHUNK_TIMEOUT_SECONDS: float = 90.0
 
+    # Neuroplasticity subsystem (adaptive weights / thresholds / routing / memory)
+    PLASTICITY_ENABLED: bool = True
+    PLASTICITY_STATE_PATH: str = "~/.aztec/plasticity_state.json"
+    PLASTICITY_DB_PATH: str = "~/.aztec/experience.db"
+    PEER_ESCALATION_MODEL: Optional[str] = None  # defaults to ELDER_MODEL at runtime
+    PLASTICITY_BASE_THRESHOLD: float = 8.0
+    PLASTICITY_THRESHOLD_FLOOR: float = 7.0
+    PLASTICITY_THRESHOLD_CEILING: float = 9.0
+    LLM_MODEL_CASCADE: Optional[str] = None  # comma-separated extra failover models
+
     # MCP Client
     MCP_SERVER_URI: str = "http://localhost:8765"
     MCP_TOOL_TIMEOUT_SECONDS: float = 15.0

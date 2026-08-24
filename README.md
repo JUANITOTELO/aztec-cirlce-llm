@@ -193,6 +193,53 @@ aztec plan --sync
 
 ---
 
+## 🧠 Neuroplasticity Layer (Adaptive Self-Tuning)
+
+Aztec's debate circle is no longer a fixed-topology pipeline: it **rewires itself across runs** like a brain strengthening and pruning synapses. The `aztec_circle.plasticity` package adds four cooperating mechanisms, all bounded so the system can never drift into permissiveness or paralysis:
+
+### 1. Synaptic Weight Adaptation (`plasticity/synaptic.py`)
+Elder Council auditor weights are learned, not hardcoded. After every run, each auditor receives a reliability signal (did its verdicts track the final consolidated outcome?), applied via a soft-Hebbian update with:
+- **Bounded projection** — weights always sum to 1.0 within `[0.15, 0.80]`.
+- **Elastic decay** toward baseline (metaplasticity), preventing irreversible lock-in.
+
+### 2. Homeostatic Thresholds (`plasticity/homeostasis.py`)
+The consensus approval threshold self-tunes to the installation's quality/efficiency equilibrium:
+- First-loop approvals → threshold relaxes slightly (saves loops & tokens).
+- Loop exhaustion / escalation → threshold tightens (demands more from drafting).
+- Flaws that keep recurring raise the flaw-penalty multiplier.
+- Everything clamped to `[PLASTICITY_THRESHOLD_FLOOR, PLASTICITY_THRESHOLD_CEILING]`.
+
+### 3. Dynamic Model Routing (`plasticity/router.py`)
+Each run gets a complexity score (regex-based domain signals + multimodal load) that routes ranks across model tiers:
+- **light** tier for trivial goals (cheap/fast models),
+- **standard** for moderate work,
+- **strong** tier for complex domains (realtime, auth, distributed, parsers…).
+- **Stress-triggered escalation**: repeated rework escalates the Peer drafter mid-run.
+- **Budget-pressure degradation**: as spend approaches the limit, elders drop tiers first and the peer reverts last — graceful decay instead of a hard `BudgetExceeded` crash.
+
+### 4. Experience Memory (`plasticity/memory.py`)
+A persistent SQLite record of runs, flaw categories (paraphrase-stable hashing), and proven fixes. Distilled into an **institutional memory** block injected into Peer drafting prompts, so the drafter starts every task from everything the circle has already learned. Adaptive state survives restarts (`~/.aztec/plasticity_state.json`).
+
+### Configuration
+
+```bash
+PLASTICITY_ENABLED=true                     # master switch (default: on)
+PLASTICITY_STATE_PATH=~/.aztec/plasticity_state.json
+PLASTICITY_DB_PATH=~/.aztec/experience.db
+PEER_ESCALATION_MODEL=                      # stress-escalation target (default: ELDER_MODEL)
+PLASTICITY_BASE_THRESHOLD=8.0               # homeostasis anchor
+PLASTICITY_THRESHOLD_FLOOR=7.0
+PLASTICITY_THRESHOLD_CEILING=9.0
+LLM_MODEL_CASCADE=model-a,model-b           # extra failover chain after primary+fallback
+```
+
+### Robustness upgrades
+- **Model cascade failover**: `primary → fallback → cascade extras` before `LLMProviderFailure`.
+- **Budget pressure API** (`BudgetManager.pressure()`): drives the degradation ladder.
+- **Zero-risk integration**: plasticity failures are fully contained — the core circle degrades to vanilla behavior, never breaks a run.
+
+---
+
 ## 💻 CLI Commands Reference
 
 | Command | Description | Example |
