@@ -365,6 +365,7 @@ class PatchAgent:
     ):
         self.provider = provider or LLMProvider()
         self.console = console
+        self._tool_registry = None  # lazily created ToolRegistry for command audit
         self.model = model or settings.get_effective_model("PATCH")
         self.indexer = indexer or ProjectIndexer()
 
@@ -533,6 +534,25 @@ Which files must be read and edited to fulfill this instruction?"""
                 cwd=cwd_target,
                 title=f"Command ({cmd_obj.description or 'Console'})",
             )
+            # Console commands land in the same audited trail as registry tools.
+            try:
+                if not confirmed:
+                    pass  # skipped commands are recorded below via skipped result
+                else:
+                    from aztec_circle.tools.registry import ToolRegistry
+                    reg = getattr(self, "_tool_registry", None)
+                    if reg is None:
+                        reg = ToolRegistry(project_root=root)
+                        self._tool_registry = reg
+                    reg.audit_command(
+                        effective_cmd,
+                        cwd=cwd_target,
+                        ok=res.success,
+                        exit_code=res.exit_code,
+                        duration_seconds=res.duration_seconds,
+                    )
+            except Exception as audit_exc:
+                log.debug("patch_agent.audit_failed", error=str(audit_exc))
             return CommandExecutionResult(
                 command=effective_cmd,
                 description=cmd_obj.description,

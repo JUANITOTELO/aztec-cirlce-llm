@@ -147,6 +147,68 @@ async def test_peer_agent_tool_budget_exhaustion_takes_last_answer(project):
     assert isinstance(draft.architecture_overview, str)
 
 
+# ── Elder verification loop ──────────────────────────────────────────────────
+
+ELDER_REQUEST_TURN = json.dumps({
+    "tool_requests": [{"tool": "fs_read", "args": {"path": "src/server.py"}, "reason": "verify port claim"}],
+})
+ELDER_FINAL_VERDICT = json.dumps({
+    "status": "APPROVED",
+    "weighted_score": 9.0,
+    "audit_items": [{"criterion": "Accuracy", "weight": 1.0, "score": 9.0, "passed": True, "critique": "claims verified"}],
+    "critical_flaws": [],
+})
+
+
+@pytest.mark.asyncio
+async def test_elder_verifies_claims_against_real_files(project):
+    from aztec_circle.agents.elder import ElderAgent
+    from aztec_circle.domain.models import PeerDraftOutput, VerdictStatus
+
+    provider = ScriptedProvider([ELDER_REQUEST_TURN, ELDER_FINAL_VERDICT])
+    elder = ElderAgent(provider=provider, tool_registry=get_registry(str(project)), project_root=str(project))
+
+    draft = PeerDraftOutput(
+        architecture_overview="Server on port 8080",
+        implementation_code={"src/server.py": "# claims to configure PORT"},
+        mitigations_applied=[],
+        assumptions_made=[],
+    )
+    verdict = await elder.audit(draft, original_goal="build a server")
+
+    assert len(provider.calls) == 2
+    # Round 2 fed the real file contents back to the auditor.
+    results_msg = provider.calls[1][-1]["content"]
+    assert "TOOL RESULTS" in results_msg and "PORT = 8080" in results_msg
+    assert verdict.status == VerdictStatus.APPROVED
+    assert verdict.input_tokens >= 200  # both rounds folded in
+
+
+@pytest.mark.asyncio
+async def test_elder_without_tools_single_call(project):
+    from aztec_circle.agents.elder import ElderAgent
+    from aztec_circle.domain.models import PeerDraftOutput
+
+    provider = ScriptedProvider([ELDER_FINAL_VERDICT])
+    elder = ElderAgent(provider=provider)
+    draft = PeerDraftOutput(architecture_overview="x", implementation_code={}, mitigations_applied=[], assumptions_made=[])
+    await elder.audit(draft, original_goal="g")
+    assert len(provider.calls) == 1
+
+
+def test_audit_command_writes_external_entry(tmp_path):
+    from aztec_circle.tools.registry import ToolRegistry
+
+    reg = ToolRegistry(project_root=str(tmp_path))
+    reg.audit_command("npm test", cwd=str(tmp_path), ok=False, exit_code=1, duration_seconds=2.5)
+
+    audit = tmp_path / ".aztec" / "tool_audit.jsonl"
+    entry = json.loads(audit.read_text().splitlines()[0])
+    assert entry["tool"] == "console_command"
+    assert entry["ok"] is False and entry["exit_code"] == 1
+    assert entry["duration_ms"] == 2500.0
+
+
 # ── Orchestrator wiring ──────────────────────────────────────────────────────
 
 def test_orchestrator_passes_project_root_to_peer(project):
@@ -163,6 +225,8 @@ def test_orchestrator_passes_project_root_to_peer(project):
     assert orch.peer_agent.project_root == str(project)
     assert orch.peer_agent.tool_registry is not None
     assert orch.peer_agent.tool_registry.get("fs_read") is not None
+    # Auditors got the same live registry for claim verification.
+    assert all(e.tool_registry is not None and e.project_root == str(project) for e in orch.elder_agents)
 
 
 def test_orchestrator_without_root_leaves_peer_untouched():

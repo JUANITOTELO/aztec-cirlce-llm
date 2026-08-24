@@ -29,6 +29,8 @@ class ElderAgent(BaseAgent):
         model: Optional[str] = None,
         provider: Optional[Any] = None,
         thinking_budget: Optional[int] = None,
+        tool_registry: Optional[Any] = None,
+        project_root: Optional[str] = None,
     ):
         model_name = model or settings.ELDER_MODEL
         super().__init__(
@@ -41,6 +43,8 @@ class ElderAgent(BaseAgent):
         self.thinking_budget = (
             thinking_budget if thinking_budget is not None else settings.ELDER_THINKING_BUDGET
         )
+        self.tool_registry = tool_registry
+        self.project_root = project_root
 
     async def audit(
         self,
@@ -64,7 +68,15 @@ class ElderAgent(BaseAgent):
             "Audit this implementation thoroughly and return your verdict strictly adhering to the JSON schema."
         )
 
-        resp = await self._invoke_llm(
+        if self.tool_registry is not None and self.project_root:
+            user_message += (
+                "\n\nAUDITOR NOTE: You have live read access to the target project. "
+                "Where the draft makes claims about existing files, configuration, or "
+                "behavior, verify them with tools before trusting them — and treat any "
+                "claim you could not verify as a finding."
+            )
+
+        resp = await self._run_llm_maybe_with_tools(
             system_prompt=system_prompt,
             user_message=user_message,
             images=images,

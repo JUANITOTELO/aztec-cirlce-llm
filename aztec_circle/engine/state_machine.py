@@ -91,13 +91,17 @@ class AztecOrchestrator:
             except Exception as exc:
                 log.warning("orchestrator.plasticity_consensus_seed_failed", error=str(exc))
 
-        # ── Agentic tool access for the drafter ──────────────────────────
+        # ── Agentic tool access for the drafter AND the auditors ─────────
         self.project_root = project_root
         if project_root and settings.AGENT_TOOLS_ENABLED:
             try:
                 from aztec_circle.tools import get_registry
-                self.peer_agent.tool_registry = get_registry(project_root)
+                registry = get_registry(project_root)
+                self.peer_agent.tool_registry = registry
                 self.peer_agent.project_root = project_root
+                for elder in self.elder_agents:
+                    elder.tool_registry = registry
+                    elder.project_root = project_root
                 log.info("orchestrator.agent_tools_enabled", root=project_root)
             except Exception as exc:
                 log.warning("orchestrator.agent_tools_init_failed", error=str(exc))

@@ -155,18 +155,38 @@ class ToolRegistry:
 
     # ── Audit ────────────────────────────────────────────────────────────
     def audit(self, name: str, args: Dict[str, Any], safety: SafetyClass, result: ToolResult) -> None:
+        self._write_audit({
+            "tool": name,
+            "safety": safety.value,
+            "args": {k: (v if len(str(v)) < 200 else f"<{len(str(v))} chars>") for k, v in args.items()},
+            "ok": result.ok,
+            "exit_code": result.exit_code,
+            "duration_ms": result.duration_ms,
+        })
+
+    def audit_command(
+        self,
+        command: str,
+        cwd: str = "",
+        ok: bool = True,
+        exit_code: int = 0,
+        duration_seconds: float = 0.0,
+    ) -> None:
+        """Audit an externally-executed console command (agent-proposed)."""
+        self._write_audit({
+            "tool": "console_command",
+            "safety": "external",
+            "args": {"command": command[:500], "cwd": cwd},
+            "ok": ok,
+            "exit_code": exit_code,
+            "duration_ms": round(duration_seconds * 1000, 2),
+        })
+
+    def _write_audit(self, entry: Dict[str, Any]) -> None:
         try:
+            entry = {"ts": time.strftime("%Y-%m-%dT%H:%M:%S"), **entry}
             audit_path = Path(self.project_root) / AUDIT_FILE
             audit_path.parent.mkdir(parents=True, exist_ok=True)
-            entry = {
-                "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
-                "tool": name,
-                "safety": safety.value,
-                "args": {k: (v if len(str(v)) < 200 else f"<{len(str(v))} chars>") for k, v in args.items()},
-                "ok": result.ok,
-                "exit_code": result.exit_code,
-                "duration_ms": result.duration_ms,
-            }
             with open(audit_path, "a", encoding="utf-8") as fh:
                 fh.write(json.dumps(entry) + "\n")
         except OSError as exc:
