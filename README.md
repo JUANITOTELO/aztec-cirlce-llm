@@ -391,3 +391,11 @@ Custom tools persist as JSON definitions:
 - `~/.aztec/tools.d/*.json` — available everywhere
 
 The agents can grow their own toolset through the same `tool_create` meta-tool, with every definition reviewed through the safety gates above.
+
+### Agentic tool access (debates that inspect real code)
+
+When Aztec runs inside a real project, the **Peer drafter gains live tool access**: it may issue bounded `tool_requests` (default 2 rounds) to read files, search, inspect git state, or run the project's test suite before finalizing its draft.
+
+- `read_only` tools execute automatically; `mutating`/`dangerous` are denied unless an operator approval path is wired — the drafter is told and adapts.
+- Every round's token usage folds into session spend; the loop is hard-bounded so a tool-happy model can't spin.
+- Disable with `AGENT_TOOLS_ENABLED=false`, tune rounds with `AGENT_TOOLS_MAX_ROUNDS`.

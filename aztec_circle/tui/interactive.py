@@ -48,7 +48,20 @@ async def run_debate_session(
         fallback_policy=state.fallback_policy,
     )
     event_queue: asyncio.Queue = asyncio.Queue()
-    orchestrator = AztecOrchestrator(state=run_state, event_queue=event_queue, console=console)
+
+    # Give the drafter live tool access when a real project is present.
+    import os as _os
+    project_root: Optional[str] = None
+    candidate = state.output_dir if state.output_dir and state.output_dir != "./aztec_output" else None
+    if candidate and _os.path.isdir(candidate):
+        project_root = _os.path.abspath(candidate)
+
+    orchestrator = AztecOrchestrator(
+        state=run_state,
+        event_queue=event_queue,
+        console=console,
+        project_root=project_root,
+    )
 
     console.print(f"\n[bold cyan]Starting Aztec Debate for:[/bold cyan] {goal}")
     if state.attached_images:

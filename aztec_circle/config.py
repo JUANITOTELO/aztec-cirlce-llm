@@ -125,6 +125,10 @@ class Settings(BaseSettings):
     MODEL_DISCOVERY_TTL_HOURS: float = 6.0
     MODEL_DISCOVERY_TIMEOUT_SECONDS: float = 8.0
 
+    # Agentic tool access during debates (Peer drafter inspects real projects)
+    AGENT_TOOLS_ENABLED: bool = True
+    AGENT_TOOLS_MAX_ROUNDS: int = 2
+
     # MCP Client
     MCP_SERVER_URI: str = "http://localhost:8765"
     MCP_TOOL_TIMEOUT_SECONDS: float = 15.0

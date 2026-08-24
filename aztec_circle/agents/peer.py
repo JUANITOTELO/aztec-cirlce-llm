@@ -29,6 +29,8 @@ class PeerAgent(BaseAgent):
         model: Optional[str] = None,
         provider: Optional[Any] = None,
         mcp_client: Optional[MCPClient] = None,
+        tool_registry: Optional[Any] = None,
+        project_root: Optional[str] = None,
     ):
         model_name = model or settings.PEER_MODEL
         super().__init__(
@@ -38,6 +40,8 @@ class PeerAgent(BaseAgent):
             provider=provider,
         )
         self.mcp_client = mcp_client or MCPClient()
+        self.tool_registry = tool_registry
+        self.project_root = project_root
 
     async def run(
         self,
@@ -78,22 +82,68 @@ class PeerAgent(BaseAgent):
         if institutional_memory:
             user_content_parts.append(f"{institutional_memory}\n")
 
+        tool_ctx: Optional[Any] = None
+        if self.tool_registry is not None and self.project_root:
+            from aztec_circle.tools import ToolContext
+            from aztec_circle.tools.agent_bridge import build_tool_prompt, MAX_TOOL_ROUNDS
+
+            tool_ctx = ToolContext(project_root=self.project_root)
+            user_content_parts.append(
+                build_tool_prompt(self.tool_registry, max_rounds=settings.AGENT_TOOLS_MAX_ROUNDS)
+            )
+
         user_content_parts.append(
             "Synthesize architecture and write complete production implementation code addressing all requirements, risks, and visual reference images."
         )
         user_message = "\n".join(user_content_parts)
 
-        # Call LLM
-        resp = await self._invoke_llm(
-            system_prompt=system_prompt,
-            user_message=user_message,
-            images=images,
-            temperature=0.35,
-            on_chunk=on_chunk,
-        )
+        # ── LLM conversation (single-shot, or bounded tool loop) ────────────
+        from aztec_circle.adapters.image_utils import format_multimodal_content
 
-        data = extract_json_payload(resp.content)
-        return self._build_output(data, resp, loop_index)
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": format_multimodal_content(user_message, images=images)},
+        ]
+
+        total_prompt_tokens = 0
+        total_completion_tokens = 0
+        final_resp = None
+
+        rounds = settings.AGENT_TOOLS_MAX_ROUNDS + 1 if tool_ctx is not None else 1
+        for round_idx in range(rounds):
+            resp = await self.provider.complete(
+                messages=messages,
+                model=self.model,
+                temperature=0.35,
+                on_chunk=on_chunk,
+            )
+            total_prompt_tokens += resp.prompt_tokens
+            total_completion_tokens += resp.completion_tokens
+            final_resp = resp
+
+            if tool_ctx is None or round_idx >= rounds - 1:
+                break  # no tools, or budget exhausted — accept current answer
+
+            from aztec_circle.tools.agent_bridge import execute_tool_requests, parse_tool_requests, render_tool_results
+
+            requests = parse_tool_requests(resp.content)
+            if not requests:
+                break  # model produced its real deliverable
+
+            log.info("peer.tool_round", round=round_idx + 1, requested=[r["tool"] for r in requests])
+            results = await execute_tool_requests(requests, self.tool_registry, tool_ctx)  # type: ignore[arg-type]
+            messages.append({"role": "assistant", "content": resp.content})
+            messages.append({"role": "user", "content": render_tool_results(results)})
+
+        data = extract_json_payload(final_resp.content if final_resp else "")
+        draft = self._build_output(data, final_resp, loop_index)
+        # Fold earlier tool-round token usage into reported totals (the draft
+        # output only carries the final response's usage).
+        if final_resp is not None and rounds > 1:
+            draft.input_tokens += max(0, total_prompt_tokens - final_resp.prompt_tokens)
+            draft.output_tokens += max(0, total_completion_tokens - final_resp.completion_tokens)
+            draft.tokens_used = draft.input_tokens + draft.output_tokens
+        return draft
 
     def _build_output(
         self,
